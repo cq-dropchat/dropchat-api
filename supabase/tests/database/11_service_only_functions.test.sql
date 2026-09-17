@@ -45,6 +45,8 @@ insert into service_only values
   ('public.purge_expired_rows(integer)'),
   ('public.backfill_message_contents(jsonb)'),
   ('public.request_id_header()'),
+  ('public.pending_deletion_media(integer)'),
+  ('public.forget_deletion_media(uuid, text[])'),
   ('billing.renew_subscriptions(integer)'),
   ('billing.grant_included_products(uuid, text, timestamp with time zone)');
 

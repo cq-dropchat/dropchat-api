@@ -19,6 +19,13 @@ import { withRequestLogging } from "../_shared/logger.ts";
  * Bounded + restartable: at most MAX_DELETES_PER_RUN objects are removed per
  * invocation. Because it deletes what it lists (no offset), the next run simply
  * resumes where this one stopped.
+ *
+ * F18: first, the media of account-scoped deletions. The organization survives
+ * those, so the folder sweep never reaches them; sweep_deletions records the
+ * objects the deleted messages referenced (public.deletion_media) and this
+ * removes the ones no remaining message of the organization uses. Objects are
+ * content-addressed, so a shared one is kept. Removing an object already gone
+ * is a no-op, so a run that dies before forgetting its rows is safe to repeat.
  */
 
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -109,6 +116,70 @@ async function drainPrefix(
   return removed;
 }
 
+type PendingMedia = {
+  organization_id: string;
+  object_name: string;
+  referenced: boolean;
+};
+
+/** F18: removes unreferenced objects recorded by account deletions. */
+async function sweepDeletedAccountMedia(
+  client: SupabaseClient,
+  budget: Budget,
+): Promise<{ removed: number; kept: number }> {
+  let removed = 0;
+  let kept = 0;
+
+  while (budget.left > 0) {
+    const limit = Math.min(LIST_LIMIT, budget.left);
+    const { data, error } = await client.rpc("pending_deletion_media", {
+      _limit: limit,
+    });
+    if (error) throw error;
+
+    const rows = (data ?? []) as PendingMedia[];
+    if (rows.length === 0) break;
+
+    const byOrg = new Map<string, PendingMedia[]>();
+    for (const row of rows) {
+      byOrg.set(row.organization_id, [
+        ...(byOrg.get(row.organization_id) ?? []),
+        row,
+      ]);
+    }
+
+    for (const [organizationId, media] of byOrg) {
+      const prefix = `organizations/${organizationId}/`;
+      const unreferenced = media
+        .filter((m) => !m.referenced && m.object_name.startsWith(prefix))
+        .map((m) => m.object_name);
+      kept += media.length - unreferenced.length;
+
+      if (unreferenced.length > 0) {
+        const { data: gone, error: removeError } = await client.storage
+          .from(BUCKET)
+          .remove(unreferenced);
+        if (removeError) throw removeError;
+        removed += gone?.length ?? 0;
+      }
+
+      const { error: forgetError } = await client.rpc(
+        "forget_deletion_media",
+        {
+          _organization_id: organizationId,
+          _object_names: media.map((m) => m.object_name),
+        },
+      );
+      if (forgetError) throw forgetError;
+    }
+
+    budget.left -= rows.length;
+    if (rows.length < limit) break;
+  }
+
+  return { removed, kept };
+}
+
 export async function handler(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
@@ -118,12 +189,19 @@ export async function handler(req: Request): Promise<Response> {
   }
 
   const client = createUnsecureClient();
+  const budget: Budget = { left: MAX_DELETES_PER_RUN };
+
+  // 0. F18: objects of deleted accounts that nothing references any more.
+  const account_media = await sweepDeletedAccountMedia(client, budget);
+  if (account_media.removed > 0 || account_media.kept > 0) {
+    log.info("storage-gc deleted-account media", account_media);
+  }
 
   // 1. Which org folders currently exist in storage?
   const orgFolders = await listOrgFolders(client);
 
   if (orgFolders.length === 0) {
-    return Response.json({ orphans: 0, removed: 0, done: true });
+    return Response.json({ orphans: 0, removed: 0, done: true, account_media });
   }
 
   // 2. Which of those orgs are gone? (one round-trip)
@@ -137,13 +215,12 @@ export async function handler(req: Request): Promise<Response> {
   const orphans = orgFolders.filter((id) => !existingIds.has(id));
 
   if (orphans.length === 0) {
-    return Response.json({ orphans: 0, removed: 0, done: true });
+    return Response.json({ orphans: 0, removed: 0, done: true, account_media });
   }
 
   // 3. Drain each orphan up to the per-run budget. Triggers on storage.objects
   //    fire per row; billing.update_storage_usage() skips usage accounting when
   //    the org no longer exists, so these deletes never touch billing.
-  const budget: Budget = { left: MAX_DELETES_PER_RUN };
   let removed = 0;
   let drained = 0;
 
@@ -161,7 +238,13 @@ export async function handler(req: Request): Promise<Response> {
     done,
   });
 
-  return Response.json({ orphans: orphans.length, drained, removed, done });
+  return Response.json({
+    orphans: orphans.length,
+    drained,
+    removed,
+    done,
+    account_media,
+  });
 }
 
 if (import.meta.main) {

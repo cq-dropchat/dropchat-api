@@ -1,61 +1,69 @@
--- F18. The sweep behind public.deletion_requests (03-18).
---
--- request_address_deletion  files an account-scoped request (Meta's
---                           data-deletion callback) and disconnects the
---                           account at once. The organization-scoped
---                           request comes from DELETE on organizations
---                           (request_organization_deletion).
--- sweep_deletions           what the `sweep-deletions` pg_cron job runs
---                           every minute: the oldest pending request, at most
---                           `_budget` rows per run, children first (messages,
---                           conversations, contacts, logs, webhook
---                           deliveries), then the account or organization row
---                           itself, whose remaining cascade is small.
 
-create function public.request_address_deletion(
-  _organization_id uuid,
-  _service public.service,
-  _address text,
-  _source text
-) returns uuid
-language plpgsql
-security definer
-set search_path to ''
-as $$
+  create table "public"."deletion_media" (
+    "request_id" uuid not null,
+    "organization_id" uuid not null,
+    "object_name" text not null,
+    "created_at" timestamp with time zone not null default now()
+      );
+
+
+alter table "public"."deletion_media" enable row level security;
+
+CREATE INDEX deletion_media_organization_object_idx ON public.deletion_media USING btree (organization_id, object_name);
+
+CREATE UNIQUE INDEX deletion_media_pkey ON public.deletion_media USING btree (request_id, object_name);
+
+alter table "public"."deletion_media" add constraint "deletion_media_pkey" PRIMARY KEY using index "deletion_media_pkey";
+
+set check_function_bodies = off;
+
+CREATE OR REPLACE FUNCTION public.forget_deletion_media(_organization_id uuid, _object_names text[])
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 declare
-  _id uuid;
+  _n integer;
 begin
-  insert into public.deletion_requests (organization_id, service, address, source)
-  values (_organization_id, _service, _address, _source)
-  on conflict (organization_id, service, address) where completed_at is null
-  do nothing
-  returning id into _id;
-
-  if _id is null then
-    select r.id into _id
-    from public.deletion_requests r
-    where r.organization_id = _organization_id
-      and r.service = _service
-      and r.address = _address
-      and r.completed_at is null;
-  end if;
-
-  update public.organizations_addresses
-  set status = 'deleting'
-  where organization_id = _organization_id
-    and service = _service
-    and address = _address;
-
-  return _id;
+  delete from public.deletion_media dm
+  where dm.organization_id = _organization_id
+    and dm.object_name = any (_object_names);
+  get diagnostics _n = row_count;
+  return _n;
 end;
-$$;
+$function$
+;
 
-create function public.sweep_deletions(_budget integer default 5000)
-returns jsonb
-language plpgsql
-security definer
-set search_path to ''
-as $$
+CREATE OR REPLACE FUNCTION public.pending_deletion_media(_limit integer DEFAULT 1000)
+ RETURNS TABLE(organization_id uuid, object_name text, referenced boolean)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select p.organization_id, p.object_name,
+    exists (
+      select 1 from public.messages m
+      where m.content -> 'file' ->> 'uri' = 'internal://media/' || p.object_name
+        and m.organization_id = p.organization_id
+    )
+  from (
+    select dm.organization_id, dm.object_name, min(dm.created_at) as created_at
+    from public.deletion_media dm
+    group by dm.organization_id, dm.object_name
+    order by min(dm.created_at), dm.object_name
+    limit _limit
+  ) p
+  order by p.created_at, p.object_name;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.sweep_deletions(_budget integer DEFAULT 5000)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 declare
   _req public.deletion_requests;
   _left integer := _budget;
@@ -196,59 +204,28 @@ begin
 
   return jsonb_build_object('request', _req.id, 'deleted', _deleted, 'completed', true);
 end;
-$$;
+$function$
+;
 
--- F18. The recorded objects storage-gc may act on, oldest first, one row per
--- object: `referenced` is whether a message of the organization still points
--- at it (messages_file_uri_idx), in which case it is kept and only forgotten.
-create function public.pending_deletion_media(_limit integer default 1000)
-returns table (organization_id uuid, object_name text, referenced boolean)
-language sql
-stable
-security definer
-set search_path to ''
-as $$
-  select p.organization_id, p.object_name,
-    exists (
-      select 1 from public.messages m
-      where m.content -> 'file' ->> 'uri' = 'internal://media/' || p.object_name
-        and m.organization_id = p.organization_id
-    )
-  from (
-    select dm.organization_id, dm.object_name, min(dm.created_at) as created_at
-    from public.deletion_media dm
-    group by dm.organization_id, dm.object_name
-    order by min(dm.created_at), dm.object_name
-    limit _limit
-  ) p
-  order by p.created_at, p.object_name;
-$$;
+grant delete on table "public"."deletion_media" to "service_role";
 
--- F18. Drops the rows of objects storage-gc has handled (removed, or kept
--- because they are still referenced), across every request that named them.
-create function public.forget_deletion_media(_organization_id uuid, _object_names text[])
-returns integer
-language plpgsql
-security definer
-set search_path to ''
-as $$
-declare
-  _n integer;
-begin
-  delete from public.deletion_media dm
-  where dm.organization_id = _organization_id
-    and dm.object_name = any (_object_names);
-  get diagnostics _n = row_count;
-  return _n;
-end;
-$$;
+grant insert on table "public"."deletion_media" to "service_role";
 
+grant references on table "public"."deletion_media" to "service_role";
+
+grant select on table "public"."deletion_media" to "service_role";
+
+grant trigger on table "public"."deletion_media" to "service_role";
+
+grant truncate on table "public"."deletion_media" to "service_role";
+
+grant update on table "public"."deletion_media" to "service_role";
+
+
+
+-- Hand-written (db diff does not model these revokes): service role only.
+revoke all on table public.deletion_media from anon, authenticated;
 revoke execute on function public.pending_deletion_media(integer) from public, anon, authenticated;
 revoke execute on function public.forget_deletion_media(uuid, text[]) from public, anon, authenticated;
 grant execute on function public.pending_deletion_media(integer) to service_role;
 grant execute on function public.forget_deletion_media(uuid, text[]) to service_role;
-
-revoke execute on function public.request_organization_deletion() from public, anon, authenticated;
-revoke execute on function public.request_address_deletion(uuid, public.service, text, text) from public, anon, authenticated;
-revoke execute on function public.sweep_deletions(integer) from public, anon, authenticated;
-grant execute on function public.request_address_deletion(uuid, public.service, text, text) to service_role;

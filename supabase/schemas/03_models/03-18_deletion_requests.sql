@@ -43,3 +43,32 @@ where completed_at is null;
 alter table public.deletion_requests enable row level security;
 
 revoke all on table public.deletion_requests from anon, authenticated;
+
+-- F18. The Storage objects an account-scoped deletion's messages referenced.
+-- The organization survives an account deletion, so storage-gc's sweep of
+-- deleted organizations' folders never reaches these; and objects are
+-- content-addressed (organizations/<org>/attachments/<sha256>), so another
+-- account of the organization may still use one. sweep_deletions records
+-- them while it deletes; storage-gc removes those no message references any
+-- more (pending_deletion_media) and forgets the rows (forget_deletion_media).
+--
+-- Service role only.
+create table public.deletion_media (
+  request_id uuid not null,
+  organization_id uuid not null,
+  -- The object name in the `media` bucket: organizations/<org>/attachments/…
+  object_name text not null,
+  created_at timestamp with time zone default now() not null
+);
+
+alter table only public.deletion_media
+add constraint deletion_media_pkey
+primary key (request_id, object_name);
+
+create index deletion_media_organization_object_idx
+on public.deletion_media
+using btree (organization_id, object_name);
+
+alter table public.deletion_media enable row level security;
+
+revoke all on table public.deletion_media from anon, authenticated;

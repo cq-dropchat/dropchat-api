@@ -912,6 +912,27 @@ export type Database = {
           },
         ]
       }
+      deletion_media: {
+        Row: {
+          created_at: string
+          object_name: string
+          organization_id: string
+          request_id: string
+        }
+        Insert: {
+          created_at?: string
+          object_name: string
+          organization_id: string
+          request_id: string
+        }
+        Update: {
+          created_at?: string
+          object_name?: string
+          organization_id?: string
+          request_id?: string
+        }
+        Relationships: []
+      }
       deletion_requests: {
         Row: {
           address: string | null
@@ -1511,6 +1532,10 @@ export type Database = {
         Returns: number
       }
       edge_functions_config: { Args: never; Returns: Record<string, unknown> }
+      forget_deletion_media: {
+        Args: { _object_names: string[]; _organization_id: string }
+        Returns: number
+      }
       get_authorized_orgs: {
         Args: { role?: Database["public"]["Enums"]["role"] }
         Returns: string[]
@@ -1556,6 +1581,14 @@ export type Database = {
         Returns: Json
       }
       message_rate_limit_per_minute: { Args: never; Returns: number }
+      pending_deletion_media: {
+        Args: { _limit?: number }
+        Returns: {
+          object_name: string
+          organization_id: string
+          referenced: boolean
+        }[]
+      }
       pending_dispatch_candidates: {
         Args: never
         Returns: {

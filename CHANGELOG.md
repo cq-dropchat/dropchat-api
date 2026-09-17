@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Deleting an account also deletes its attachments** (F18). When one account
+  is deleted (Meta's data-deletion callback), the attachments its messages
+  referenced are now removed from Storage by the hourly `storage-gc` run, unless
+  another message of the organization still uses the same file (attachments are
+  stored once per content). Before, they stayed in Storage for as long as the
+  organization existed. Legacy (v0) media references are not covered.
+
 - **Billing periods renew** (F17). A pg_cron job (`renew-subscriptions`, every 5
   minutes) renews every subscription whose `current_period_end` has passed: the
   period advances to the current one (missed periods are skipped, not granted),
