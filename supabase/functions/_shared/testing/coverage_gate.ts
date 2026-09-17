@@ -17,12 +17,12 @@
 //   --min-handlers N   lines % over every other file
 //   --min-lines N      lines % over all files
 
-// Ratchet (end of phase 4): reached − 2, rounded down. Reached: _shared
-// 74.4 %, handlers 54.3 %, all 57.6 %. Never lowered.
-// (Phase 3: 66 / 29 / 35.)
-const DEFAULT_MIN_SHARED = 72;
-const DEFAULT_MIN_HANDLERS = 52;
-const DEFAULT_MIN_LINES = 55;
+// Ratchet (end of phase 5): reached − 2, rounded down. Reached: _shared
+// 76.2 %, handlers 57.9 %, all 60.7 %. Never lowered.
+// (Phase 4: 72 / 52 / 55. Phase 3: 66 / 29 / 35.)
+const DEFAULT_MIN_SHARED = 74;
+const DEFAULT_MIN_HANDLERS = 55;
+const DEFAULT_MIN_LINES = 58;
 
 type Totals = { found: number; hit: number };
 
