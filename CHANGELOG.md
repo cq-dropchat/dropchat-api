@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Message caps and a rate limit apply to API roles** (F09). An API key or a
+  signed-in member is capped on every armed row it inserts into `messages`,
+  whatever its shape (rows shaped like inbound used to skip the plan cap). Real
+  inbound traffic from the service role is never capped. New per-organization
+  rate limit for API roles: 120 armed inserts per minute
+  (`public.message_rate_limit_per_minute()`); past it PostgREST answers
+  `429 Too Many Requests` (SQLSTATE `PT429`) with a retry hint. Counters live in
+  `public.rate_limits` (service role only).
+
 - **`messages.external_id` is unique per organization** (F03), not across the
   table: `messages_external_id_key` is replaced by the unique index
   `messages_org_external_id_key (organization_id, external_id)`. Two tenants can

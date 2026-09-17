@@ -844,3 +844,64 @@ begin
   return new;
 end;
 $$;
+
+-- F09. How many armed message inserts an API role may make per organization
+-- per minute. A function rather than a setting so the tests can read it and
+-- a tuning change stays a one-line migration. The service role (webhooks,
+-- dispatchers, crons) is never counted: a burst of real traffic is not
+-- abuse.
+create function public.message_rate_limit_per_minute() returns integer
+language sql
+immutable
+as $$
+  select 120;
+$$;
+
+-- F09. Before-insert guard on messages for API roles (anon = API key,
+-- authenticated = a signed-in member). Counts armed rows per organization
+-- per minute in public.rate_limits and refuses with SQLSTATE PT429 — which
+-- PostgREST turns into HTTP 429 Too Many Requests — past the limit.
+--
+-- Why a trigger and not a PostgREST pre-request hook: the trigger sees the
+-- row's organization_id, runs for every write path PostgREST fronts (REST,
+-- RPC, bulk inserts row by row) and is exercised by pgTAP.
+create function public.check_message_rate_limit() returns trigger
+language plpgsql
+security definer
+set search_path to ''
+as $$
+declare
+  _window timestamp with time zone := date_trunc('minute', now());
+  _count integer;
+begin
+  -- auth.role() is the JWT claim PostgREST sets — 'anon' for an API key,
+  -- 'authenticated' for a member, 'service_role' for the service key. Not
+  -- current_role: inside a SECURITY DEFINER function that is the owner.
+  if coalesce(auth.role(), '') not in ('anon', 'authenticated') then
+    return new;
+  end if;
+
+  insert into public.rate_limits (organization_id, scope, window_start, count)
+  values (new.organization_id, 'messages', _window, 1)
+  on conflict (organization_id, scope, window_start)
+  do update set count = public.rate_limits.count + 1, updated_at = now()
+  returning count into _count;
+
+  if _count > public.message_rate_limit_per_minute() then
+    raise exception 'Rate limit exceeded: % messages per minute per organization',
+      public.message_rate_limit_per_minute()
+      using errcode = 'PT429',
+        hint = 'retry after the current minute ends';
+  end if;
+
+  -- First hit of a new minute: sweep this organization's stale windows.
+  if _count = 1 then
+    delete from public.rate_limits r
+    where r.organization_id = new.organization_id
+      and r.scope = 'messages'
+      and r.window_start < now() - interval '1 hour';
+  end if;
+
+  return new;
+end;
+$$;

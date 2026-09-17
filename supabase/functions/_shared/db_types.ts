@@ -1127,6 +1127,38 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          count: number
+          organization_id: string
+          scope: string
+          updated_at: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          organization_id: string
+          scope: string
+          updated_at?: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          organization_id?: string
+          scope?: string
+          updated_at?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rate_limits_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       secrets: {
         Row: {
           address: string | null
@@ -1288,6 +1320,7 @@ export type Database = {
         Args: { object: Json; path: string[]; target: Json }
         Returns: Json
       }
+      message_rate_limit_per_minute: { Args: never; Returns: number }
       reject_invitation: { Args: { invitation_id: string }; Returns: undefined }
     }
     Enums: {

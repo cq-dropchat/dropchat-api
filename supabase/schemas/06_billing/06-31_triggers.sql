@@ -8,22 +8,18 @@ execute function billing.initialize_subscription();
 -- Check billing limit before message insert
 -- Named to sort before "handle_new_message" (alphabetical trigger execution)
 --
--- Only sendable rows are capped — the same three facts that arm
--- handle_outgoing_message_to_dispatcher (account-authored, pending, not
--- record-only). Inbound is what the org's CONTACTS sent: blocking it loses
--- data and 500s the shared Meta webhook, so it never trips the cap (usage
--- still counts it). The status conditions also exempt receipt merges and
--- history/echo imports, which carry an explicit final status.
+-- Armed rows only (status.pending): receipt merges and history/echo imports
+-- carry an explicit final status and are exempt. Which armed rows count is
+-- billing.check_message_limit's call — sendable rows always, and every row
+-- an API role inserts (F09); real inbound from the service role never.
 create trigger check_billing_message_limit
 before insert
 on public.messages
 for each row
 when (
-  new.sender_address is null
-  and (new.status ->> 'pending') is not null
-  and new.content ->> 'internal' is null
+  (new.status ->> 'pending') is not null
 )
-execute function billing.check_product_limit();
+execute function billing.check_message_limit();
 
 -- Update message usage after insert (only recent, excludes history sync)
 create trigger update_billing_message_usage

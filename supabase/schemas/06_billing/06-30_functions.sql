@@ -138,6 +138,37 @@ begin
 end;
 $$;
 
+-- Messages: which rows count against the cap (F09).
+--
+-- Sendable rows always do — account-authored, armed, not record-only: the
+-- same three facts that arm handle_outgoing_message_to_dispatcher. Inbound
+-- rows written by the service role (the webhooks) never do: blocking what a
+-- contact said loses data and 500s the shared Meta webhook.
+--
+-- An API role (anon = API key, authenticated = signed-in member) is capped
+-- on EVERY armed row it inserts, whatever its shape. Before this rule a
+-- member key inserted rows shaped like inbound (sender_address set) without
+-- limit: each one skipped the cap, woke agent-client and an LLM call, and
+-- landed in the shared pg_net queue.
+create function billing.check_message_limit() returns trigger
+language plpgsql
+security definer
+set search_path to ''
+as $$
+begin
+  -- auth.role(): the JWT claim, not current_role — this function is
+  -- SECURITY DEFINER, so current_role would be its owner.
+  if (
+    new.sender_address is null
+    and new.content ->> 'internal' is null
+  ) or coalesce(auth.role(), '') in ('anon', 'authenticated') then
+    perform billing.check_limit(new.organization_id, 'messages');
+  end if;
+
+  return new;
+end;
+$$;
+
 -- Generic trigger: check limit before insert.
 -- Product id is derived from the table name (e.g. messages, conversations).
 create function billing.check_product_limit() returns trigger
