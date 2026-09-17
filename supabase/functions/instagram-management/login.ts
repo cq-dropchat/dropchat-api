@@ -546,20 +546,90 @@ export async function disconnect(
 }
 
 /**
- * Deletes the stored data for an Instagram account (data deletion request).
- * The IG-scoped `user_id` from the signed request is the value we store as the
- * organizations_addresses `address`.
+ * The organization that owns an Instagram account for Meta's callbacks: the
+ * newest row by created_at, whatever its status. Several organizations can
+ * hold a row for one account (connecting it elsewhere takes the connection
+ * over without touching the older row), and the newest is the one
+ * instagram-webhook routes to. Status is ignored because Meta usually sends
+ * the deauthorize — which disconnects the owner — before the data-deletion
+ * request (F18).
+ */
+async function findInstagramOwner(
+  client: Client,
+  ig_user_id: string,
+): Promise<string | null> {
+  const { data } = await client
+    .from("organizations_addresses")
+    .select("organization_id")
+    .eq("service", "instagram")
+    .eq("address", ig_user_id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+    .throwOnError();
+
+  return data?.organization_id ?? null;
+}
+
+/** Deauthorize callback: disconnects the owning organization's account. */
+export async function deauthorizeInstagram(
+  client: Client,
+  ig_user_id: string,
+): Promise<void> {
+  const organization_id = await findInstagramOwner(client, ig_user_id);
+  if (!organization_id) return;
+
+  await client
+    .from("organizations_addresses")
+    .update({ status: "disconnected" })
+    .eq("organization_id", organization_id)
+    .eq("service", "instagram")
+    .eq("address", ig_user_id)
+    .throwOnError();
+}
+
+/**
+ * Data-deletion callback (F18): files a deletion request for the owning
+ * organization's account and returns its id, the confirmation code Meta
+ * shows the user. The account is disconnected at once; pg_cron's
+ * sweep_deletions removes its conversations and messages in batches. Null
+ * when no organization holds the account.
  */
 export async function deleteInstagramData(
   client: Client,
   ig_user_id: string,
-): Promise<void> {
-  await client
-    .from("organizations_addresses")
-    .delete()
-    .eq("address", ig_user_id)
-    .eq("service", "instagram")
+): Promise<string | null> {
+  const organization_id = await findInstagramOwner(client, ig_user_id);
+  if (!organization_id) return null;
+
+  const { data } = await client
+    .rpc("request_address_deletion", {
+      _organization_id: organization_id,
+      _service: "instagram",
+      _address: ig_user_id,
+      _source: "meta_data_deletion",
+    })
     .throwOnError();
+
+  return data;
+}
+
+/** State of a data-deletion request, for Meta's status URL. */
+export async function getDeletionStatus(
+  client: Client,
+  confirmation_code: string,
+): Promise<"pending" | "completed" | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(confirmation_code)) return null;
+
+  const { data } = await client
+    .from("deletion_requests")
+    .select("completed_at")
+    .eq("id", confirmation_code)
+    .maybeSingle()
+    .throwOnError();
+
+  if (!data) return null;
+  return data.completed_at ? "completed" : "pending";
 }
 
 type SignedRequest = {

@@ -896,6 +896,42 @@ export type Database = {
           },
         ]
       }
+      deletion_requests: {
+        Row: {
+          address: string | null
+          completed_at: string | null
+          deleted_rows: number
+          id: string
+          organization_id: string
+          requested_at: string
+          service: Database["public"]["Enums"]["service"] | null
+          source: string
+          started_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          completed_at?: string | null
+          deleted_rows?: number
+          id?: string
+          organization_id: string
+          requested_at?: string
+          service?: Database["public"]["Enums"]["service"] | null
+          source: string
+          started_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          completed_at?: string | null
+          deleted_rows?: number
+          id?: string
+          organization_id?: string
+          requested_at?: string
+          service?: Database["public"]["Enums"]["service"] | null
+          source?: string
+          started_at?: string | null
+        }
+        Relationships: []
+      }
       invitations: {
         Row: {
           created_at: string
@@ -1130,6 +1166,7 @@ export type Database = {
       organizations: {
         Row: {
           created_at: string
+          deletion_requested_at: string | null
           extra: Json | null
           id: string
           name: string
@@ -1137,6 +1174,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deletion_requested_at?: string | null
           extra?: Json | null
           id?: string
           name: string
@@ -1144,6 +1182,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deletion_requested_at?: string | null
           extra?: Json | null
           id?: string
           name?: string
@@ -1546,7 +1585,17 @@ export type Database = {
         Args: { _conversation_id: string; _message_id: string }
         Returns: string
       }
+      request_address_deletion: {
+        Args: {
+          _address: string
+          _organization_id: string
+          _service: Database["public"]["Enums"]["service"]
+          _source: string
+        }
+        Returns: string
+      }
       settle_webhook_deliveries: { Args: never; Returns: number }
+      sweep_deletions: { Args: { _budget?: number }; Returns: Json }
       webhook_max_attempts: { Args: never; Returns: number }
       webhook_retry_delay: { Args: { attempt: number }; Returns: string }
     }

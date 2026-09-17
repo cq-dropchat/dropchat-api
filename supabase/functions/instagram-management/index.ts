@@ -14,8 +14,10 @@ import {
 } from "../_shared/supabase.ts";
 import {
   buildAuthorizeUrl,
+  deauthorizeInstagram,
   deleteInstagramData,
   disconnect,
+  getDeletionStatus,
   type InstagramLoginPayload,
   parseSignedRequest,
   performInstagramLogin,
@@ -409,11 +411,7 @@ app.post("/instagram-management/deauthorize", async (c) => {
 
   const client = createUnsecureClient();
 
-  await client
-    .from("organizations_addresses")
-    .update({ status: "disconnected" })
-    .eq("address", payload.user_id)
-    .eq("service", "instagram");
+  await deauthorizeInstagram(client, payload.user_id);
 
   return c.json({ success: true });
 });
@@ -435,10 +433,17 @@ app.post("/instagram-management/data-deletion", async (c) => {
   log.info("Instagram data deletion request", { user_id: payload.user_id });
 
   const client = createUnsecureClient();
-  await deleteInstagramData(client, payload.user_id);
+  const request_id = await deleteInstagramData(client, payload.user_id);
+
+  if (!request_id) {
+    log.info("No organization holds the Instagram account", {
+      user_id: payload.user_id,
+    });
+  }
 
   // Meta requires a JSON response with a status URL and a confirmation code.
-  const confirmation_code = crypto.randomUUID();
+  // The code is the deletion request's id, so the status URL can report it.
+  const confirmation_code = request_id ?? crypto.randomUUID();
   const origin = new URL(c.req.url).origin;
   const url =
     `${origin}/instagram-management/data-deletion/status?code=${confirmation_code}`;
@@ -446,13 +451,16 @@ app.post("/instagram-management/data-deletion", async (c) => {
   return c.json({ url, confirmation_code });
 });
 
-app.get("/instagram-management/data-deletion/status", (c) => {
-  const code = c.req.query("code");
+app.get("/instagram-management/data-deletion/status", async (c) => {
+  const code = c.req.query("code") ?? "";
 
-  return c.json({
-    status: "Instagram data deletion request processed.",
-    confirmation_code: code,
-  });
+  const status = await getDeletionStatus(createUnsecureClient(), code);
+
+  if (!status) {
+    return c.json({ status: "unknown", confirmation_code: code }, 404);
+  }
+
+  return c.json({ status, confirmation_code: code });
 });
 
 // Exported for tests; served only as the entry module (edge runtime).

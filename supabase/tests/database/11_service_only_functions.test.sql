@@ -39,7 +39,9 @@ insert into service_only values
   ('public.dispatch_webhook_deliveries(integer)'),
   ('public.deliver_webhooks()'),
   ('public.begin_agent_turn(uuid, uuid, timestamp with time zone)'),
-  ('public.claim_agent_turn(uuid, uuid)');
+  ('public.claim_agent_turn(uuid, uuid)'),
+  ('public.request_address_deletion(uuid, public.service, text, text)'),
+  ('public.sweep_deletions(integer)');
 
 select is(
   (select array_agg(fn order by fn) from service_only
@@ -55,7 +57,7 @@ select is(
 );
 select ok(
   (select bool_and(has_function_privilege('service_role', fn::regprocedure, 'execute')) from service_only
-   where fn not like '%agent_turn%'),
+   where fn not like '%agent_turn%' and fn not like '%sweep_deletions%'),
   'service_role still executes them'
 );
 

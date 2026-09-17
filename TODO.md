@@ -51,10 +51,12 @@ Monetization
       a queue table (pgmq) with attempt-count + backoff. Enqueue is already
       durable/transactional; only redelivery is missing.
 
-- [ ] Batched/async mass deletions — org delete cascades to 15 tables, account
-      delete cascades conversations+messages, and the Meta data-deletion
-      callback fires it unauthenticated. Mark + reap in pg_cron instead of one
-      transaction.
+- [x] Batched/async mass deletions — mark + sweep in pg_cron (F18):
+      `deletion_requests`, `sweep_deletions` every minute (5,000 rows/run). The
+      Meta callbacks verify `signed_request` and act on the owning organization
+      only. Still open: organization deletion leaves the media files in Storage
+      (needs the Storage API, not SQL), and there is no per-organization export
+      yet.
 
 - [ ] Move the RLS helpers out of `public`.
 

@@ -29,6 +29,12 @@ begin
     -- A deleted agent is a former member: this is what makes marking the row
     -- revoke access rather than merely rename it.
     and a.deleted_at is null
+    -- F18: an organization whose deletion was requested is gone for every
+    -- reader at once; the sweep removes its rows later, in batches.
+    and not exists (
+      select 1 from public.organizations o
+      where o.id = a.organization_id and o.deletion_requested_at is not null
+    )
     and (
       case a.role
         when 'owner' then 3
@@ -65,6 +71,10 @@ begin
       )
     )
     and (a.expires_at is null or a.expires_at > now())
+    and not exists (
+      select 1 from public.organizations o
+      where o.id = a.organization_id and o.deletion_requested_at is not null
+    )
     and (
       case (a.role::text)
         when 'owner' then 3

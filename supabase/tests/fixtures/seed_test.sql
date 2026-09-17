@@ -163,8 +163,14 @@ where bucket_id = 'media'
   and name in (tests.val('media_a'), tests.val('media_b'));
 reset storage.allow_delete_query;
 
+-- F18: a DELETE on organizations files a deletion request unless it runs as
+-- the sweep does. Also clear requests left behind by earlier runs.
+set app.deletion_sweep = 'on';
 delete from public.organizations
 where id in (tests.id('org_a'), tests.id('org_b'));
+reset app.deletion_sweep;
+delete from public.deletion_requests
+where organization_id in (tests.id('org_a'), tests.id('org_b'));
 
 delete from auth.users
 where id in (tests.id('user_alice'), tests.id('user_amber'), tests.id('user_bob'));

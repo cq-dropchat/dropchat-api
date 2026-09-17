@@ -920,3 +920,39 @@ begin
   return new;
 end;
 $$;
+
+-- F18. An organization is not deleted in the deleting transaction: the
+-- DELETE files a deletion request, marks the row (get_authorized_orgs stops
+-- returning it, so every reader loses it at once), disconnects its accounts
+-- so ingestion stops feeding it, and is cancelled. sweep_deletions removes
+-- the data in batches and deletes the row with app.deletion_sweep set,
+-- which is the only DELETE this lets through.
+--
+-- RLS still decides who may delete (owners); a repeated DELETE finds the
+-- pending request and files nothing new.
+create function public.request_organization_deletion() returns trigger
+language plpgsql
+security definer
+set search_path to ''
+as $$
+begin
+  if current_setting('app.deletion_sweep', true) = 'on' then
+    return old;
+  end if;
+
+  insert into public.deletion_requests (organization_id, source)
+  values (old.id, 'owner')
+  on conflict (organization_id, service, address) where completed_at is null
+  do nothing;
+
+  update public.organizations
+  set deletion_requested_at = coalesce(deletion_requested_at, now())
+  where id = old.id;
+
+  update public.organizations_addresses
+  set status = 'deleting'
+  where organization_id = old.id;
+
+  return null;
+end;
+$$;
