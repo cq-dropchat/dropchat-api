@@ -1,0 +1,556 @@
+export const snapshot = {};
+
+snapshot[`F29: SQL tools with the postgres driver (characterization) > definitions 1`] = `
+[
+  {
+    description: "Get database schema information including tables, columns, constraints, and enums.",
+    inputSchema: {
+      "\$schema": "https://json-schema.org/draft/2020-12/schema",
+      additionalProperties: false,
+      properties: {
+        schemas: {
+          description: "Optional: schema names to include.",
+          items: {
+            type: "string",
+          },
+          type: "array",
+        },
+      },
+      type: "object",
+    },
+    name: "getDbSchema",
+    outputSchema: {
+      "\$schema": "https://json-schema.org/draft/2020-12/schema",
+      additionalProperties: false,
+      properties: {
+        enums: {
+          items: {
+            additionalProperties: false,
+            properties: {
+              name: {
+                type: "string",
+              },
+              schema: {
+                type: "string",
+              },
+              values: {
+                items: {
+                  type: "string",
+                },
+                type: "array",
+              },
+            },
+            required: [
+              "schema",
+              "name",
+              "values",
+            ],
+            type: "object",
+          },
+          type: "array",
+        },
+        tables: {
+          items: {
+            additionalProperties: false,
+            properties: {
+              columns: {
+                items: {
+                  additionalProperties: false,
+                  properties: {
+                    comment: {
+                      type: "string",
+                    },
+                    default: {
+                      type: "string",
+                    },
+                    name: {
+                      type: "string",
+                    },
+                    nullable: {
+                      type: "boolean",
+                    },
+                    type: {
+                      type: "string",
+                    },
+                  },
+                  required: [
+                    "name",
+                    "type",
+                    "nullable",
+                  ],
+                  type: "object",
+                },
+                type: "array",
+              },
+              comment: {
+                type: "string",
+              },
+              constraints: {
+                items: {
+                  anyOf: [
+                    {
+                      additionalProperties: false,
+                      properties: {
+                        columns: {
+                          items: {
+                            type: "string",
+                          },
+                          type: "array",
+                        },
+                        name: {
+                          type: "string",
+                        },
+                        schema: {
+                          type: "string",
+                        },
+                        type: {
+                          anyOf: [
+                            {
+                              const: "PRIMARY KEY",
+                              type: "string",
+                            },
+                            {
+                              const: "UNIQUE",
+                              type: "string",
+                            },
+                          ],
+                        },
+                      },
+                      required: [
+                        "schema",
+                        "name",
+                        "type",
+                        "columns",
+                      ],
+                      type: "object",
+                    },
+                    {
+                      additionalProperties: false,
+                      properties: {
+                        columns: {
+                          items: {
+                            type: "string",
+                          },
+                          type: "array",
+                        },
+                        name: {
+                          type: "string",
+                        },
+                        referenced_constraint: {
+                          additionalProperties: false,
+                          properties: {
+                            name: {
+                              type: "string",
+                            },
+                            schema: {
+                              type: "string",
+                            },
+                          },
+                          required: [
+                            "schema",
+                            "name",
+                          ],
+                          type: "object",
+                        },
+                        referenced_table: {
+                          additionalProperties: false,
+                          properties: {
+                            columns: {
+                              items: {
+                                type: "string",
+                              },
+                              type: "array",
+                            },
+                            name: {
+                              type: "string",
+                            },
+                            schema: {
+                              type: "string",
+                            },
+                          },
+                          required: [
+                            "schema",
+                            "name",
+                            "columns",
+                          ],
+                          type: "object",
+                        },
+                        schema: {
+                          type: "string",
+                        },
+                        type: {
+                          const: "FOREIGN KEY",
+                          type: "string",
+                        },
+                      },
+                      required: [
+                        "schema",
+                        "name",
+                        "type",
+                        "columns",
+                        "referenced_table",
+                        "referenced_constraint",
+                      ],
+                      type: "object",
+                    },
+                  ],
+                },
+                type: "array",
+              },
+              name: {
+                type: "string",
+              },
+              schema: {
+                type: "string",
+              },
+              type: {
+                type: "string",
+              },
+            },
+            required: [
+              "schema",
+              "name",
+              "type",
+              "columns",
+              "constraints",
+            ],
+            type: "object",
+          },
+          type: "array",
+        },
+      },
+      required: [
+        "tables",
+      ],
+      type: "object",
+    },
+    type: "sql",
+  },
+  {
+    description: "Execute SQL queries against a SQL database.",
+    inputSchema: {
+      "\$schema": "https://json-schema.org/draft/2020-12/schema",
+      additionalProperties: false,
+      properties: {
+        query: {
+          description: "The SQL query to execute.",
+          type: "string",
+        },
+      },
+      required: [
+        "query",
+      ],
+      type: "object",
+    },
+    name: "executeSql",
+    outputSchema: {
+      "\$schema": "https://json-schema.org/draft/2020-12/schema",
+      items: {
+        additionalProperties: {},
+        propertyNames: {
+          type: "string",
+        },
+        type: "object",
+      },
+      type: "array",
+    },
+    type: "sql",
+  },
+  {
+    description: "Bulk insert data into a SQL database from a CSV file URI.",
+    inputSchema: {
+      "\$schema": "https://json-schema.org/draft/2020-12/schema",
+      additionalProperties: false,
+      properties: {
+        columns: {
+          description: "Subset of columns to read from the CSV file. If not provided, all columns are used.",
+          items: {
+            type: "string",
+          },
+          type: "array",
+        },
+        file_uri: {
+          description: "The URI of the CSV file to insert.",
+          type: "string",
+        },
+        renames: {
+          description: "Renames columns using a mapper. Columns not in the mapper are left as-is.",
+          items: {
+            additionalProperties: false,
+            properties: {
+              from: {
+                type: "string",
+              },
+              to: {
+                type: "string",
+              },
+            },
+            required: [
+              "from",
+              "to",
+            ],
+            type: "object",
+          },
+          type: "array",
+        },
+        schema: {
+          description: "The schema to insert into.",
+          type: "string",
+        },
+        table: {
+          description: "The table to insert into. It will be created if it does not exist. Use the 'temp_' prefix if the table should be deleted later.",
+          type: "string",
+        },
+        types: {
+          description: "Types of columns, when the table has to be created. If not provided, TEXT is used for all columns.",
+          items: {
+            type: "string",
+          },
+          type: "array",
+        },
+      },
+      required: [
+        "table",
+        "file_uri",
+      ],
+      type: "object",
+    },
+    name: "bulkInsert",
+    outputSchema: {
+      "\$schema": "https://json-schema.org/draft/2020-12/schema",
+      additionalProperties: false,
+      properties: {
+        columns: {
+          items: {
+            type: "string",
+          },
+          type: "array",
+        },
+        rows_inserted: {
+          type: "number",
+        },
+      },
+      required: [
+        "columns",
+        "rows_inserted",
+      ],
+      type: "object",
+    },
+    type: "sql",
+  },
+  {
+    description: "Select data from a SQL database and return it as a CSV file URI.",
+    inputSchema: {
+      "\$schema": "https://json-schema.org/draft/2020-12/schema",
+      additionalProperties: false,
+      properties: {
+        file_name: {
+          description: "The file name to use for the CSV file.",
+          type: "string",
+        },
+        query: {
+          description: "The SQL query to execute.",
+          type: "string",
+        },
+      },
+      required: [
+        "query",
+        "file_name",
+      ],
+      type: "object",
+    },
+    name: "selectAsCsv",
+    outputSchema: {
+      "\$schema": "https://json-schema.org/draft/2020-12/schema",
+      additionalProperties: false,
+      properties: {
+        columns: {
+          items: {
+            type: "string",
+          },
+          type: "array",
+        },
+        file_uri: {
+          anyOf: [
+            {
+              type: "string",
+            },
+            {
+              type: "null",
+            },
+          ],
+        },
+        rows_selected: {
+          type: "number",
+        },
+      },
+      required: [
+        "file_uri",
+        "columns",
+        "rows_selected",
+      ],
+      type: "object",
+    },
+    type: "sql",
+  },
+  {
+    description: "Sample N rows from each table in the database to preview actual data.",
+    inputSchema: {
+      "\$schema": "https://json-schema.org/draft/2020-12/schema",
+      additionalProperties: false,
+      properties: {
+        limit: {
+          default: 3,
+          description: "Number of rows to sample from each table (default: 3, max: 10).",
+          maximum: 10,
+          minimum: 1,
+          type: "number",
+        },
+        schemas: {
+          description: "Optional: schema names to include.",
+          items: {
+            type: "string",
+          },
+          type: "array",
+        },
+      },
+      required: [
+        "limit",
+      ],
+      type: "object",
+    },
+    name: "sampleTableRows",
+    outputSchema: {
+      "\$schema": "https://json-schema.org/draft/2020-12/schema",
+      additionalProperties: false,
+      properties: {
+        tables: {
+          items: {
+            additionalProperties: false,
+            properties: {
+              name: {
+                type: "string",
+              },
+              rows: {
+                items: {
+                  additionalProperties: {},
+                  propertyNames: {
+                    type: "string",
+                  },
+                  type: "object",
+                },
+                type: "array",
+              },
+              schema: {
+                type: "string",
+              },
+            },
+            required: [
+              "schema",
+              "name",
+              "rows",
+            ],
+            type: "object",
+          },
+          type: "array",
+        },
+      },
+      required: [
+        "tables",
+      ],
+      type: "object",
+    },
+    type: "sql",
+  },
+]
+`;
+
+snapshot[`F29: SQL tools with the postgres driver (characterization) > getDbSchema 1`] = `
+{
+  error: 'syntax error at or near "\`"',
+}
+`;
+
+snapshot[`F29: SQL tools with the postgres driver (characterization) > sampleTableRows 1`] = `
+{
+  tables: [
+    {
+      name: "customers",
+      rows: Result(2) [
+        {
+          email: "ana@example.test",
+          id: 1,
+          note: null,
+          plan: "pro",
+        },
+        {
+          email: "beto@example.test",
+          id: 2,
+          note: "vip",
+          plan: "free",
+        },
+      ],
+      schema: "f29_sql",
+    },
+    {
+      name: "orders",
+      rows: Result(2) [
+        {
+          customer_id: 1,
+          id: 10,
+          total: "99.50",
+        },
+        {
+          customer_id: 1,
+          id: 11,
+          total: "5.00",
+        },
+      ],
+      schema: "f29_sql",
+    },
+  ],
+}
+`;
+
+snapshot[`F29: SQL tools with the postgres driver (characterization) > executeSql 1`] = `
+Result(2) [
+  {
+    email: "ana@example.test",
+    total: "104.50",
+  },
+  {
+    email: "beto@example.test",
+    total: "20.00",
+  },
+]
+`;
+
+snapshot[`F29: SQL tools with the postgres driver (characterization) > selectAsCsv 1`] = `
+{
+  csv: "id,email,note\\r
+1,ana@example.test,\\r
+2,beto@example.test,vip\\r
+3,caro@example.test,\\r
+",
+  result: {
+    columns: [
+      "id",
+      "email",
+      "note",
+    ],
+    file_uri: "internal://media/organizations/aaaaaaaa-0000-4000-8000-000000000001/attachments/VFAuPLpMWknuomtG7_05vg8lZmj9s731xuBTVMz_Mcs",
+    rows_selected: 3,
+  },
+}
+`;
+
+snapshot[`F29: SQL tools with the postgres driver (characterization) > bulkInsert 1`] = `
+{
+  insert: {
+    error: 'syntax error at or near ","',
+  },
+  rows: {
+    result: Result(0) [],
+  },
+}
+`;
