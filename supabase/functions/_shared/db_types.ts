@@ -1493,6 +1493,7 @@ export type Database = {
         Args: { p_batch?: number }
         Returns: number
       }
+      edge_functions_config: { Args: never; Returns: Record<string, unknown> }
       get_authorized_orgs: {
         Args: { role?: Database["public"]["Enums"]["role"] }
         Returns: string[]

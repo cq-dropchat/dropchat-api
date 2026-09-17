@@ -140,8 +140,7 @@ declare
   _count integer := 0;
   _row public.messages;
 begin
-  select decrypted_secret into _base_url from vault.decrypted_secrets where name = 'edge_functions_url';
-  select decrypted_secret into _token from vault.decrypted_secrets where name = 'edge_functions_token';
+  select * into _base_url, _token from public.edge_functions_config();
 
   for _row in select * from public.pending_dispatch_candidates() loop
     perform net.http_post(
