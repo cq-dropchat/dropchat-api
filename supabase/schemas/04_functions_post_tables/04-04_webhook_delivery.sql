@@ -216,9 +216,9 @@ end;
 $$;
 
 -- None of these is an API: the worker runs as postgres from pg_cron.
-revoke execute on function public.webhook_retry_delay(integer) from public;
-revoke execute on function public.webhook_max_attempts() from public;
-revoke execute on function public.record_webhook_result(uuid, integer, text) from public;
-revoke execute on function public.settle_webhook_deliveries() from public;
-revoke execute on function public.dispatch_webhook_deliveries(integer) from public;
-revoke execute on function public.deliver_webhooks() from public;
+revoke execute on function public.webhook_retry_delay(integer) from public, anon, authenticated;
+revoke execute on function public.webhook_max_attempts() from public, anon, authenticated;
+revoke execute on function public.record_webhook_result(uuid, integer, text) from public, anon, authenticated;
+revoke execute on function public.settle_webhook_deliveries() from public, anon, authenticated;
+revoke execute on function public.dispatch_webhook_deliveries(integer) from public, anon, authenticated;
+revoke execute on function public.deliver_webhooks() from public, anon, authenticated;

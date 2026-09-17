@@ -166,9 +166,9 @@ begin
 end;
 $$;
 
-revoke execute on function public.claim_message_dispatch(uuid) from public;
-revoke execute on function public.release_message_dispatch(uuid, jsonb) from public;
-revoke execute on function public.pending_dispatch_candidates() from public;
-revoke execute on function public.dispatch_pending_messages() from public;
+revoke execute on function public.claim_message_dispatch(uuid) from public, anon, authenticated;
+revoke execute on function public.release_message_dispatch(uuid, jsonb) from public, anon, authenticated;
+revoke execute on function public.pending_dispatch_candidates() from public, anon, authenticated;
+revoke execute on function public.dispatch_pending_messages() from public, anon, authenticated;
 grant execute on function public.claim_message_dispatch(uuid) to service_role;
 grant execute on function public.release_message_dispatch(uuid, jsonb) to service_role;
