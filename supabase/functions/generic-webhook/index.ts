@@ -424,7 +424,7 @@ async function handle(req: Request): Promise<Response> {
 
     const { error } = await client
       .from("messages")
-      .upsert(rows, { onConflict: "external_id" });
+      .upsert(rows, { onConflict: "organization_id,external_id" });
 
     if (error) {
       log.error(`Failed to upsert ${label}`, {
@@ -516,6 +516,7 @@ async function handle(req: Request): Promise<Response> {
     const { data: updated } = await client
       .from("messages")
       .update({ content: { text }, status: { edited: edit.timestamp } })
+      .eq("organization_id", organization_id)
       .eq("external_id", original_message_id)
       .select("id")
       .throwOnError();
@@ -541,7 +542,7 @@ async function handle(req: Request): Promise<Response> {
           } as unknown as IncomingMessage,
           status: { edited: edit.timestamp } as IncomingStatus,
           timestamp: edit.timestamp,
-        }], { onConflict: "external_id" })
+        }], { onConflict: "organization_id,external_id" })
         .throwOnError();
     }
   }
@@ -550,6 +551,7 @@ async function handle(req: Request): Promise<Response> {
     await client
       .from("messages")
       .update({ status: { deleted: timestamp } })
+      .eq("organization_id", organization_id)
       .eq("external_id", original_message_id)
       .throwOnError();
   }

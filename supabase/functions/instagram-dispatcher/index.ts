@@ -290,6 +290,7 @@ export async function handler(req: Request): Promise<Response> {
       await commitDispatchedMessage({
         client,
         messageId: message.id,
+        organizationId: message.organization_id,
         externalId: external_id,
         status: { accepted: new Date().toISOString() },
       });

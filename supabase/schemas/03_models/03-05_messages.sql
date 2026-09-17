@@ -55,8 +55,21 @@ on delete set null;
 alter table only public.messages
 add constraint messages_pkey primary key (id);
 
-alter table only public.messages
-add constraint messages_external_id_key unique (external_id);
+-- The service's id for the message (a WhatsApp WAMID, an Instagram mid, a
+-- Slack team:channel:ts), unique PER TENANT — not across the table. Two
+-- organizations can legitimately receive the same message under the same id:
+-- two whatsapp-web sessions of one number, two accounts in one WhatsApp
+-- group. A global key merged the second tenant's upsert into the first
+-- tenant's row, and every edit/revoke keyed by external_id landed on it too
+-- (audit F03). Ingestors upsert on (organization_id, external_id) and filter
+-- their updates by organization_id; commitDispatchedMessage resolves its
+-- duplicate inside the organization as well.
+--
+-- Created CONCURRENTLY in the migration: messages is the largest table and
+-- a plain CREATE INDEX blocks its writes for the whole build.
+create unique index messages_org_external_id_key
+on public.messages
+using btree (organization_id, external_id);
 
 -- Declared NOT VALID (not inline) to match the deployed state. ~46k legacy
 -- messages predate the v1 content schema (no version/kind) and were never

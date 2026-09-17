@@ -20,8 +20,8 @@ import * as log from "./logger.ts";
  *
  * Handles the race where a webhook for the same `external_id` lands before this
  * update and inserts its own row — e.g. a `sent`/`read` status (or an echo)
- * arriving before the dispatcher finished writing. The unique constraint on
- * `external_id` then rejects our update (Postgres 23505). Rather than dropping
+ * arriving before the dispatcher finished writing. The unique index on
+ * `(organization_id, external_id)` then rejects our update (Postgres 23505). Rather than dropping
  * our row (which holds the authoritative content + agent metadata, and the id
  * the UI/agent already rendered) or losing the webhook row's status, we MERGE:
  * fold the duplicate's status into ours, delete the now-redundant duplicate, and
@@ -30,15 +30,21 @@ import * as log from "./logger.ts";
  * `externalId` is optional: some sends (e.g. Instagram reactions) yield no id to
  * track, in which case there is no unique-violation risk and we just merge the
  * status onto our row.
+ *
+ * `organizationId` scopes the duplicate hunt (F03): external ids are unique
+ * per tenant, so another organization may legitimately hold the same id, and
+ * neither its status nor its row is ours to fold or delete.
  */
 export async function commitDispatchedMessage({
   client,
   messageId,
+  organizationId,
   externalId,
   status,
 }: {
   client: SupabaseClient<Database>;
   messageId: string;
+  organizationId: string;
   externalId?: string;
   status: Record<string, Json>;
 }): Promise<void> {
@@ -68,6 +74,7 @@ export async function commitDispatchedMessage({
   const { data: duplicate } = await client
     .from("messages")
     .select("status")
+    .eq("organization_id", organizationId)
     .eq("external_id", externalId)
     .maybeSingle()
     .throwOnError();
@@ -87,6 +94,7 @@ export async function commitDispatchedMessage({
   await client
     .from("messages")
     .delete()
+    .eq("organization_id", organizationId)
     .eq("external_id", externalId)
     .throwOnError();
 

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **`messages.external_id` is unique per organization** (F03), not across the
+  table: `messages_external_id_key` is replaced by the unique index
+  `messages_org_external_id_key (organization_id, external_id)`. Two tenants can
+  now hold the same service id (two whatsapp-web sessions of one number, two
+  accounts in one group). If you upsert messages through PostgREST, use
+  `on_conflict=organization_id,external_id`; if you update by `external_id`,
+  filter by `organization_id` too.
+
 - **Credentials leave `extra`** (F02). `organizations_addresses.extra`
   (`access_token`, `refresh_token`), `agents.extra` (`api_key`,
   `tools[].config.password`, `tools[].config.token`, `tools[].config.headers`)

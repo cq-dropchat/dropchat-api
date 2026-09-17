@@ -985,7 +985,7 @@ async function processMessage(request: Request): Promise<Response> {
 
     const { error } = await client
       .from("messages")
-      .upsert(rows, { onConflict: "external_id" });
+      .upsert(rows, { onConflict: "organization_id,external_id" });
 
     if (error) {
       log.error(`Failed to upsert ${label}`, { error, count: rows.length });

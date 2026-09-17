@@ -543,12 +543,19 @@ async function processMessage(request: Request): Promise<Response> {
   const contacts_addresses: ContactAddressInsert[] = [];
   // Coexistence edit/revoke events modify existing rows by their ORIGINAL id,
   // so they are applied as UPDATEs after the upserts rather than batched.
+  // organization_id travels with each one: external ids are unique per
+  // tenant (F03), so the update must name the tenant too.
   const edits: {
+    organization_id: string;
     original_message_id: string;
     text: string;
     timestamp: string;
   }[] = [];
-  const revokes: { original_message_id: string; timestamp: string }[] = [];
+  const revokes: {
+    organization_id: string;
+    original_message_id: string;
+    timestamp: string;
+  }[] = [];
 
   for (const entry of payload.entry) {
     const waba_id = entry.id; // WhatsApp business account ID (WABA ID)
@@ -715,6 +722,7 @@ async function processMessage(request: Request): Promise<Response> {
           // row. Coexistence-only event.
           if (webhookMessage.type === "revoke") {
             revokes.push({
+              organization_id,
               original_message_id: webhookMessage.revoke.original_message_id,
               timestamp: new Date(webhookMessage.timestamp * 1000)
                 .toISOString(),
@@ -736,6 +744,7 @@ async function processMessage(request: Request): Promise<Response> {
               continue;
             }
             edits.push({
+              organization_id,
               original_message_id: webhookMessage.edit.original_message_id,
               text,
               timestamp: new Date(webhookMessage.timestamp * 1000)
@@ -832,6 +841,7 @@ async function processMessage(request: Request): Promise<Response> {
           // as an incoming revoke (applied below, keyed by external_id).
           if (webhookMessage.type === "revoke") {
             revokes.push({
+              organization_id,
               original_message_id: webhookMessage.revoke.original_message_id,
               timestamp: new Date(webhookMessage.timestamp * 1000)
                 .toISOString(),
@@ -852,6 +862,7 @@ async function processMessage(request: Request): Promise<Response> {
               continue;
             }
             edits.push({
+              organization_id,
               original_message_id: webhookMessage.edit.original_message_id,
               text,
               timestamp: new Date(webhookMessage.timestamp * 1000)
@@ -956,6 +967,7 @@ async function processMessage(request: Request): Promise<Response> {
                 // Message's default branch and get dropped with a warning.
                 if (webhookMessage.type === "revoke") {
                   revokes.push({
+                    organization_id,
                     original_message_id:
                       webhookMessage.revoke.original_message_id,
                     timestamp: new Date(webhookMessage.timestamp * 1000)
@@ -974,6 +986,7 @@ async function processMessage(request: Request): Promise<Response> {
                     continue;
                   }
                   edits.push({
+                    organization_id,
                     original_message_id:
                       webhookMessage.edit.original_message_id,
                     text,
@@ -1253,7 +1266,7 @@ async function processMessage(request: Request): Promise<Response> {
 
     const { error } = await client
       .from("messages")
-      .upsert(rows, { onConflict: "external_id" });
+      .upsert(rows, { onConflict: "organization_id,external_id" });
 
     if (error) {
       log.error(`Failed to upsert ${label}`, {
@@ -1276,18 +1289,22 @@ async function processMessage(request: Request): Promise<Response> {
   // direction; if we never stored the original, the update matches no rows (you
   // cannot edit or delete a message we do not have). Run after the upserts so an
   // original delivered in the same webhook already exists.
-  for (const { original_message_id, text, timestamp } of edits) {
+  for (
+    const { organization_id, original_message_id, text, timestamp } of edits
+  ) {
     await client
       .from("messages")
       .update({ content: { text }, status: { edited: timestamp } })
+      .eq("organization_id", organization_id)
       .eq("external_id", original_message_id)
       .throwOnError();
   }
 
-  for (const { original_message_id, timestamp } of revokes) {
+  for (const { organization_id, original_message_id, timestamp } of revokes) {
     await client
       .from("messages")
       .update({ status: { deleted: timestamp } })
+      .eq("organization_id", organization_id)
       .eq("external_id", original_message_id)
       .throwOnError();
   }

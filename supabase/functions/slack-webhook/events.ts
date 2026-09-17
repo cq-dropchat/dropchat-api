@@ -505,6 +505,7 @@ async function onMessage(
         content: { text, mentions: mentions ?? null },
         status: { edited: tsToIso(event.event_ts ?? event.message.ts) },
       })
+      .eq("organization_id", ctx.organization_id)
       .eq("external_id", externalId(ctx.team, channel, event.message.ts))
       .throwOnError();
     return;
@@ -518,6 +519,7 @@ async function onMessage(
       .update({
         status: { deleted: tsToIso(event.event_ts ?? event.deleted_ts) },
       })
+      .eq("organization_id", ctx.organization_id)
       .eq("external_id", externalId(ctx.team, channel, event.deleted_ts))
       .throwOnError();
     return;
@@ -669,7 +671,7 @@ async function onMessage(
 
   await ctx.client
     .from("messages")
-    .upsert(rows, { onConflict: "external_id" })
+    .upsert(rows, { onConflict: "organization_id,external_id" })
     .throwOnError();
 }
 
@@ -764,7 +766,7 @@ async function onReaction(
         },
         re_message_id: externalId(ctx.team, channel, ts),
       } as IncomingMessage,
-    }, { onConflict: "external_id" })
+    }, { onConflict: "organization_id,external_id" })
     .throwOnError();
 }
 

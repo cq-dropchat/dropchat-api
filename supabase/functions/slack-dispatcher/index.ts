@@ -332,6 +332,7 @@ export async function handler(req: Request): Promise<Response> {
     await commitDispatchedMessage({
       client,
       messageId: message.id,
+      organizationId: message.organization_id,
       externalId: ts
         ? `${message.organization_address}:${message.conversation_address}:${ts}`
         : undefined,
