@@ -153,9 +153,13 @@ insert into public.invitations (organization_id, email, role, invited_by) values
 ;
 
 -- API Keys (for Mountain Peaks)
-insert into public.api_keys (organization_id, key, role, name) values
-  ('3a182d8d-d6d8-44bd-b021-029915476b8c', '1234567890', 'member', 'Default')
-;
+-- P8: keys are stored hashed and there is no plaintext column; a seed states
+-- the hash of the obviously-fake key it wants ('1234567890', for local work).
+insert into public.api_keys (organization_id, key_hash, key_prefix, role, name)
+values (
+  '3a182d8d-d6d8-44bd-b021-029915476b8c',
+  extensions.digest('1234567890', 'sha256'), '12345678', 'member', 'Default'
+);
 
 -- Onboarding Tokens (for Mountain Peaks - created by Goat)
 insert into public.onboarding_tokens (name, organization_id, expires_at, status, used_at, service) values

@@ -703,7 +703,6 @@ export type Database = {
           created_at: string
           expires_at: string | null
           id: string
-          key: string | null
           key_hash: string | null
           key_prefix: string | null
           last_used_at: string | null
@@ -716,7 +715,6 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
-          key?: string | null
           key_hash?: string | null
           key_prefix?: string | null
           last_used_at?: string | null
@@ -729,7 +727,6 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
-          key?: string | null
           key_hash?: string | null
           key_prefix?: string | null
           last_used_at?: string | null
@@ -1612,7 +1609,6 @@ export type Database = {
         Returns: boolean
       }
       agent_turn_lease: { Args: never; Returns: string }
-      api_key_plaintext_cutover: { Args: never; Returns: string }
       begin_agent_turn: {
         Args: {
           _conversation_id: string

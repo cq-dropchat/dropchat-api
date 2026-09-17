@@ -259,10 +259,16 @@ insert into public.agents (id, organization_id, user_id, name, extra) values
 -- API keys
 -- ---------------------------------------------------------------------------
 
-insert into public.api_keys (organization_id, key, role, name) values
-  (tests.id('org_a'), tests.val('key_a_member'), 'member', 'A member key'),
-  (tests.id('org_a'), tests.val('key_a_owner'),  'owner',  'A owner key'),
-  (tests.id('org_b'), tests.val('key_b_member'), 'member', 'B member key');
+-- P8: no plaintext column any more, so the fixture stores what the database
+-- stores — the hash and the prefix of each (obviously fake) test key.
+insert into public.api_keys (organization_id, key_hash, key_prefix, role, name)
+values
+  (tests.id('org_a'), extensions.digest(tests.val('key_a_member'), 'sha256'),
+   left(tests.val('key_a_member'), 8), 'member', 'A member key'),
+  (tests.id('org_a'), extensions.digest(tests.val('key_a_owner'), 'sha256'),
+   left(tests.val('key_a_owner'), 8),  'owner',  'A owner key'),
+  (tests.id('org_b'), extensions.digest(tests.val('key_b_member'), 'sha256'),
+   left(tests.val('key_b_member'), 8), 'member', 'B member key');
 
 -- ---------------------------------------------------------------------------
 -- Accounts (the local address per org already exists via trigger)

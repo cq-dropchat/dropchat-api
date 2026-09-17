@@ -58,18 +58,12 @@ begin
 
   if api_key is not null then
     -- F14: the secret is compared as sha256 (api_keys_key_hash_key serves
-    -- the probe). A row that still carries a plain key and no hash is only
-    -- honoured until the cutover; an expired key is never honoured.
+    -- the probe) and nothing else — P8 removed the plaintext fallback the
+    -- cutover allowed. A row without a hash matches nothing, and an expired
+    -- key is never honoured.
     select a.organization_id, a.id into org_id, key_id
     from public.api_keys a
-    where (
-      a.key_hash = extensions.digest(api_key, 'sha256')
-      or (
-        a.key_hash is null
-        and a.key = api_key
-        and now() < public.api_key_plaintext_cutover()
-      )
-    )
+    where a.key_hash = extensions.digest(api_key, 'sha256')
     and (a.expires_at is null or a.expires_at > now())
     and not exists (
       select 1 from public.organizations o
@@ -216,8 +210,16 @@ begin
   -- 24 random bytes → 48 hex chars; `sk_` marks it as an OpenBSP secret.
   _key := 'sk_' || encode(extensions.gen_random_bytes(24), 'hex');
 
-  insert into public.api_keys (organization_id, name, role, key, expires_at)
-  values (p_organization_id, p_name, p_role, _key, p_expires_at)
+  -- Hashed here rather than by a trigger on a write-only column (P8): this
+  -- function is the only way a key is created, so the plaintext never leaves
+  -- this block except in the reply.
+  insert into public.api_keys (
+    organization_id, name, role, key_hash, key_prefix, expires_at
+  )
+  values (
+    p_organization_id, p_name, p_role,
+    extensions.digest(_key, 'sha256'), left(_key, 8), p_expires_at
+  )
   returning public.api_keys.id into _id;
 
   return query select _id, _key, left(_key, 8);

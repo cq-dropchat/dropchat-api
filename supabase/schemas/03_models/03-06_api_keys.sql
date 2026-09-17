@@ -1,17 +1,19 @@
--- API keys (F14): the secret is never stored. `key` is a write-only slot —
--- a client may still insert the plain key there and hash_api_key
--- (02-03_trigger_functions.sql) turns it into key_hash + key_prefix and
--- clears it before the row lands — and it is dropped at the cutover date
--- (see CHANGELOG). Lookups compare `key_hash = sha256(header)`, which the
--- unique index serves. Only the prefix is ever shown again; the full key is
--- returned exactly once, by create_api_key (04-01_auth_helpers.sql).
+-- API keys (F14, P8): the secret is never stored, and there is nowhere to
+-- store it. A key is minted by create_api_key (04-01_auth_helpers.sql), which
+-- returns it exactly once and keeps `key_hash` + `key_prefix`; lookups compare
+-- `key_hash = sha256(header)`, which the unique index serves, and only the
+-- prefix is ever shown again.
+--
+-- F14 shipped with a write-only `key` column so a client could still hand the
+-- database a plain key (hashed and cleared by a trigger before the row
+-- landed), and get_authorized_orgs honoured a row that carried one and no
+-- hash until a cutover date. Both are gone: a key the database never sees is
+-- a key it cannot leak.
 create table public.api_keys (
   id uuid default gen_random_uuid() not null,
   organization_id uuid not null,
   role public.role default 'member'::public.role not null,
   name text not null,
-  -- Write-only. Null on every stored row.
-  key text,
   -- sha256 of the key; what authentication compares against.
   key_hash bytea,
   -- The first characters of the key (`sk_` + 5), for lists and audit logs.
@@ -42,15 +44,6 @@ on delete cascade;
 create index api_keys_organization_idx
 on public.api_keys
 using btree (organization_id);
-
--- `a_` so it runs before set_updated_at; it must run before the row is
--- stored, which is what BEFORE gives.
-create trigger a_hash_api_key
-before insert or update of key
-on public.api_keys
-for each row
-when (new.key is not null)
-execute function public.hash_api_key();
 
 create trigger set_updated_at
 before update

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **`api_keys.key` is gone, and so is the plaintext fallback** (P8, closing
+  F14). The write-only `key` column — where a client could still hand the
+  database a plain key for it to hash — no longer exists, and
+  `get_authorized_orgs` compares `key_hash` and nothing else: a row without a
+  hash authenticates nothing, whatever it holds. `create_api_key` (owners) is
+  the only way to mint a key and still returns it exactly once. Announced for
+  2026-11-01; brought forward because no deployment holds such a row. If you
+  were inserting into `api_keys` yourself, that insert now fails with `42703`
+  (undefined column) — use the RPC.
+
 - **Media preprocessing is queued like everything else** (P5). The per-minute
   safety net that picked up messages whose media was never preprocessed called
   the function with pg_net directly — no retry, no fairness between
