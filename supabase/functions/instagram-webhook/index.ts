@@ -2,6 +2,7 @@ import { waitUntil } from "../_shared/edge_runtime.ts";
 import { revealAddresses } from "../_shared/secrets.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
+import { verifyMetaSignature } from "../_shared/meta_signature.ts";
 import { withRequestLogging } from "../_shared/logger.ts";
 import { flagNeedsReauth } from "../_shared/instagram.ts";
 import {
@@ -30,8 +31,6 @@ import {
 
 const API_VERSION = "v25.0";
 const VERIFY_TOKEN = Deno.env.get("INSTAGRAM_VERIFY_TOKEN");
-const APP_ID = Deno.env.get("INSTAGRAM_APP_ID");
-const APP_SECRET = Deno.env.get("INSTAGRAM_APP_SECRET");
 
 // 24 hours. Profile is refreshed when older than this; tunable via constant.
 const PROFILE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -163,94 +162,39 @@ function verifyToken(request: Request): Response {
 }
 
 /**
- * Validates the Instagram webhook signature to ensure the request comes from
- * Meta. Mirrors whatsapp-webhook's validation, including the multi-app
- * INSTAGRAM_APP_ID|secret1|secret2 splitting and `app_id` query-param routing.
- * Instagram Login is its own Meta app (separate from the WhatsApp app in
- * META_APP_*), so it has its own id/secret; multiple IG apps may still be
- * configured.
+ * F19: every configured app is tried unless `?app_id=` names one; a request
+ * that matches none is logged as an error (it is still acked: Meta must not
+ * retry it). Credentials are read per request.
  */
 async function validateWebhookSignature(
   request: Request,
   body: string,
 ): Promise<boolean> {
-  if (!APP_ID || !APP_SECRET) {
-    log.warn(
-      "INSTAGRAM_APP_ID or INSTAGRAM_APP_SECRET environment variable not set",
-    );
-    return false;
-  }
+  const appIds = Deno.env.get("INSTAGRAM_APP_ID");
+  const appId = new URL(request.url).searchParams.get("app_id");
 
-  const ids = APP_ID.split("|");
-  const secrets = APP_SECRET.split("|");
+  const result = await verifyMetaSignature(
+    body,
+    request.headers.get("X-Hub-Signature-256"),
+    {
+      appIds,
+      appSecrets: Deno.env.get("INSTAGRAM_APP_SECRET"),
+      appId,
+    },
+  );
 
-  if (ids.length !== secrets.length) {
-    log.warn(
-      "INSTAGRAM_APP_ID and INSTAGRAM_APP_SECRET environment variables must have the same number of elements, separated by '|'",
-    );
-    return false;
-  }
-
-  let idIndex = 0;
-
-  const url = new URL(request.url);
-  const appId = url.searchParams.get("app_id");
-
-  if (appId) {
-    idIndex = ids.indexOf(appId);
-
-    if (idIndex === -1) {
-      log.warn(
-        `Could not find app_id '${appId}' in INSTAGRAM_APP_ID environment variable`,
-      );
-      return false;
-    }
-  }
-
-  const signature = request.headers.get("X-Hub-Signature-256");
-
-  if (!signature) {
-    log.warn("Missing X-Hub-Signature-256 header");
-    return false;
-  }
-
-  const signatureValue = signature.replace("sha256=", "");
-
-  try {
-    const encoder = new TextEncoder();
-    const key = encoder.encode(secrets[idIndex]);
-    const data = encoder.encode(body);
-
-    const cryptoKey = await crypto.subtle.importKey(
-      "raw",
-      key,
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"],
-    );
-
-    const hmac = await crypto.subtle.sign("HMAC", cryptoKey, data);
-    const expectedSignature = Array.from(new Uint8Array(hmac))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-
-    const isValid = signatureValue === expectedSignature;
-
-    if (!isValid) {
-      log.warn("Invalid webhook signature", {
-        expected: expectedSignature,
-        received: signatureValue,
-      });
-    }
-
-    return isValid;
-  } catch (error) {
+  if (!result.valid) {
     log.error(
-      "Error validating webhook signature",
-      error instanceof Error ? error.message : String(error),
+      "Instagram webhook signature did not verify: the request was acked and dropped",
+      {
+        reason: result.reason,
+        app_id_param: appId,
+        apps_configured: appIds ? appIds.split("|").length : 0,
+      },
     );
-    return false;
   }
+
+  return result.valid;
 }
 
 /**

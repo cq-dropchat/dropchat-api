@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Meta webhooks accept every configured app** (F19). With several apps in
+  `META_APP_ID`/`META_APP_SECRET` (or the `INSTAGRAM_*` pair), a request without
+  `?app_id=` is now checked against every secret instead of only the first, so a
+  second app pointed at the same callback URL is no longer dropped. `?app_id=`
+  still pins one app. A request that matches none is still answered 200 (Meta
+  must not retry) and now logs an `error` line with the reason
+  (`missing_signature`, `unknown_app_id`, `signature_mismatch`,
+  `misconfigured`); the expected signature is no longer logged.
+
 - **Retention for logs and onboarding tokens; no more `hooks` rows** (F15).
   `public.logs` rows older than 90 days and `onboarding_tokens` expired more
   than 30 days ago are deleted by the hourly `purge-expired-rows` job. The Edge
