@@ -1,0 +1,686 @@
+export const snapshot = {};
+
+snapshot[`F29: processPayload writes the same rows for every branch (characterization) 1`] = `
+{
+  account: {
+    status: "connected",
+  },
+  bsuidContacts: [
+    {
+      address: "AR.F29.2",
+      extra: {
+        address_type: "bsuid",
+        bsuid: "AR.F29.2",
+        name: "Dos",
+        username: "dos",
+      },
+      organization_address: "100000000000001",
+      service: "whatsapp",
+      status: "active",
+    },
+    {
+      address: "AR.F29.5",
+      extra: {
+        address_type: "bsuid",
+        bsuid: "AR.F29.5",
+        synced: {
+          action: "remove",
+          name: "Sin Teléfono",
+        },
+        username: "sintel",
+      },
+      organization_address: "100000000000001",
+      service: "whatsapp",
+      status: "active",
+    },
+  ],
+  contacts: [
+    {
+      address: "5491129000001",
+      extra: {
+        address_type: "phone",
+        bsuid: "AR.F29.1",
+        name: "Uno",
+        phone_number: "5491129000001",
+        replaced_by_bsuid: "AR.F29.1b",
+      },
+      organization_address: "100000000000001",
+      service: "whatsapp",
+      status: "inactive",
+    },
+    {
+      address: "5491129000002",
+      extra: {
+        address_type: "phone",
+        bsuid: "AR.F29.3",
+        phone_number: "5491129000002",
+        username: "tres",
+      },
+      organization_address: "100000000000001",
+      service: "whatsapp",
+      status: "active",
+    },
+    {
+      address: "5491129000003",
+      extra: {
+        address_type: "phone",
+        bsuid: "AR.F29.4",
+        phone_number: "5491129000003",
+        synced: {
+          action: "add",
+          name: "Contacto Tres",
+        },
+      },
+      organization_address: "100000000000001",
+      service: "whatsapp",
+      status: "active",
+    },
+  ],
+  logs: [
+    {
+      category: "account_update",
+      level: "info",
+      message: "account_reconnected",
+      metadata: {
+        value: {
+          event: "ACCOUNT_RECONNECTED",
+          messaging_product: "whatsapp",
+        },
+        waba_id: "300000000000001",
+      },
+      organization_address: null,
+      service: "whatsapp",
+    },
+    {
+      category: "account_update",
+      level: "info",
+      message: "partner_app_installed",
+      metadata: {
+        value: {
+          event: "PARTNER_APP_INSTALLED",
+          messaging_product: "whatsapp",
+          waba_info: {
+            owner_business_id: "1",
+            partner_app_id: "2",
+            waba_id: "300000000000001",
+          },
+        },
+        waba_id: "300000000000001",
+      },
+      organization_address: null,
+      service: "whatsapp",
+    },
+    {
+      category: "history",
+      level: "error",
+      message: "History sync declined",
+      metadata: {
+        code: 2593107,
+        error_data: {
+          details: "x",
+        },
+        message: "History sync declined",
+        title: "History sync declined",
+      },
+      organization_address: "100000000000001",
+      service: "whatsapp",
+    },
+    {
+      category: "history",
+      level: "error",
+      message: "Received 1 error messages with code 131051",
+      metadata: {
+        code: 131051,
+        error_data: {
+          details: "x",
+        },
+        message: "Unsupported message type",
+        title: "Unsupported message type",
+      },
+      organization_address: "100000000000001",
+      service: "whatsapp",
+    },
+    {
+      category: "history",
+      level: "info",
+      message: "Syncing 1 conversations and 6 messages",
+      metadata: {
+        chunk_order: 1,
+        phase: 0,
+        progress: 100,
+      },
+      organization_address: "100000000000001",
+      service: "whatsapp",
+    },
+    {
+      category: "messages",
+      level: "error",
+      message: "Received 1 error messages with code 131051",
+      metadata: {
+        code: 131051,
+        error_data: {
+          details: "x",
+        },
+        message: "Unsupported message type",
+        title: "Unsupported message type",
+      },
+      organization_address: "100000000000001",
+      service: "whatsapp",
+    },
+    {
+      category: "messages",
+      level: "error",
+      message: "Something went wrong",
+      metadata: {
+        code: 131000,
+        error_data: {
+          details: "x",
+        },
+        message: "Something went wrong",
+        title: "Something went wrong",
+      },
+      organization_address: "100000000000001",
+      service: "whatsapp",
+    },
+    {
+      category: "smb_message_echoes",
+      level: "error",
+      message: "Received 1 error messages with code 131051",
+      metadata: {
+        code: 131051,
+        error_data: {
+          details: "x",
+        },
+        message: "Unsupported message type",
+        title: "Unsupported message type",
+      },
+      organization_address: "100000000000001",
+      service: "whatsapp",
+    },
+  ],
+  messages: [
+    {
+      content: {
+        file: {
+          mime_type: "audio/ogg; codecs=opus",
+          size: 12,
+          uri: "internal://media/organizations/aaaaaaaa-0000-4000-8000-000000000001/attachments/N4FMS1vqMXi7HfbnAkErvKQk0Zy6NIA7CVXRfWideLo",
+        },
+        kind: "audio",
+        type: "file",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.audio",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:26+00:00",
+    },
+    {
+      content: {
+        kind: "text",
+        text: "sin teléfono",
+        type: "text",
+        version: "1",
+      },
+      conversation_address: "AR.F29.2",
+      external_id: "wamid.F29.bsuid",
+      organization_address: "100000000000001",
+      sender_address: "AR.F29.2",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:39+00:00",
+    },
+    {
+      content: {
+        data: {
+          payload: "ok",
+          text: "Ok",
+        },
+        kind: "button",
+        type: "data",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.button",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:33+00:00",
+    },
+    {
+      content: {
+        data: [
+          {
+            name: {
+              formatted_name: "Ana",
+            },
+            phones: [
+              {
+                phone: "+54 9 11",
+                type: "CELL",
+              },
+            ],
+          },
+        ],
+        kind: "contacts",
+        type: "data",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.contacts",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:31+00:00",
+    },
+    {
+      content: {
+        file: {
+          mime_type: "application/pdf",
+          name: "f.pdf",
+          size: 0,
+          uri: "F29MEDIA404",
+        },
+        kind: "document",
+        text: "doc",
+        type: "file",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.document",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        error: "Could not download media item from WhatsApp servers",
+      },
+      timestamp: "2025-09-04T15:33:28+00:00",
+    },
+    {
+      content: {
+        kind: "text",
+        text: "desde la app, editado",
+        type: "text",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.echo",
+      organization_address: "100000000000001",
+      sender_address: null,
+      service: "whatsapp",
+      status: {
+        edited: "2025-09-04T15:34:01.000Z",
+        sent: "2025-09-04T15:34:00.000Z",
+      },
+      timestamp: "2025-09-04T15:34:00+00:00",
+    },
+    {
+      content: {
+        kind: "text",
+        text: "eco del historial",
+        type: "text",
+        version: "1",
+      },
+      conversation_address: "5491129000002",
+      external_id: "wamid.F29.hist.echo",
+      organization_address: "100000000000001",
+      sender_address: null,
+      service: "whatsapp",
+      status: {
+        pending: null,
+        sent: "2025-09-04T15:34:16.000Z",
+      },
+      timestamp: "2025-09-04T15:34:16+00:00",
+    },
+    {
+      content: {
+        kind: "text",
+        text: "viejo editado",
+        type: "text",
+        version: "1",
+      },
+      conversation_address: "5491129000002",
+      external_id: "wamid.F29.hist.in",
+      organization_address: "100000000000001",
+      sender_address: "5491129000002",
+      service: "whatsapp",
+      status: {
+        edited: "2025-09-04T15:34:13.000Z",
+        pending: null,
+        read: "2025-09-04T15:34:10.000Z",
+      },
+      timestamp: "2025-09-04T15:34:10+00:00",
+    },
+    {
+      content: {
+        kind: "text",
+        text: "respuesta vieja",
+        type: "text",
+        version: "1",
+      },
+      conversation_address: "5491129000002",
+      external_id: "wamid.F29.hist.out",
+      organization_address: "100000000000001",
+      sender_address: null,
+      service: "whatsapp",
+      status: {
+        deleted: "2025-09-04T15:34:14.000Z",
+        pending: null,
+        read: "2025-09-04T15:34:11.000Z",
+      },
+      timestamp: "2025-09-04T15:34:11+00:00",
+    },
+    {
+      content: {
+        kind: "text",
+        text: "pendiente",
+        type: "text",
+        version: "1",
+      },
+      conversation_address: "5491129000002",
+      external_id: "wamid.F29.hist.pending",
+      organization_address: "100000000000001",
+      sender_address: null,
+      service: "whatsapp",
+      status: {
+        accepted: "2025-09-04T15:34:12.000Z",
+        pending: null,
+      },
+      timestamp: "2025-09-04T15:34:12+00:00",
+    },
+    {
+      content: {
+        file: {
+          mime_type: "image/jpeg",
+          size: 12,
+          uri: "internal://media/organizations/aaaaaaaa-0000-4000-8000-000000000001/attachments/aqxgpyI3-76GJvxnT_PocZFbbZxwo7MMtitW29wLEws",
+        },
+        kind: "image",
+        text: "_foto_",
+        type: "file",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.image",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:25+00:00",
+    },
+    {
+      content: {
+        data: {
+          button_reply: {
+            id: "b1",
+            title: "Sí",
+          },
+          type: "button_reply",
+        },
+        kind: "interactive",
+        type: "data",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.interactive",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:32+00:00",
+    },
+    {
+      content: {
+        data: {
+          address: "Calle 1",
+          latitude: -34.6,
+          longitude: -58.4,
+          name: "Casa",
+        },
+        kind: "location",
+        type: "data",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.location",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:30+00:00",
+    },
+    {
+      content: {
+        data: {
+          catalog_id: "c",
+          product_items: [],
+        },
+        kind: "order",
+        type: "data",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.order",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:34+00:00",
+    },
+    {
+      content: {},
+      conversation_address: "AR.F29.2",
+      external_id: "wamid.F29.out.failed",
+      organization_address: "100000000000001",
+      sender_address: null,
+      service: "whatsapp",
+      status: {
+        errors: [
+          {
+            code: 131026,
+            error_data: {
+              details: "x",
+            },
+            message: "Undeliverable",
+            title: "Undeliverable",
+          },
+        ],
+        failed: "2025-09-04T15:33:51.000Z",
+      },
+      timestamp: "<now>",
+    },
+    {
+      content: {},
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.out.status",
+      organization_address: "100000000000001",
+      sender_address: null,
+      service: "whatsapp",
+      status: {
+        delivered: "2025-09-04T15:33:50.000Z",
+      },
+      timestamp: "<now>",
+    },
+    {
+      content: {
+        data: {},
+        kind: "media_placeholder",
+        type: "data",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.placeholder",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:35+00:00",
+    },
+    {
+      content: {
+        data: {
+          action: "added",
+          name: "👍",
+          unicode: "👍",
+        },
+        kind: "reaction",
+        re_message_id: "wamid.F29.text",
+        type: "data",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.react",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:23+00:00",
+    },
+    {
+      content: {
+        forwarded: true,
+        kind: "text",
+        re_message_id: "wamid.F29.text",
+        text: "respuesta",
+        type: "text",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.reply",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        deleted: "2025-09-04T15:33:42.000Z",
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:22+00:00",
+    },
+    {
+      content: {
+        file: {
+          mime_type: "image/webp",
+          size: 12,
+          uri: "internal://media/organizations/aaaaaaaa-0000-4000-8000-000000000001/attachments/VKeAjVEfH3ySELn5Xir1vhr5-4mbutg6W6aUaX1q03A",
+        },
+        kind: "sticker",
+        type: "file",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.sticker",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:29+00:00",
+    },
+    {
+      content: {
+        kind: "text",
+        text: "hola editado",
+        type: "text",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.text",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        edited: "2025-09-04T15:33:40.000Z",
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:21+00:00",
+    },
+    {
+      content: {
+        data: {
+          action: "removed",
+        },
+        kind: "reaction",
+        re_message_id: "wamid.F29.text",
+        type: "data",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.unreact",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:24+00:00",
+    },
+    {
+      content: {
+        data: {
+          type: "poll",
+        },
+        kind: "unsupported",
+        type: "data",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.unsupported",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:36+00:00",
+    },
+    {
+      content: {
+        file: {
+          mime_type: "video/mp4",
+          name: "v.mp4",
+          size: 12,
+          uri: "internal://media/organizations/aaaaaaaa-0000-4000-8000-000000000001/attachments/0YWHh5Wc42tmIsR-NHDO8_YOJ3DNTvqy4IYvbiJHxts",
+        },
+        kind: "video",
+        type: "file",
+        version: "1",
+      },
+      conversation_address: "5491129000001",
+      external_id: "wamid.F29.video",
+      organization_address: "100000000000001",
+      sender_address: "5491129000001",
+      service: "whatsapp",
+      status: {
+        pending: "<now>",
+      },
+      timestamp: "2025-09-04T15:33:27+00:00",
+    },
+  ],
+}
+`;
