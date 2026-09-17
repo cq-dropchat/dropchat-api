@@ -30,6 +30,9 @@ export type WhatsAppOrganizationAddressExtra = {
   access_token?: string; // Meta system-user token
   callback_url?: string | null;
   verify_token?: string | null;
+  // F28: set by the dispatcher when Meta rejects this account's token (190);
+  // outgoing messages fail without calling Meta until a new token clears it.
+  dispatch_auth_failure?: { code: number; message: string; at: string };
 };
 
 export type InstagramOrganizationAddressExtra = {

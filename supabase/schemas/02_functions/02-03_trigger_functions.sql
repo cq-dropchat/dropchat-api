@@ -812,6 +812,15 @@ begin
     end if;
   end if;
 
+  -- F28: the dispatcher marks an account whose token Meta rejected (code 190)
+  -- and stops calling Meta with it. A different token — re-onboarding, a
+  -- refresh, a manual fix, or its removal — is what lifts that mark, in the
+  -- same write. Writing the mask back leaves the token, and the mark, as is.
+  if tg_table_name = 'organizations_addresses'
+     and (_next -> 'access_token') is distinct from (coalesce(_stored, '{}'::jsonb) -> 'access_token') then
+    _extra := _extra - 'dispatch_auth_failure';
+  end if;
+
   new.extra := _extra;
 
   -- Persist. An empty document is a deleted row, so a fully revoked secret

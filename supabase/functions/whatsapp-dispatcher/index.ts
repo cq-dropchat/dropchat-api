@@ -21,6 +21,7 @@ import {
 import { getAddressSecrets } from "../_shared/secrets.ts";
 import { Json } from "../_shared/db_types.ts";
 import { markdownToWhatsApp } from "../_shared/markdown.ts";
+import { insertLog } from "../_shared/logs.ts";
 
 const API_VERSION = "v24.0";
 const DEFAULT_ACCESS_TOKEN = Deno.env.get("META_SYSTEM_USER_ACCESS_TOKEN") ||
@@ -40,7 +41,8 @@ function isBsuid(address: string): boolean {
 class WhatsAppError extends Error {
   constructor(
     message: string,
-    options?: { cause?: { headers: unknown; body: unknown } },
+    // The cause is Meta's JSON error body: `{ error: { code, message } }`.
+    options?: { cause?: unknown },
   ) {
     super(message, options);
     this.name = "WhatsAppError";
@@ -93,6 +95,79 @@ const RETRYABLE_META_CODES = new Set([
   131064,
   133004,
 ]);
+
+/**
+ * F28. Codes that mean the account's token is no longer valid (190: expired,
+ * revoked, password changed, app removed). Retrying cannot help, and every
+ * message after it would fail the same way.
+ */
+const AUTH_FAILURE_META_CODES = new Set([190]);
+
+type AuthFailure = { code: number; message: string; at: string };
+
+async function readAuthFailure(
+  client: SupabaseClient,
+  message: MessageRow,
+): Promise<AuthFailure | null> {
+  const { data } = await client
+    .from("organizations_addresses")
+    .select("failure:extra->dispatch_auth_failure")
+    .eq("organization_id", message.organization_id)
+    .eq("service", "whatsapp")
+    .eq("address", message.organization_address)
+    .maybeSingle()
+    .throwOnError();
+
+  return (data?.failure as AuthFailure | null) ?? null;
+}
+
+/**
+ * Marks the account and tells its members, once. `extra` is readable by
+ * members; the mark holds Meta's code and message, nothing token-derived.
+ * extract_secrets lifts it when a different token is stored.
+ */
+async function markAuthFailure(
+  client: SupabaseClient,
+  message: MessageRow,
+  rejectedToken: string,
+  failure: { code: number; message: string },
+) {
+  // A token renewed while this request was on its way must not be marked.
+  const current = await getAddressSecrets(
+    client,
+    message.organization_id,
+    "whatsapp",
+    message.organization_address,
+  );
+  if (current?.access_token !== rejectedToken) return;
+
+  const mark: AuthFailure = { ...failure, at: new Date().toISOString() };
+
+  await client
+    .from("organizations_addresses")
+    .update({ extra: { dispatch_auth_failure: mark } })
+    .eq("organization_id", message.organization_id)
+    .eq("service", "whatsapp")
+    .eq("address", message.organization_address)
+    .throwOnError();
+
+  await insertLog(client, {
+    organization_id: message.organization_id,
+    organization_address: message.organization_address,
+    service: "whatsapp",
+    category: "dispatch",
+    level: "error",
+    message:
+      "Meta rejected the account's access token; outgoing messages fail until the account is reconnected",
+    metadata: { code: failure.code, meta_message: failure.message },
+  });
+
+  log.error("Account token rejected by Meta; account marked", {
+    organization_id: message.organization_id,
+    organization_address: message.organization_address,
+    code: failure.code,
+  });
+}
 
 /** Uploads media to WA servers
  *
@@ -444,8 +519,16 @@ export async function handler(req: Request): Promise<Response> {
     message.organization_address,
   );
 
-  const access_token = (typeof secrets?.access_token === "string" &&
-    secrets.access_token) || DEFAULT_ACCESS_TOKEN;
+  const ownToken = typeof secrets?.access_token === "string" &&
+      secrets.access_token
+    ? secrets.access_token
+    : undefined;
+  const access_token = ownToken || DEFAULT_ACCESS_TOKEN;
+
+  // F28: Meta rejected this account's token before; storing a new one clears
+  // the mark. Only an account's own token is marked: the shared system-user
+  // token is platform configuration, and rotating it touches no account.
+  const authFailure = ownToken ? await readAuthFailure(client, message) : null;
 
   let to: string | undefined;
   let recipient: string | undefined;
@@ -484,6 +567,18 @@ export async function handler(req: Request): Promise<Response> {
     }
 
     try {
+      if (authFailure) {
+        throw new WhatsAppError("Account token was rejected by Meta", {
+          cause: {
+            error: {
+              code: authFailure.code,
+              message:
+                `The account's access token was rejected by Meta (${authFailure.at}): ${authFailure.message}. Reconnect the account to send again.`,
+            },
+          },
+        });
+      }
+
       const patchedMessage = await uploadMediaItem({
         message,
         access_token,
@@ -550,6 +645,19 @@ export async function handler(req: Request): Promise<Response> {
         error: errorMessage,
       });
 
+      if (
+        metaCode != null && AUTH_FAILURE_META_CODES.has(metaCode) && ownToken &&
+        !authFailure
+      ) {
+        await markAuthFailure(client, message, ownToken, {
+          code: metaCode,
+          message: (isWhatsAppError
+            ? (error.cause as { error?: { message?: string } })?.error
+              ?.message
+            : undefined) ?? errorMessage,
+        });
+      }
+
       await client
         .from("messages")
         .update({
@@ -600,6 +708,13 @@ export async function handler(req: Request): Promise<Response> {
       throw new Error(
         `Cannot mark message with id ${message.id} as read because its external_id is missing.`,
       );
+    }
+
+    if (authFailure) {
+      log.info("Read receipt skipped: the account's token was rejected", {
+        message_id: message.id,
+      });
+      return new Response();
     }
 
     const payload: EndpointStatus = {

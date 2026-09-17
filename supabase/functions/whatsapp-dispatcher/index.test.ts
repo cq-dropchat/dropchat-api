@@ -160,3 +160,162 @@ Deno.test({
     }
   },
 });
+
+// ---------------------------------------------------------------------------
+// F28 — an expired or revoked token (Meta code 190) failed every message on
+// its own: one Graph call each, nothing on the account saying why, and the
+// same for every message until someone noticed. Now the first 190 marks the
+// account (`extra.dispatch_auth_failure`, readable by members, plus a line in
+// public.logs); later messages fail at once without calling Meta, until a new
+// token is stored — which clears the mark. The account stays `connected`:
+// Meta still delivers its inbound webhooks, which a disconnected account
+// would drop.
+// ---------------------------------------------------------------------------
+
+const EXPIRED = () =>
+  Promise.resolve(Response.json({
+    error: {
+      message: "Error validating access token: Session has expired",
+      type: "OAuthException",
+      code: 190,
+      error_subcode: 463,
+    },
+  }, { status: 401 }));
+
+async function addressExtra(client: ReturnType<typeof service>) {
+  const { data } = await client
+    .from("organizations_addresses")
+    .select("extra, status")
+    .eq("organization_id", fixture.orgA)
+    .eq("service", "whatsapp")
+    .eq("address", fixture.waA)
+    .single()
+    .throwOnError();
+  return data as { extra: Record<string, unknown>; status: string };
+}
+
+async function setToken(client: ReturnType<typeof service>, token: string) {
+  await client
+    .from("organizations_addresses")
+    .update({ extra: { access_token: token } })
+    .eq("organization_id", fixture.orgA)
+    .eq("service", "whatsapp")
+    .eq("address", fixture.waA)
+    .throwOnError();
+}
+
+async function statusOf(client: ReturnType<typeof service>, id: string) {
+  const { data } = await client
+    .from("messages")
+    .select("status")
+    .eq("id", id)
+    .single()
+    .throwOnError();
+  return data.status as Record<string, unknown>;
+}
+
+Deno.test({
+  name:
+    "F28: an expired token marks the account, and later messages fail without calling Meta",
+  ignore: !up,
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    const client = service();
+    const since = new Date().toISOString();
+    const first = await outgoingRow(client);
+    const second = await outgoingRow(client);
+    const graph = stubGraph(EXPIRED);
+
+    try {
+      await handler(request(first));
+      const firstStatus = await statusOf(client, first.id);
+      assert(firstStatus.failed, "a 190 is permanent");
+      assertEquals(firstStatus.pending, undefined);
+
+      const { extra, status } = await addressExtra(client);
+      assertEquals(status, "connected", "inbound must keep flowing");
+      const mark = extra.dispatch_auth_failure as Record<string, unknown>;
+      assert(mark, "the account was not marked");
+      assertEquals(mark.code, 190);
+      assert(
+        !JSON.stringify(mark).includes("EAAG"),
+        "token leaked in the mark",
+      );
+
+      const { data: logs } = await client
+        .from("logs")
+        .select("level, category, message")
+        .eq("organization_id", fixture.orgA)
+        .eq("category", "dispatch")
+        .gte("created_at", since)
+        .throwOnError();
+      assertEquals(logs.length, 1);
+      assertEquals(logs[0].level, "error");
+
+      await handler(request(second));
+      assertEquals(graph.sends(), 1, "Meta was called with a known-bad token");
+      const secondStatus = await statusOf(client, second.id);
+      assert(secondStatus.failed);
+      assertEquals(secondStatus.pending, undefined);
+      assert(
+        JSON.stringify(secondStatus.errors).includes("190"),
+        JSON.stringify(secondStatus.errors),
+      );
+    } finally {
+      graph.restore();
+      await setToken(client, "EAAG-test-secret-a");
+      await client.from("messages").delete().in("id", [first.id, second.id]);
+      await client.from("logs").delete().eq("organization_id", fixture.orgA)
+        .eq("category", "dispatch").gte("created_at", since);
+    }
+  },
+});
+
+Deno.test({
+  name: "F28: storing a new token lifts the mark and sends again",
+  ignore: !up,
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    const client = service();
+    const since = new Date().toISOString();
+    const failing = await outgoingRow(client);
+    let graph = stubGraph(EXPIRED);
+    let next: MessageRow | undefined;
+
+    try {
+      await handler(request(failing));
+      assert((await addressExtra(client)).extra.dispatch_auth_failure);
+      graph.restore();
+
+      await setToken(client, "EAAG-test-secret-a-renewed");
+      assertEquals(
+        (await addressExtra(client)).extra.dispatch_auth_failure,
+        undefined,
+        "a new token did not clear the mark",
+      );
+
+      next = await outgoingRow(client);
+      graph = stubGraph(() =>
+        Promise.resolve(Response.json({
+          messaging_product: "whatsapp",
+          contacts: [{ input: fixture.contactA1, wa_id: fixture.contactA1 }],
+          messages: [{ id: `wamid.F28.${next!.id}` }],
+        }))
+      );
+      await handler(request(next));
+      assertEquals(graph.sends(), 1);
+      assert((await statusOf(client, next.id)).accepted);
+    } finally {
+      graph.restore();
+      await setToken(client, "EAAG-test-secret-a");
+      await client.from("messages").delete().in(
+        "id",
+        [failing.id, next?.id].filter(Boolean) as string[],
+      );
+      await client.from("logs").delete().eq("organization_id", fixture.orgA)
+        .eq("category", "dispatch").gte("created_at", since);
+    }
+  },
+});

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **WhatsApp: a rejected token stops outgoing sends for that account** (F28).
+  When Meta answers a send with code 190 (token expired or revoked) on an
+  account with its own token, the dispatcher sets
+  `organizations_addresses.extra.dispatch_auth_failure` (`{code, message, at}`)
+  and writes an `error` line to `public.logs` (category `dispatch`). Until a
+  different token is stored for the account, outgoing messages fail at once with
+  that error, without calling Meta, and read receipts are skipped. Storing a new
+  token clears the mark in the same write. The account stays `connected`, so
+  inbound messages keep arriving. Accounts on the shared system-user token are
+  not marked.
+
 - **MCP: choose the organization** (F27). A user who belongs to several
   organizations can name one with the `Organization-Id` header or, for
   connectors that cannot set headers, `?organization_id=` on the MCP URL. It
