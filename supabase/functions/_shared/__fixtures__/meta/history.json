@@ -1,0 +1,56 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "300000000000001",
+      "changes": [
+        {
+          "field": "history",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "5491100000001",
+              "phone_number_id": "100000000000001"
+            },
+            "contacts": [
+              {
+                "profile": { "name": "Carla" },
+                "wa_id": "5491100000101",
+                "user_id": "AR.10000000000000000101"
+              }
+            ],
+            "history": [
+              {
+                "metadata": { "phase": 0, "chunk_order": 1, "progress": 100 },
+                "threads": [
+                  {
+                    "id": "5491100000101",
+                    "messages": [
+                      {
+                        "from": "5491100000101",
+                        "id": "wamid.FIXTURE.HIST.IN.1",
+                        "timestamp": "1756000000",
+                        "type": "text",
+                        "text": { "body": "mensaje viejo del contacto" },
+                        "history_context": { "status": "DELIVERED" }
+                      },
+                      {
+                        "from": "5491100000001",
+                        "to": "5491100000101",
+                        "id": "wamid.FIXTURE.HIST.OUT.1",
+                        "timestamp": "1756000060",
+                        "type": "text",
+                        "text": { "body": "respuesta vieja del negocio" },
+                        "history_context": { "status": "READ" }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

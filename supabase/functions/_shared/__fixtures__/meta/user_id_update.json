@@ -1,0 +1,29 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "300000000000001",
+      "changes": [
+        {
+          "field": "user_id_update",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "5491100000001",
+              "phone_number_id": "100000000000001"
+            },
+            "user_id_update": [
+              {
+                "user_id": {
+                  "previous": "AR.10000000000000000101",
+                  "current": "AR.10000000000000000999"
+                },
+                "timestamp": "1757000400"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

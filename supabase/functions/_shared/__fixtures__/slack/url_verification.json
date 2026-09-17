@@ -1,0 +1,5 @@
+{
+  "token": "slack-verification-token-test",
+  "challenge": "challenge-fixture-value",
+  "type": "url_verification"
+}

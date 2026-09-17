@@ -216,7 +216,7 @@ async function postPayloadToInstagramEndpoint({
   return await response.json();
 }
 
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
 
@@ -434,4 +434,6 @@ Deno.serve(async (req) => {
   }
 
   return new Response();
-});
+}
+
+if (import.meta.main) Deno.serve(handler);

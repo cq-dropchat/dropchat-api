@@ -108,7 +108,7 @@ async function drainPrefix(
   return removed;
 }
 
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
 
@@ -161,4 +161,6 @@ Deno.serve(async (req) => {
   });
 
   return Response.json({ orphans: orphans.length, drained, removed, done });
-});
+}
+
+if (import.meta.main) Deno.serve(handler);

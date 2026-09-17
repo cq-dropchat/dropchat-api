@@ -102,7 +102,7 @@ function isQuotaError(error: unknown): boolean {
 // here so every 500 says why. Quota rejections are not faults: they answer
 // 402 so the connector knows not to retry and can degrade instead (e.g. send
 // the message without its media, stamping status.error).
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   try {
     return await handle(req);
   } catch (error) {
@@ -122,7 +122,9 @@ Deno.serve(async (req) => {
     log.error("Connector webhook failed", { error: message, path });
     return new Response("Internal error", { status: 500 });
   }
-});
+}
+
+if (import.meta.main) Deno.serve(handler);
 
 async function handle(req: Request): Promise<Response> {
   if (req.method !== "POST") {

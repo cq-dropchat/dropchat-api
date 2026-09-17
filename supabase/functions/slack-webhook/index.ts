@@ -62,7 +62,7 @@ async function verifySignature(req: Request, body: string): Promise<boolean> {
   return diff === 0;
 }
 
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
@@ -136,4 +136,6 @@ Deno.serve(async (req) => {
   }
 
   return new Response();
-});
+}
+
+if (import.meta.main) Deno.serve(handler);

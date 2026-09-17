@@ -364,4 +364,7 @@ app.all("*", async (c) => {
   return transport.handleRequest(c.req.raw);
 });
 
-Deno.serve(app.fetch);
+// Exported for tests; served only as the entry module (edge runtime).
+export const handler = (req: Request) => app.fetch(req);
+
+if (import.meta.main) Deno.serve(handler);

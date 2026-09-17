@@ -134,7 +134,7 @@ function getNewestIncomingMessage(
 
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
 
@@ -992,4 +992,6 @@ Deno.serve(async (req) => {
   // The caller is pg_net, which discards the body — don't serialize the
   // whole conversation into it.
   return new Response("ok", { headers: corsHeaders });
-});
+}
+
+if (import.meta.main) Deno.serve(handler);

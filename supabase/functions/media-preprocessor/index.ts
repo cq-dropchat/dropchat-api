@@ -114,7 +114,7 @@ const INLINE_DATA_SIZE_LIMIT = 19 * 1000 * 1000; // 19MB
 
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
 
@@ -574,4 +574,6 @@ Deno.serve(async (req) => {
     .throwOnError();
 
   return new Response();
-});
+}
+
+if (import.meta.main) Deno.serve(handler);

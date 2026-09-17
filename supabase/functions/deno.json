@@ -1,15 +1,24 @@
 {
+  "tasks": {
+    "test": "deno test --allow-all --coverage=coverage",
+    "test:coverage": "deno test --allow-all --coverage=coverage && deno coverage coverage --lcov --output=coverage/lcov.info --exclude='\\.test\\.ts$|_shared/db_types\\.ts|__fixtures__|_shared/testing/' && deno run --allow-read _shared/testing/coverage_gate.ts coverage/lcov.info"
+  },
   "fmt": {
     "lineWidth": 80,
     "indentWidth": 2,
     "semiColons": true,
     "singleQuote": false,
     "proseWrap": "preserve",
-    "exclude": ["_shared/db_types.ts"]
+    "exclude": [
+      "_shared/db_types.ts"
+    ]
   },
   "lint": {
     "rules": {
-      "exclude": ["no-unversioned-import", "no-import-prefix"]
+      "exclude": [
+        "no-unversioned-import",
+        "no-import-prefix"
+      ]
     }
   },
   "imports": {
@@ -25,7 +34,6 @@
     "ajv": "https://esm.sh/ajv@8.17/dist/2020",
     "@slack/web-api": "npm:@slack/web-api@^8.0.0",
     "@slack/types": "npm:@slack/types@^3.0.0",
-    "@hono/mcp": "npm:@hono/mcp",
     "@hono/hono": "jsr:@hono/hono",
     "openai/resources/chat/completions": "npm:openai@^5.12.2/resources/chat/completions",
     "@std/encoding/base64url": "jsr:@std/encoding@1.0.10/base64url",

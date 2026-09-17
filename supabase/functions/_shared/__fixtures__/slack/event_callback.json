@@ -1,0 +1,20 @@
+{
+  "token": "slack-verification-token-test",
+  "team_id": "T0FIXTURE",
+  "api_app_id": "A0FIXTURE",
+  "event": {
+    "type": "message",
+    "channel": "C0FIXTURE",
+    "user": "U0FIXTURE",
+    "text": "hello from *slack*",
+    "ts": "1757000000.000100",
+    "channel_type": "channel",
+    "event_ts": "1757000000.000100"
+  },
+  "type": "event_callback",
+  "event_id": "Ev0FIXTURE",
+  "event_time": 1757000000,
+  "authorizations": [
+    { "team_id": "T0FIXTURE", "user_id": "U0BOT", "is_bot": true }
+  ]
+}

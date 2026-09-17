@@ -291,7 +291,7 @@ async function send(
   }
 }
 
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
 
   if (token !== SERVICE_ROLE_KEY) {
@@ -419,4 +419,6 @@ Deno.serve(async (req) => {
   }
 
   return new Response();
-});
+}
+
+if (import.meta.main) Deno.serve(handler);

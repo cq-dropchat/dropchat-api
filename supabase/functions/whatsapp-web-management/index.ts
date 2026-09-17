@@ -273,4 +273,7 @@ app.post("/whatsapp-web-management/sessions/events", async (c) => {
   return c.json({});
 });
 
-Deno.serve(app.fetch);
+// Exported for tests; served only as the entry module (edge runtime).
+export const handler = (req: Request) => app.fetch(req);
+
+if (import.meta.main) Deno.serve(handler);

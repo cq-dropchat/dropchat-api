@@ -124,7 +124,7 @@ function collectOrgAddresses(payload: InstagramWebhookPayload): string[] {
   return Array.from(ids);
 }
 
-Deno.serve(async (request) => {
+export async function handler(request: Request): Promise<Response> {
   switch (request.method) {
     case "GET":
       return verifyToken(request);
@@ -133,7 +133,9 @@ Deno.serve(async (request) => {
   }
 
   return new Response("Method not implemented", { status: 501 });
-});
+}
+
+if (import.meta.main) Deno.serve(handler);
 
 function verifyToken(request: Request): Response {
   if (!VERIFY_TOKEN) {

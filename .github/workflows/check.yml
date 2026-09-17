@@ -16,3 +16,41 @@ jobs:
       - run: deno fmt --check
       - run: cd supabase/functions && deno lint && deno check .
       - run: cd plugin && deno lint && deno check .
+
+  # Database (pgTAP) and Edge Function (Deno.test) suites against a local
+  # Supabase. Gates: every test green, Deno line coverage over the threshold
+  # in _shared/testing/coverage_gate.ts.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      # Applies every migration and seed.sql on a fresh database. A broken
+      # seed (F25) fails here, before it reaches anyone's laptop.
+      - run: supabase start -x studio,imgproxy,inbucket,logflare,vector
+      - run: supabase db reset
+
+      - name: pgTAP
+        run: supabase/tests/run.sh
+
+      - name: Deno.test + coverage gate
+        run: cd supabase/functions && deno task test:coverage
+        env:
+          SUPABASE_URL: http://127.0.0.1:54321
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lcov-functions
+          path: supabase/functions/coverage/lcov.info
+          if-no-files-found: ignore
+
+      - if: always()
+        run: supabase stop --no-backup

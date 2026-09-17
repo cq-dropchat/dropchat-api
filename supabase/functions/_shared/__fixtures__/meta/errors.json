@@ -1,0 +1,31 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "300000000000001",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "5491100000001",
+              "phone_number_id": "100000000000001"
+            },
+            "errors": [
+              {
+                "code": 130429,
+                "title": "Rate limit hit",
+                "message": "(#130429) Rate limit hit",
+                "error_data": {
+                  "details": "Message failed to send because there were too many messages sent from this phone number in a short period of time"
+                },
+                "href": "https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes/"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
