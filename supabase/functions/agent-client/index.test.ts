@@ -325,3 +325,60 @@ Deno.test({
     }
   },
 });
+
+// ---------------------------------------------------------------------------
+// P1 — the window was bounded by the function's own clock while the rows are
+// stamped by the database's. With the database ahead, the triggering row fell
+// outside the window, `getNewestIncomingMessage` returned `undefined` and the
+// handler threw a TypeError: 500, and the contact never got an answer.
+// ---------------------------------------------------------------------------
+
+/** Runs the function's clock `ms` behind the database's, as real skew does. */
+function skewClockBack(ms: number) {
+  const RealDate = Date;
+  class SkewedDate extends RealDate {
+    // deno-lint-ignore no-explicit-any
+    constructor(...args: any[]) {
+      // No arguments means "now", which is where the skew lives.
+      // deno-lint-ignore no-explicit-any
+      super(...(args.length ? args : [RealDate.now() - ms]) as [any]);
+    }
+    static override now() {
+      return RealDate.now() - ms;
+    }
+  }
+  // deno-lint-ignore no-explicit-any
+  globalThis.Date = SkewedDate as any;
+  return { restore: () => (globalThis.Date = RealDate) };
+}
+
+Deno.test({
+  name:
+    "P1: a database clock ahead of the function's still gets one answer, not a TypeError",
+  ignore: !up,
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    const client = service();
+    const since = new Date(Date.now() - 1000).toISOString();
+    await cleanup(client, since);
+    const llm = stubLlm();
+    // No settle(): the skew is the case under test. The agent answers with
+    // response_delay_seconds: 0, where any skew at all is enough.
+    const clock = skewClockBack(2000);
+
+    try {
+      await withTestAgent(client, async () => {
+        const m = await inbound(client, "hola");
+        await invoke(m);
+
+        assertEquals(llm.calls(), 1);
+        assertEquals(await replies(client, since), 1);
+      });
+    } finally {
+      clock.restore();
+      llm.restore();
+      await cleanup(client, since);
+    }
+  },
+});
