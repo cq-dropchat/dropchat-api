@@ -47,6 +47,10 @@ insert into service_only values
   ('public.request_id_header()'),
   ('public.pending_deletion_media(integer)'),
   ('public.forget_deletion_media(uuid, text[])'),
+  ('public.claim_organization_export()'),
+  ('public.finish_organization_export(uuid, text, text)'),
+  ('public.expired_organization_exports(integer)'),
+  ('public.mark_organization_export_expired(uuid)'),
   ('billing.renew_subscriptions(integer)'),
   ('billing.grant_included_products(uuid, text, timestamp with time zone)');
 

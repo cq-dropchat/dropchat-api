@@ -265,6 +265,35 @@ curl 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/logs?level=eq.error&selec
   -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_API_KEY>'
 ```
 
+## 9. (Optional) Export your organization's data
+
+An owner (user or **owner** API key) can take a copy of the organization's data:
+one NDJSON file per table (`organizations`, `organizations_addresses`,
+`contacts_addresses`, `conversations`, `messages`, `agents`, `webhooks`, `logs`)
+and a `manifest.json`, in a ZIP. Credentials are not included: `extra` values
+stored as secrets, credential-named keys and webhook tokens are left out.
+Attachments are not included either; `messages.content.file.uri` names them.
+
+```bash
+# File the export (returns its id; while one is pending you get that one)
+curl -X POST 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/rpc/request_organization_export' \
+  -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_OWNER_API_KEY>' \
+  -H 'Content-Type: application/json' -d '{"_organization_id": "<ORG_ID>"}'
+
+# Wait for status "ready" (pending → processing → ready | failed)
+curl 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/organization_exports?id=eq.<EXPORT_ID>&select=status,object_name,error,expires_at' \
+  -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_OWNER_API_KEY>'
+
+# Sign a download URL for object_name (valid 1 hour here)
+curl -X POST 'https://nheelwshzbgenpavwhcy.supabase.co/storage/v1/object/sign/exports/<OBJECT_NAME>' \
+  -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_OWNER_API_KEY>' \
+  -H 'Content-Type: application/json' -d '{"expiresIn": 3600}'
+```
+
+The file is removed 7 days after it is ready (the row then reads `expired`), and
+at once if the organization or one of its accounts is deleted. A member or admin
+(or their keys) gets `42501`.
+
 ---
 
 ## Recap

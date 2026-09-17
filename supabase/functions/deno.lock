@@ -24,6 +24,7 @@
     "npm:@types/node@*": "24.2.0",
     "npm:ajv@8.17.1": "8.17.1",
     "npm:dayjs@^1.11.10": "1.11.12",
+    "npm:fflate@0.8.2": "0.8.2",
     "npm:mathjs@^11.10.0": "11.12.0",
     "npm:mysql2@^3.14.3": "3.16.2",
     "npm:openai@^4.52.5": "4.104.0_zod@4.3.6",
@@ -608,6 +609,9 @@
         "node-domexception",
         "web-streams-polyfill@3.3.3"
       ]
+    },
+    "fflate@0.8.2": {
+      "integrity": "sha512-cPJU47OaAoCbg0pBvzsgpTPhmhqI5eJjh/JIu8tPj5q+T7iLvW/JAYUqmE7KOB4R1ZyEhzBaIQpQpardBF5z8A=="
     },
     "finalhandler@2.1.1": {
       "integrity": "sha512-S8KoZgRZN+a5rNwqTxlZZePjT/4cnm0ROV70LedRHZ0p8u9fRID0hJUZQpkKLzro8LfmC8sx23bY6tVNxv8pQA==",
@@ -1461,6 +1465,7 @@
       "npm:@slack/web-api@8",
       "npm:@supabase/supabase-js@2.54.0",
       "npm:dayjs@^1.11.10",
+      "npm:fflate@0.8.2",
       "npm:mathjs@^11.10.0",
       "npm:mysql2@^3.14.3",
       "npm:openai@^5.12.2",

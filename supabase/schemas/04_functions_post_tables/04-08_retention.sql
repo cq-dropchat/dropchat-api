@@ -23,6 +23,7 @@ declare
   _hooks integer;
   _logs integer;
   _tokens integer;
+  _exports integer;
 begin
   delete from supabase_functions.hooks
   where id in (
@@ -47,10 +48,22 @@ begin
   );
   get diagnostics _tokens = row_count;
 
+  -- F18: exports whose file is gone (expired) or that failed, a week after
+  -- they finished.
+  delete from public.organization_exports
+  where id in (
+    select e.id from public.organization_exports e
+    where e.status in ('expired', 'failed')
+      and coalesce(e.completed_at, e.requested_at) < now() - interval '7 days'
+    limit _batch
+  );
+  get diagnostics _exports = row_count;
+
   return jsonb_build_object(
     'hooks', _hooks,
     'logs', _logs,
-    'onboarding_tokens', _tokens
+    'onboarding_tokens', _tokens,
+    'organization_exports', _exports
   );
 end;
 $$;

@@ -76,6 +76,15 @@ begin
 
   _org := _req.address is null;
 
+  -- F18: an export holds the data being deleted. Expire the organization's
+  -- ready exports now (the org-export worker removes the files); one still
+  -- being built is expired when it finishes (finish_organization_export).
+  update public.organization_exports
+  set expires_at = now()
+  where organization_id = _req.organization_id
+    and status = 'ready'
+    and expires_at > now();
+
   -- Messages: through the conversations of the scope, so both scopes use
   -- messages_org_conv_timestamp_idx. For an account, the internal objects
   -- the deleted rows referenced under the organization's own path are

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Organization export** (F18). `rpc/request_organization_export` with
+  `{"_organization_id"}` (owners and owner API keys only; `42501` otherwise)
+  files an export and returns its id; while one is pending or processing, the
+  same id is returned. The `org-export` worker writes a ZIP to the private
+  `exports` bucket at `organizations/<org>/exports/<id>.zip` with one NDJSON per
+  table (`organizations`, `organizations_addresses`, `contacts_addresses`,
+  `conversations`, `messages`, `agents`, `webhooks`, `logs`) and a
+  `manifest.json`. Credentials are not included and attachments are not either
+  (their URIs are). Owners read `public.organization_exports` (`status`:
+  `pending`, `processing`, `ready`, `failed`, `expired`) and sign a download URL
+  for `object_name`. Files expire after 7 days, and at once when the
+  organization or one of its accounts is deleted. Export files do not count
+  against the storage quota. See INTEGRATING.md §9.
+
 - **Deleting an account also deletes its attachments** (F18). When one account
   is deleted (Meta's data-deletion callback), the attachments its messages
   referenced are now removed from Storage by the hourly `storage-gc` run, unless

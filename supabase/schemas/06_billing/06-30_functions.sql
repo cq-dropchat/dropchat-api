@@ -277,6 +277,11 @@ declare
   _org_id uuid;
   _size_gb numeric;
 begin
+  -- F18: only attachments count; export files are the platform's.
+  if new.bucket_id is distinct from 'media' then
+    return new;
+  end if;
+
   _org_id := (string_to_array(new.name, '/'))[2]::uuid;
   _size_gb := coalesce((new.metadata->>'size')::numeric, 0) / 1000000000.0;
 
@@ -296,6 +301,11 @@ declare
   _org_id uuid;
   _size_gb numeric;
 begin
+  -- F18: only attachments count; export files are the platform's.
+  if coalesce(new.bucket_id, old.bucket_id) is distinct from 'media' then
+    return coalesce(new, old);
+  end if;
+
   if tg_op = 'INSERT' then
     _org_id := (string_to_array(new.name, '/'))[2]::uuid;
     _size_gb := coalesce((new.metadata->>'size')::numeric, 0) / 1000000000.0;

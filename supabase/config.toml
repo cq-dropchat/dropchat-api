@@ -92,6 +92,11 @@ verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/storage-gc/index.ts"
 
+[functions.org-export]
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/org-export/index.ts"
+
 [functions.slack-management]
 verify_jwt = false
 import_map = "./functions/deno.json"
