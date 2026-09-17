@@ -78,6 +78,12 @@ challenge pointing at `/mcp/.well-known/oauth-protected-resource`, which names
 Supabase Auth's native OAuth 2.1 server (dynamic client registration on) as the
 authorization server. Consent UI: `/oauth/consent` in open-bsp-ui.
 
+Organization: on the OAuth path, `Organization-Id: <uuid>` (or
+`?organization_id=<uuid>` on the URL, for connectors that cannot set headers)
+picks one of the user's current memberships — `403` if it is not one, `400` if
+it is not a uuid. Without it, the user's oldest membership. On the API-key path
+the key's organization is used; `Organization-Id`, if sent, must match it.
+
 Optional `Allowed-Contacts` / `Allowed-Accounts` headers (comma-separated phone
 numbers) restrict which contacts/accounts the caller can touch; empty or absent
 means unrestricted (RLS still applies).

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **MCP: choose the organization** (F27). A user who belongs to several
+  organizations can name one with the `Organization-Id` header or, for
+  connectors that cannot set headers, `?organization_id=` on the MCP URL. It
+  must be one of the user's current memberships (`403` otherwise, `400` for a
+  malformed id). Without it the server uses the user's oldest membership, the
+  same one on every request; before, it took whichever membership the database
+  returned first, and removed memberships could be picked. An API key already
+  belongs to one organization: `Organization-Id` is optional and must match it
+  (`403` otherwise).
+
 - **Meta webhooks accept every configured app** (F19). With several apps in
   `META_APP_ID`/`META_APP_SECRET` (or the `INSTAGRAM_*` pair), a request without
   `?app_id=` is now checked against every secret instead of only the first, so a

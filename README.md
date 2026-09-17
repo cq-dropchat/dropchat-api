@@ -285,7 +285,9 @@ Two authentication methods:
 - **OAuth (humans, recommended)** — just add the server URL; the MCP client
   discovers Supabase Auth's OAuth 2.1 server (dynamic client registration),
   opens the browser, and you sign in with your OpenBSP account and approve on
-  the consent page. Access is scoped to your user via RLS.
+  the consent page. Access is scoped to your user via RLS. If you belong to
+  several organizations, add `?organization_id=<uuid>` to the URL (or send an
+  `Organization-Id` header); otherwise your oldest membership is used.
 - **API key (servers and bots)** — send an `api-key: <API_KEY>` header
   (`Authorization: Bearer <API_KEY>` also works). Get it from OpenBSP > Settings
   > API Keys. Optionally, `Allowed-Contacts` and `Allowed-Accounts` headers

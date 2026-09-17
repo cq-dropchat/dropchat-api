@@ -20,6 +20,11 @@ import { authBaseUrl, functionsBaseUrl } from "../_shared/urls.ts";
 import * as log from "../_shared/logger.ts";
 import { withRequestLogging } from "../_shared/logger.ts";
 import * as tools from "./tools.ts";
+import {
+  chooseApiKeyOrganization,
+  chooseUserOrganization,
+  requestedOrganization,
+} from "./organization.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Hono context variables set by auth middleware
@@ -64,6 +69,16 @@ app.use("*", async (c, next) => {
     return c.json({ error: message }, 401);
   };
 
+  // 401 keeps the OAuth challenge; 400 and 403 are about the organization
+  // named, which a new token would not change.
+  const refuse = (
+    choice: { status: 400 | 401 | 403; error: string },
+  ) => {
+    if (choice.status === 401) return unauthorized(choice.error);
+    log.warn(choice.error, { status: choice.status });
+    return c.json({ error: choice.error }, choice.status);
+  };
+
   try {
     const bearer = (c.req.header("Authorization") ?? "").replace(
       /^Bearer\s+/i,
@@ -90,8 +105,16 @@ app.use("*", async (c, next) => {
         return unauthorized("API key not authorized");
       }
 
+      const choice = chooseApiKeyOrganization(
+        key.organization_id,
+        requestedOrganization(c.req.raw),
+      );
+      if (!choice.ok) {
+        return refuse(choice);
+      }
+
       c.set("supabase", supabase);
-      c.set("orgId", key.organization_id);
+      c.set("orgId", choice.orgId);
     } else if (looksLikeJwt) {
       // Human via OAuth (or a plain Supabase session JWT).
       const supabase = createClient(c.req.raw);
@@ -101,19 +124,19 @@ app.use("*", async (c, next) => {
         return unauthorized("Invalid token", error);
       }
 
-      // Org-scope the session: first org the user belongs to (RLS applies).
-      const { data: agents, error: agentsError } = await supabase
-        .from("agents")
-        .select("organization_id")
-        .eq("user_id", data.user.id)
-        .limit(1);
-
-      if (agentsError || !agents?.length) {
-        return unauthorized("No organization for this user", agentsError);
+      // Org-scope the session (F27): the organization the request names, or
+      // the user's oldest membership. RLS applies.
+      const choice = await chooseUserOrganization(
+        supabase,
+        data.user.id,
+        requestedOrganization(c.req.raw),
+      );
+      if (!choice.ok) {
+        return refuse(choice);
       }
 
       c.set("supabase", supabase);
-      c.set("orgId", agents[0].organization_id);
+      c.set("orgId", choice.orgId);
     } else {
       return unauthorized("Missing credentials");
     }
