@@ -1,0 +1,764 @@
+export const snapshot = {};
+
+snapshot[`F29: agent-client tool round, then the answer (characterization) 1`] = `
+{
+  requests: [
+    [
+      {
+        content: "You are a test robot.
+
+{
+  now: '<now>',
+  user: {
+    name: undefined,
+    phone: '+5491129100001'
+  }
+}",
+        role: "system",
+      },
+      {
+        content: "¿cuánto es 2+2?",
+        role: "user",
+      },
+    ],
+    [
+      {
+        content: "You are a test robot.
+
+{
+  now: '<now>',
+  user: {
+    name: undefined,
+    phone: '+5491129100001'
+  }
+}",
+        role: "system",
+      },
+      {
+        content: "¿cuánto es 2+2?",
+        role: "user",
+      },
+      {
+        role: "assistant",
+        tool_calls: [
+          {
+            function: {
+              arguments: '{"expression":"2+2"}',
+              name: "calculator",
+            },
+            id: "call_1_0",
+            type: "function",
+          },
+          {
+            function: {
+              arguments: '{"expr":1}',
+              name: "calculator",
+            },
+            id: "call_1_1",
+            type: "function",
+          },
+          {
+            function: {
+              arguments: "{}",
+              name: "weather",
+            },
+            id: "call_1_2",
+            type: "function",
+          },
+        ],
+      },
+      {
+        content: '{"result":4}',
+        role: "tool",
+        tool_call_id: "call_1_0",
+      },
+      {
+        content: \`Tool input validation failed: [{"instancePath":"","schemaPath":"#/required","keyword":"required","params":{"missingProperty":"expression"},"message":"must have required property 'expression'"}]\`,
+        role: "tool",
+        tool_call_id: "call_1_1",
+      },
+      {
+        content: "Tool weather not found between available tools.",
+        role: "tool",
+        tool_call_id: "call_1_2",
+      },
+    ],
+  ],
+  rows: [
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          expression: "2+2",
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "use",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_1_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          expr: 1,
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "use",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_1_1",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        internal: true,
+        kind: "text",
+        task: {
+          id: "<uuid>",
+        },
+        text: "{}",
+        tool: {
+          event: "use",
+          name: "weather",
+          provider: "local",
+          type: "function",
+          use_id: "call_1_2",
+        },
+        type: "text",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          result: 4,
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "result",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_1_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        internal: true,
+        kind: "text",
+        task: {
+          id: "<uuid>",
+        },
+        text: \`Tool input validation failed: [{"instancePath":"","schemaPath":"#/required","keyword":"required","params":{"missingProperty":"expression"},"message":"must have required property 'expression'"}]\`,
+        tool: {
+          event: "result",
+          is_error: true,
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_1_1",
+        },
+        type: "text",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        internal: true,
+        kind: "text",
+        task: {
+          id: "<uuid>",
+        },
+        text: "Tool weather not found between available tools.",
+        tool: {
+          event: "result",
+          is_error: true,
+          name: "weather",
+          provider: "local",
+          type: "function",
+          use_id: "call_1_2",
+        },
+        type: "text",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        kind: "text",
+        text: "Son 4.",
+        type: "text",
+        version: "1",
+      },
+      sender_address: null,
+      status: {
+        pending: "<now>",
+      },
+    },
+  ],
+}
+`;
+
+snapshot[`F29: agent-client stops after ten iterations (characterization) 1`] = `
+{
+  llmCalls: 10,
+  rows: [
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          expression: "1+1",
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "use",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_1_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          result: 2,
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "result",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_1_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          expression: "1+1",
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "use",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_2_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          result: 2,
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "result",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_2_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          expression: "1+1",
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "use",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_3_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          result: 2,
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "result",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_3_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          expression: "1+1",
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "use",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_4_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          result: 2,
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "result",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_4_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          expression: "1+1",
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "use",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_5_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          result: 2,
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "result",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_5_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          expression: "1+1",
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "use",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_6_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          result: 2,
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "result",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_6_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          expression: "1+1",
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "use",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_7_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          result: 2,
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "result",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_7_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          expression: "1+1",
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "use",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_8_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          result: 2,
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "result",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_8_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          expression: "1+1",
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "use",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_9_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          result: 2,
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "result",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_9_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          expression: "1+1",
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "use",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_10_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          result: 2,
+        },
+        internal: true,
+        kind: "data",
+        task: {
+          id: "<uuid>",
+        },
+        tool: {
+          event: "result",
+          name: "calculator",
+          provider: "local",
+          type: "function",
+          use_id: "call_10_0",
+        },
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        internal: true,
+        kind: "text",
+        text: "Max LLM iterations reached!",
+        type: "text",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+  ],
+}
+`;
+
+snapshot[`F29: agent-client greets a new conversation (characterization) 1`] = `
+{
+  llmCalls: 0,
+  rows: [
+    {
+      agent_id: "<agent>",
+      content: {
+        kind: "text",
+        text: "¡Bienvenido! ¿En qué te ayudo?",
+        type: "text",
+        version: "1",
+      },
+      sender_address: null,
+      status: {
+        pending: "<now>",
+      },
+    },
+  ],
+}
+`;

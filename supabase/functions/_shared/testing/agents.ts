@@ -57,6 +57,7 @@ export function stubLlm(latencyMs = 200) {
 export async function withTestAgent(
   client: Client,
   fn: (agentId: string) => Promise<void>,
+  extraOverrides: Record<string, unknown> = {},
 ) {
   const { data: robot } = await client
     .from("agents")
@@ -86,6 +87,7 @@ export async function withTestAgent(
         model: "openai/gpt-oss-20b",
         instructions: "You are a test robot.",
         response_delay_seconds: 0,
+        ...extraOverrides,
       },
     })
     .select("id")
