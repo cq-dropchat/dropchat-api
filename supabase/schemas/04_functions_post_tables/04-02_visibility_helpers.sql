@@ -107,6 +107,31 @@ $$;
 -- restored from the old row on every API-role update
 -- (preserve_conversation_addressing), so a participant cannot retype a private
 -- room as a channel and publish it to the organization.
+-- The restriction rule for one conversation's columns (F10: shared with the
+-- realtime broadcast trigger, so the two cannot drift). Immutable SQL: inlined
+-- into get_restricted_conversations.
+create function public.is_restricted_conversation(
+  conv_service public.service,
+  conv_type text,
+  conv_extra jsonb
+) returns boolean
+language sql
+immutable
+set search_path to ''
+as $$
+  select
+    -- Slack: shared iff the bot is in it.
+    (
+      conv_service = 'slack'::public.service
+      and not coalesce((conv_extra->>'is_bot_member')::boolean, false)
+    )
+    -- local: shared iff it is a public channel.
+    or (
+      conv_service = 'local'::public.service
+      and conv_type is distinct from 'channel'
+    );
+$$;
+
 create function public.get_restricted_conversations()
 returns setof uuid
 language sql
@@ -117,18 +142,7 @@ as $$
   select c.id
   from public.conversations c
   where c.organization_id in (select public.get_authorized_orgs('member'))
-    and (
-      -- Slack: shared iff the bot is in it.
-      (
-        c.service = 'slack'::public.service
-        and not coalesce((c.extra->>'is_bot_member')::boolean, false)
-      )
-      -- local: shared iff it is a public channel.
-      or (
-        c.service = 'local'::public.service
-        and c.type is distinct from 'channel'
-      )
-    );
+    and public.is_restricted_conversation(c.service, c.type, c.extra);
 $$;
 
 -- Boolean form, for callers that hold a single row rather than a query to

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Realtime broadcast channels** (F10). Conversation and message changes are
+  published to private Realtime channels: `org:<organization_id>` (a notice with
+  `table`, `op`, `id`, `organization_id`, `conversation_id`, `updated_at` and,
+  for a message update, `status_changed`; never content) for conversations
+  shared with the whole organization; `agent:<agent_id>` (the same notice) for
+  conversations only some members see, sent to each of them; and
+  `conv:<conversation_id>` (the full row). Join with
+  `channel(topic, { config: { private: true } })`; members and API keys of the
+  organization may join `org:`, a member their own `agent:`, and anyone who can
+  read the conversation its `conv:`. Fetch the rows a notice names through the
+  REST API. `postgres_changes` keeps working.
+
 - **Agent and media preprocessing calls are queued and retried** (F12).
   agent-client and media-preprocessor are no longer called with pg_net from the
   message triggers: calls go to `public.edge_calls` and a pg_cron worker sends

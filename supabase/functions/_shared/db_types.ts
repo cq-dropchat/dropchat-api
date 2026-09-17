@@ -1746,6 +1746,14 @@ export type Database = {
       }
       is_media_visible: { Args: { object_name: string }; Returns: boolean }
       is_public_https_url: { Args: { url: string }; Returns: boolean }
+      is_restricted_conversation: {
+        Args: {
+          conv_extra: Json
+          conv_service: Database["public"]["Enums"]["service"]
+          conv_type: string
+        }
+        Returns: boolean
+      }
       jsonb_deep_set: {
         Args: { path: string[]; target: Json; value: Json }
         Returns: Json
@@ -1795,6 +1803,7 @@ export type Database = {
         }
       }
       purge_expired_rows: { Args: { _batch?: number }; Returns: Json }
+      realtime_topic_uuid: { Args: { _prefix: string }; Returns: string }
       record_edge_call_result: {
         Args: {
           _error: string
