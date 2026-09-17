@@ -13,7 +13,11 @@ using (
   -- Subselect so the header is read once per query (an InitPlan) instead of
   -- once per row. It still evaluates before the OR's right side, so the
   -- short-circuit above holds.
-  key = (select current_setting('request.headers', true)::json->>'api-key')
+  key_hash = (
+    select extensions.digest(
+      current_setting('request.headers', true)::json->>'api-key', 'sha256'
+    )
+  )
   or organization_id in (
     select public.get_authorized_orgs('owner')
   )

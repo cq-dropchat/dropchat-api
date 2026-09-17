@@ -625,8 +625,12 @@ export type Database = {
       api_keys: {
         Row: {
           created_at: string
+          expires_at: string | null
           id: string
-          key: string
+          key: string | null
+          key_hash: string | null
+          key_prefix: string | null
+          last_used_at: string | null
           name: string
           organization_id: string
           role: Database["public"]["Enums"]["role"]
@@ -634,8 +638,12 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          expires_at?: string | null
           id?: string
-          key: string
+          key?: string | null
+          key_hash?: string | null
+          key_prefix?: string | null
+          last_used_at?: string | null
           name: string
           organization_id: string
           role?: Database["public"]["Enums"]["role"]
@@ -643,8 +651,12 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          expires_at?: string | null
           id?: string
-          key?: string
+          key?: string | null
+          key_hash?: string | null
+          key_prefix?: string | null
+          last_used_at?: string | null
           name?: string
           organization_id?: string
           role?: Database["public"]["Enums"]["role"]
@@ -1276,6 +1288,20 @@ export type Database = {
       agent_identity_unchanged: {
         Args: { p_id: string; p_organization_id: string; p_user_id: string }
         Returns: boolean
+      }
+      api_key_plaintext_cutover: { Args: never; Returns: string }
+      create_api_key: {
+        Args: {
+          p_expires_at?: string
+          p_name: string
+          p_organization_id: string
+          p_role?: Database["public"]["Enums"]["role"]
+        }
+        Returns: {
+          id: string
+          key: string
+          key_prefix: string
+        }[]
       }
       get_authorized_orgs: {
         Args: { role?: Database["public"]["Enums"]["role"] }

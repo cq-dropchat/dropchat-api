@@ -7,6 +7,7 @@ declare
   req_level int;
   api_key text;
   org_id uuid;
+  key_id uuid;
 begin
   req_level := case role::text
     when 'owner' then 3
@@ -50,9 +51,20 @@ begin
   api_key := current_setting('request.headers', true)::json->>'api-key';
 
   if api_key is not null then
-    select a.organization_id into org_id
+    -- F14: the secret is compared as sha256 (api_keys_key_hash_key serves
+    -- the probe). A row that still carries a plain key and no hash is only
+    -- honoured until the cutover; an expired key is never honoured.
+    select a.organization_id, a.id into org_id, key_id
     from public.api_keys a
-    where a.key = api_key
+    where (
+      a.key_hash = extensions.digest(api_key, 'sha256')
+      or (
+        a.key_hash is null
+        and a.key = api_key
+        and now() < public.api_key_plaintext_cutover()
+      )
+    )
+    and (a.expires_at is null or a.expires_at > now())
     and (
       case (a.role::text)
         when 'owner' then 3
@@ -62,6 +74,15 @@ begin
     ) >= req_level;
 
     if org_id is not null then
+      -- Usage stamp, at most once a minute, and only where a write is
+      -- possible: PostgREST serves GET inside a READ ONLY transaction.
+      if current_setting('transaction_read_only', true) = 'off' then
+        update public.api_keys a
+        set last_used_at = now()
+        where a.id = key_id
+          and (a.last_used_at is null or a.last_used_at < now() - interval '1 minute');
+      end if;
+
       return next org_id;
     end if;
     -- Same reasoning as the JWT branch: invalid key or insufficient role returns
@@ -150,4 +171,45 @@ set search_path to ''
 as $$
   select a.id from public.agents a
   where a.user_id = auth.uid() and a.deleted_at is null;
+$$;
+
+-- F14. Mints an API key and returns the plain secret ONCE. The row keeps
+-- only sha256 + prefix (hash_api_key), so nothing can show it again.
+-- Owners only — the same line api_keys' insert policy draws — checked here
+-- because the insert below runs as the definer.
+create function public.create_api_key(
+  p_organization_id uuid,
+  p_name text,
+  p_role public.role default 'member',
+  p_expires_at timestamp with time zone default null
+) returns table (id uuid, key text, key_prefix text)
+language plpgsql
+security definer
+set search_path to ''
+as $$
+declare
+  _key text;
+  _id uuid;
+begin
+  if p_organization_id not in (select public.get_authorized_orgs('owner')) then
+    raise exception using
+      errcode = '42501',
+      message = 'only owners can create api keys';
+  end if;
+
+  if p_name is null or length(trim(p_name)) = 0 then
+    raise exception using
+      errcode = '22023',
+      message = 'api key name is required';
+  end if;
+
+  -- 24 random bytes → 48 hex chars; `sk_` marks it as an OpenBSP secret.
+  _key := 'sk_' || encode(extensions.gen_random_bytes(24), 'hex');
+
+  insert into public.api_keys (organization_id, name, role, key, expires_at)
+  values (p_organization_id, p_name, p_role, _key, p_expires_at)
+  returning public.api_keys.id into _id;
+
+  return query select _id, _key, left(_key, 8);
+end;
 $$;

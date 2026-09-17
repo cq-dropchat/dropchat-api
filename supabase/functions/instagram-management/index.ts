@@ -1,3 +1,5 @@
+import type { ApiKeyRow } from "../_shared/types/database_types.ts";
+import { findApiKey } from "../_shared/api_keys.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Hono } from "@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
@@ -105,19 +107,23 @@ app.use("*", async (c, next) => {
 
   const client = createApiClient(c.req.raw);
 
-  const { data: apiKey, error: apiKeyError } = await client
-    .from("api_keys")
-    .select()
-    .eq("key", token)
-    .maybeSingle();
+  // F14: keys are stored hashed; the self-read policy compares the same
+  // sha256, so this finds the caller's own row (or nothing).
+  let apiKey: ApiKeyRow | null = null;
 
-  if (apiKeyError || !apiKey) {
+  try {
+    apiKey = await findApiKey(client, token);
+  } catch (apiKeyError) {
     log.error("Invalid API key", apiKeyError);
 
     throw new HTTPException(401, {
       message: "Invalid API key",
       cause: apiKeyError,
     });
+  }
+
+  if (!apiKey) {
+    throw new HTTPException(401, { message: "Invalid API key" });
   }
 
   c.set("apiKey", apiKey);

@@ -905,3 +905,31 @@ begin
   return new;
 end;
 $$;
+
+-- F14. Until this instant, an api_keys row that still holds a plain `key`
+-- and no hash (one the backfill never saw — there should be none) may
+-- authenticate by plaintext comparison; after it, only key_hash counts. A
+-- function so a test can override it inside its transaction. Date in the
+-- CHANGELOG.
+create function public.api_key_plaintext_cutover() returns timestamp with time zone
+language sql
+immutable
+as $$
+  select '2026-11-01T00:00:00Z'::timestamptz;
+$$;
+
+-- F14. Turns a plain `key` into its sha256 and visible prefix, and clears
+-- the plaintext, before the row is stored. Fires on insert and on any
+-- update that sets `key` (rotation by re-stating it).
+create function public.hash_api_key() returns trigger
+language plpgsql
+set search_path to ''
+as $$
+begin
+  new.key_hash := extensions.digest(new.key, 'sha256');
+  new.key_prefix := left(new.key, 8);
+  new.key := null;
+
+  return new;
+end;
+$$;

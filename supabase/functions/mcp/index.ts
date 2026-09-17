@@ -5,6 +5,7 @@
 //    RFC 9728 protected-resource metadata below.
 //  • Servers/chatbots: an org API key, in the `api-key` header or (legacy)
 //    as the Authorization bearer token.
+import { findApiKey } from "../_shared/api_keys.ts";
 import { Hono } from "@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
 import { McpServer } from "npm:@modelcontextprotocol/sdk@1.25.3/server/mcp.js";
@@ -75,14 +76,17 @@ app.use("*", async (c, next) => {
     if (apiKey) {
       const supabase = createApiClientFromKey(apiKey);
 
-      const { data: key, error: apiKeyError } = await supabase
-        .from("api_keys")
-        .select("organization_id")
-        .eq("key", apiKey)
-        .maybeSingle();
+      // F14: keys are stored hashed; findApiKey compares sha256 under RLS.
+      let key: { organization_id: string } | null = null;
 
-      if (apiKeyError || !key) {
+      try {
+        key = await findApiKey(supabase, apiKey);
+      } catch (apiKeyError) {
         return unauthorized("API key not authorized", apiKeyError);
+      }
+
+      if (!key) {
+        return unauthorized("API key not authorized");
       }
 
       c.set("supabase", supabase);

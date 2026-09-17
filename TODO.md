@@ -76,7 +76,7 @@ Monetization
 
 - [ ] Data export / DB dump
 
-- [ ] Encrypt API keys
+- [x] Encrypt API keys — stored as sha256 + prefix (F14)
 
 - [ ] Improved error handling
       https://modelcontextprotocol.io/specification/2025-03-26/server/tools#error-handling
