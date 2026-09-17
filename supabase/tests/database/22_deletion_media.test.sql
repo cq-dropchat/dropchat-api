@@ -16,7 +16,7 @@
 -- them no message still references, removes those through the Storage API,
 -- and forgets every row it handled (forget_deletion_media).
 begin;
-select plan(17);
+select plan(18);
 
 select has_table('public', 'deletion_media', 'deletion_media exists');
 
@@ -179,6 +179,28 @@ select tests.clear_authentication();
 select tests.authenticate_as_anon();
 select pg_temp.refused('anon');
 select tests.clear_authentication();
+
+-- P4/§5.2: the one shape this capture could not see was a v0 content, which
+-- carried the object as `media.id` with no `internal://media/` prefix — a
+-- different JSON path, so `content->'file'->>'uri'` read null and the object
+-- was never recorded. Since the backfill, `messages_content_schema` is
+-- validated and such a row cannot be written at all, which is what closes the
+-- gap: there is no unconvertible shape left for the sweep to miss.
+select throws_ok(
+  $$
+    insert into public.messages (
+      organization_id, service, organization_address, conversation_address,
+      sender_address, content, status
+    ) values (
+      tests.id('org_a'), 'whatsapp', tests.val('wa_a'), tests.val('contact_a1'),
+      tests.val('contact_a1'),
+      '{"type": "image", "media": {"id": "organizations/aaaaaaaa-0000-4000-8000-000000000001/attachments/f18-v0"}}',
+      '{"delivered": "2026-09-10T10:00:00Z"}'
+    )
+  $$,
+  '23514', null,
+  'a v0 media content, the one shape this sweep could not see, cannot be written'
+);
 
 select * from finish();
 rollback;
