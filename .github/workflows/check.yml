@@ -54,3 +54,19 @@ jobs:
 
       - if: always()
         run: supabase stop --no-backup
+
+  # F25: main is production (the Supabase GitHub integration deploys every
+  # push). Changes reach it only by promoting develop, which has already been
+  # deployed to DEV and smoke-tested. This job fails any other pull request
+  # into main; pair it with branch protection on main (require this check,
+  # no direct pushes) so the gate cannot be skipped.
+  promotion:
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: main only accepts develop
+        run: |
+          if [ "${{ github.head_ref }}" != "develop" ]; then
+            echo "::error::Pull requests into main must come from develop (got '${{ github.head_ref }}')."
+            exit 1
+          fi

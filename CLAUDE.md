@@ -104,6 +104,11 @@ ORDER BY created_at DESC;
     updates (e.g. backfilling a new column on existing rows).
   - **Imperative bits db diff can't model** — e.g. `cron.schedule(...)` /
     pg_cron jobs (see `*_cron.sql` migrations).
+  - **`CREATE INDEX CONCURRENTLY`** — on large tables (`messages`,
+    `conversations`) edit the generated `CREATE INDEX` into
+    `CREATE INDEX CONCURRENTLY`. The CLI runs each migration statement outside a
+    transaction block (verified), so it applies; keep it before any statement
+    that depends on the index (e.g. dropping the constraint it replaces).
   - **Enum value additions** — for an enum used by a column that an RLS policy
     (or other dependent) references, `db diff`'s rename/recreate/recast fails to
     apply: _"cannot alter type of a column used in a policy definition"_. Still
@@ -120,6 +125,9 @@ ORDER BY created_at DESC;
 - Migrations apply automatically via CI: pushing to `origin/develop` deploys to
   DEV, pushing to `origin/main` deploys to PROD. Never apply migrations manually
   or execute DDL directly on production.
+- Every change to a policy, helper or trigger ships with a pgTAP test under
+  `supabase/tests/database/` (run `supabase/tests/run.sh`); Edge Function
+  changes with a `Deno.test` (`cd supabase/functions && deno task test`).
 - See README.md "Local development > Database" for the full workflow.
 
 ## Generated types
