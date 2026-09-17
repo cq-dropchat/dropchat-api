@@ -590,48 +590,35 @@ begin
 end;
 $$;
 
+-- Enqueues one delivery per matching webhook (F06). Nothing leaves the
+-- database here: deliver_webhooks() (04-04_webhook_delivery.sql), on its
+-- pg_cron tick, sends, signs, retries and dead-letters. The insert is part
+-- of the writer's transaction, so a change that commits is delivered and
+-- one that rolls back is not.
+--
+-- The payload is the row as the API roles see it: since F02 no credential
+-- is stored in `extra`, so to_jsonb(new) carries the mask, never a token.
 create function public.notify_webhook() returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $$
-declare
-  webhook_record record;
-  headers jsonb;
 begin
-  -- loop through all matching webhooks
-  for webhook_record in
-    select w.url, w.token
-    from public.webhooks w
-    where new.organization_id = w.organization_id
-      and w.table_name = tg_table_name::public.webhook_table
-      and lower(tg_op)::public.webhook_operation = any(w.operations)
-    limit 3
-  loop
-    -- prepare headers
-    headers := case
-      when webhook_record.token is not null then
-        jsonb_build_object(
-          'content-type', 'application/json',
-          'authorization', 'Bearer ' || webhook_record.token
-        )
-      else
-        jsonb_build_object(
-          'content-type', 'application/json'
-        )
-      end;
-
-    -- send webhook notification
-    perform net.http_post(
-      url := webhook_record.url,
-      body := jsonb_build_object(
-        'data', to_jsonb(new),
-        'entity', tg_table_name,
-        'action', lower(tg_op)
-      ),
-      headers := headers
-    );
-  end loop;
+  insert into public.webhook_deliveries (organization_id, webhook_id, event, payload)
+  select
+    new.organization_id,
+    w.id,
+    tg_table_name || '.' || lower(tg_op),
+    jsonb_build_object(
+      'data', to_jsonb(new),
+      'entity', tg_table_name,
+      'action', lower(tg_op)
+    )
+  from public.webhooks w
+  where w.organization_id = new.organization_id
+    and w.table_name = tg_table_name::public.webhook_table
+    and lower(tg_op)::public.webhook_operation = any(w.operations)
+  order by w.created_at;
 
   return new;
 end;

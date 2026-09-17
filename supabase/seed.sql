@@ -284,9 +284,9 @@ insert into billing.ledger (organization_id, product_id, type, quantity, agent_i
 insert into public.webhooks (organization_id, table_name, operations, url, token) values
   ('3a182d8d-d6d8-44bd-b021-029915476b8c', 'messages',
    ARRAY['insert', 'update']::webhook_operation[],
-   'http://127.0.0.1:54321/rest/v1/messages', 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz'),
+   'https://hooks.example.test/messages', 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz'),
   ('3a182d8d-d6d8-44bd-b021-029915476b8c', 'conversations',
    ARRAY['insert']::webhook_operation[],
-   'http://127.0.0.1:54321/rest/v1/conversations', 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz')
+   'https://hooks.example.test/conversations', 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz')
 ;
 

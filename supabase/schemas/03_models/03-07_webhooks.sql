@@ -13,6 +13,13 @@ alter table only public.webhooks
 add constraint webhooks_pkey
 primary key (id);
 
+-- F06: https to a public hostname only (is_public_https_url,
+-- 04-04_webhook_delivery.sql). NOT VALID: a subscription that predates the
+-- rule keeps its row, and the worker refuses to deliver to it instead.
+alter table only public.webhooks
+add constraint webhooks_url_check
+check (public.is_public_https_url(url)) not valid;
+
 alter table only public.webhooks
 add constraint webhooks_organization_id_fkey
 foreign key (organization_id)

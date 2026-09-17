@@ -44,11 +44,12 @@ Monetization
 
 ## General
 
-- [ ] Webhook delivery retries — pg_net makes one attempt per event (no retry,
-      backoff, or dead-letter). Add retry with backoff + a dead-letter view.
-      Options: a pg_cron sweep re-firing net.\_http_response failures, or move
-      delivery to a queue table (pgmq) with attempt-count + backoff. Enqueue is
-      already durable/transactional; only redelivery is missing.
+- [x] Webhook delivery retries — queue table + pg_cron worker, HMAC, backoff,
+      dead letter (F06) — pg_net makes one attempt per event (no retry, backoff,
+      or dead-letter). Add retry with backoff + a dead-letter view. Options: a
+      pg_cron sweep re-firing net.\_http_response failures, or move delivery to
+      a queue table (pgmq) with attempt-count + backoff. Enqueue is already
+      durable/transactional; only redelivery is missing.
 
 - [ ] Batched/async mass deletions — org delete cascades to 15 tables, account
       delete cascades conversations+messages, and the Meta data-deletion

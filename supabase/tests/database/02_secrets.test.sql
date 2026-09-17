@@ -206,25 +206,25 @@ select tests.clear_authentication();
 insert into public.webhooks (organization_id, table_name, operations, url, token)
 values (tests.id('org_a'), 'organizations_addresses',
         array['update']::public.webhook_operation[],
-        'https://127.0.0.1:9/hooks/addresses', 'test-webhook-token-a');
+        'https://hooks.example.test/addresses', 'test-webhook-token-a');
 
 update public.organizations_addresses
 set status = 'disconnected'
 where organization_id = tests.id('org_a') and service = 'whatsapp';
 
 select is(
-  (select bool_or(pg_temp.leaks(convert_from(body, 'utf8')::jsonb))
-   from net.http_request_queue
-   where url = 'https://127.0.0.1:9/hooks/addresses'),
+  (select bool_or(pg_temp.leaks(d.payload))
+   from public.webhook_deliveries d
+   where d.event = 'organizations_addresses.update'),
   false,
   'notify_webhook: the organizations_addresses payload carries no token'
 );
 
 select is(
-  (select count(*) from net.http_request_queue
-   where url = 'https://127.0.0.1:9/hooks/addresses'),
+  (select count(*) from public.webhook_deliveries d
+   where d.event = 'organizations_addresses.update'),
   1::bigint,
-  'notify_webhook: the update was delivered once'
+  'notify_webhook: the update was enqueued once'
 );
 
 select * from finish();

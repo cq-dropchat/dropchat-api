@@ -1229,6 +1229,72 @@ export type Database = {
           },
         ]
       }
+      webhook_deliveries: {
+        Row: {
+          attempts: number
+          created_at: string
+          delivered_at: string | null
+          event: string
+          id: string
+          last_error: string | null
+          last_status_code: number | null
+          next_at: string
+          organization_id: string
+          payload: Json
+          request_id: number | null
+          status: string
+          updated_at: string
+          webhook_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          delivered_at?: string | null
+          event: string
+          id?: string
+          last_error?: string | null
+          last_status_code?: number | null
+          next_at?: string
+          organization_id: string
+          payload: Json
+          request_id?: number | null
+          status?: string
+          updated_at?: string
+          webhook_id: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          delivered_at?: string | null
+          event?: string
+          id?: string
+          last_error?: string | null
+          last_status_code?: number | null
+          next_at?: string
+          organization_id?: string
+          payload?: Json
+          request_id?: number | null
+          status?: string
+          updated_at?: string
+          webhook_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_deliveries_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhooks: {
         Row: {
           created_at: string
@@ -1303,6 +1369,11 @@ export type Database = {
           key_prefix: string
         }[]
       }
+      deliver_webhooks: { Args: never; Returns: Json }
+      dispatch_webhook_deliveries: {
+        Args: { p_batch?: number }
+        Returns: number
+      }
       get_authorized_orgs: {
         Args: { role?: Database["public"]["Enums"]["role"] }
         Returns: string[]
@@ -1338,6 +1409,7 @@ export type Database = {
         Returns: boolean
       }
       is_media_visible: { Args: { object_name: string }; Returns: boolean }
+      is_public_https_url: { Args: { url: string }; Returns: boolean }
       jsonb_deep_set: {
         Args: { path: string[]; target: Json; value: Json }
         Returns: Json
@@ -1347,7 +1419,14 @@ export type Database = {
         Returns: Json
       }
       message_rate_limit_per_minute: { Args: never; Returns: number }
+      record_webhook_result: {
+        Args: { p_delivery_id: string; p_error?: string; p_status_code: number }
+        Returns: undefined
+      }
       reject_invitation: { Args: { invitation_id: string }; Returns: undefined }
+      settle_webhook_deliveries: { Args: never; Returns: number }
+      webhook_max_attempts: { Args: never; Returns: number }
+      webhook_retry_delay: { Args: { attempt: number }; Returns: string }
     }
     Enums: {
       log_level: "info" | "warning" | "error"

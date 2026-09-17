@@ -348,13 +348,14 @@ insert into public.messages (
    '2026-09-01T11:01:00Z');
 
 -- ---------------------------------------------------------------------------
--- Webhooks (org A). Points at a closed local port so pg_net never delivers.
+-- Webhooks (org A). A public-looking name that resolves nowhere: the
+-- allowlist accepts it and nothing is ever delivered.
 -- ---------------------------------------------------------------------------
 
 insert into public.webhooks (id, organization_id, table_name, operations, url, token) values
   (tests.id('webhook_a'), tests.id('org_a'), 'messages',
    array['insert', 'update']::public.webhook_operation[],
-   'https://127.0.0.1:9/hooks/messages', 'test-webhook-token-a');
+   'https://hooks.example.test/messages', 'test-webhook-token-a');
 
 \echo 1..1
 \echo ok 1 - test fixture loaded

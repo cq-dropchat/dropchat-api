@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Outgoing webhooks are queued, signed and retried** (F06/F12). The trigger no
+  longer calls pg_net: it inserts one row per matching webhook in
+  `public.webhook_deliveries`, and the `deliver-webhooks` pg_cron job (every 30
+  s) sends them with a 5 s timeout, retries non-2xx answers after 1 s, 5 s, 30
+  s, 5 min and 1 h, and marks them `failed` after the fifth attempt. The
+  `limit 3` per event is gone. New headers: `x-openbsp-signature` (`sha256=`
+  HMAC of the raw body with the webhook token), `x-openbsp-delivery-id`,
+  `x-openbsp-event`. `webhooks.url` must be `https` to a public hostname (check
+  constraint, `NOT VALID` for existing rows; the worker refuses to deliver to a
+  URL that fails it). Payload shape unchanged.
+
 - **`init_data` walks an index instead of sorting the organization** (F07). New
   index
   `messages_org_timestamp_idx (organization_id, timestamp desc,

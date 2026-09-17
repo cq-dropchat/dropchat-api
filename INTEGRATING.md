@@ -89,12 +89,62 @@ curl -X POST 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/webhooks' \
   }'
 ```
 
-Subscribable tables: `organizations_addresses` (account connected / disconnected
-— **the payload includes the account access token**), `logs` (Meta events &
-errors), `contacts`, `contacts_addresses`, plus `messages` / `conversations`
-(the latter two only carry data for accounts _not_ using a per-account webhook —
-see step 7). OpenBSP `POST`s `{ entity, action, data: <row> }` to your `url`,
-with `Authorization: Bearer <token>` if you set one.
+Subscribable tables: `organizations_addresses` (account connected /
+disconnected; credentials in `extra` read as `********`), `logs` (Meta events &
+errors), `contacts_addresses`, plus `messages` / `conversations` (the latter two
+only carry data for accounts _not_ using a per-account webhook — see step 7).
+OpenBSP `POST`s `{ entity, action, data: <row> }` to your `url`.
+
+**URL rules.** `https://` to a public hostname only. Plain `http`, IP literals,
+`localhost` and internal names (`*.internal`, `*.local`, …) are refused.
+
+**Delivery.** Events are queued in the same transaction as the change and sent
+within ~30 s, with a 5 s timeout. Any non-2xx answer (or a timeout) is retried
+after 1 s, 5 s, 30 s, 5 min and 1 h; after the fifth failure the delivery is
+kept as `failed` in `webhook_deliveries` (readable by owners). Deliveries can
+arrive more than once and out of order: dedupe on `x-openbsp-delivery-id`.
+
+**Headers.**
+
+| Header                  | Value                                              |
+| ----------------------- | -------------------------------------------------- |
+| `authorization`         | `Bearer <token>`, when the webhook has a token     |
+| `x-openbsp-signature`   | `sha256=<hex HMAC-SHA256(token, raw body)>`        |
+| `x-openbsp-delivery-id` | unique per delivery (stable across retries)        |
+| `x-openbsp-event`       | `<table>.<insert\|update>`, e.g. `messages.insert` |
+
+**Verify the signature** against the raw body, before parsing it:
+
+```ts
+async function verifyOpenBSP(req: Request, token: string) {
+  const body = await req.text();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(token),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const mac = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(body),
+  );
+  const expected = "sha256=" +
+    [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  const got = req.headers.get("x-openbsp-signature") ?? "";
+  if (got.length !== expected.length) return null;
+  let diff = 0;
+  for (let i = 0; i < got.length; i++) {
+    diff |= got.charCodeAt(i) ^ expected.charCodeAt(i);
+  }
+  return diff === 0 ? JSON.parse(body) : null;
+}
+```
+
+The same code, with tests, is
+[`supabase/functions/_shared/webhook_signature.ts`](supabase/functions/_shared/webhook_signature.ts).
 
 ## 5. Mint an onboarding link (API key)
 

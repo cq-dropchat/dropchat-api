@@ -109,6 +109,11 @@ envelope:
 }
 ```
 
+Deliveries are signed (`x-openbsp-signature`), retried with backoff and may
+arrive twice — see
+[INTEGRATING.md](INTEGRATING.md#4-optional-register-webhooks-instead-of-polling)
+for the headers and a verification snippet.
+
 Reply when `data.sender_address` is set — the contact authored it; it is null on
 your own outgoing rows, which the webhook also fires for (and, with `"update"`,
 for status changes).
