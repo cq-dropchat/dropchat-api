@@ -1456,6 +1456,7 @@ export type Database = {
       }
       agent_turn_lease: { Args: never; Returns: string }
       api_key_plaintext_cutover: { Args: never; Returns: string }
+      backfill_message_contents: { Args: { _rows: Json }; Returns: number }
       begin_agent_turn: {
         Args: {
           _conversation_id: string

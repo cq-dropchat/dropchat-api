@@ -42,7 +42,8 @@ insert into service_only values
   ('public.claim_agent_turn(uuid, uuid)'),
   ('public.request_address_deletion(uuid, public.service, text, text)'),
   ('public.sweep_deletions(integer)'),
-  ('public.purge_expired_rows(integer)');
+  ('public.purge_expired_rows(integer)'),
+  ('public.backfill_message_contents(jsonb)');
 
 select is(
   (select array_agg(fn order by fn) from service_only
