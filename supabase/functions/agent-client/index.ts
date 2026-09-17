@@ -2,6 +2,7 @@ import { revealAgents } from "../_shared/secrets.ts";
 import { describeRemoteTool } from "./tools/mcp.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
   contactName,
@@ -1003,4 +1004,6 @@ export async function handler(req: Request): Promise<Response> {
   return new Response("ok", { headers: corsHeaders });
 }
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("agent-client", handler));
+}

@@ -27,6 +27,7 @@
 // `media_url` is a short-lived signed download URL for `content.file.uri`
 // (`internal://media/...`) so the connector never needs storage credentials.
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 import {
   createUnsecureClient,
   type MessageRow,
@@ -234,4 +235,6 @@ export async function handler(req: Request): Promise<Response> {
   return new Response();
 }
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("generic-dispatcher", handler));
+}

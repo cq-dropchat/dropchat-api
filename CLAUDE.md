@@ -57,6 +57,12 @@ curl -s "https://api.supabase.com/v1/projects/${REF}/analytics/endpoints/logs.al
   --data-urlencode "iso_timestamp_start=2026-04-10T00:00:00Z"
 ```
 
+Log lines are JSON (`_shared/logger.ts`): `ts`, `level`, `fn`, `request_id`,
+`msg`, plus the details' fields (`organization_id`, `message_id`, …). Every
+response carries `x-request-id`; filter one invocation with
+`regexp_contains(event_message, '"request_id":"<id>"')`, or one message with
+`'"message_id":"<uuid>"'`.
+
 Available log tables: `function_logs` (stdout), `function_edge_logs`
 (HTTP-level), `edge_logs`, `postgres_logs`, `auth_logs`, `storage_logs`,
 `realtime_logs`. Uses BigQuery SQL syntax. Max 1000 rows per query. Always

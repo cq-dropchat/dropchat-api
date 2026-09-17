@@ -1,6 +1,7 @@
 import { getAddressSecrets } from "../_shared/secrets.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 import {
   createUnsecureClient,
   type IgAttachmentType,
@@ -451,4 +452,6 @@ export async function handler(req: Request): Promise<Response> {
   return new Response();
 }
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("instagram-dispatcher", handler));
+}

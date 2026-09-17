@@ -5,6 +5,7 @@ import { Hono } from "@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
 import { HTTPException } from "jsr:@hono/hono/http-exception";
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 import { Json } from "../_shared/db_types.ts";
 import {
   createApiClient,
@@ -471,4 +472,6 @@ app.post("/whatsapp-management/onboard", async (c) => {
 // Exported for tests; served only as the entry module (edge runtime).
 export const handler = (req: Request) => app.fetch(req);
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("whatsapp-management", handler));
+}

@@ -2,6 +2,7 @@ import { waitUntil } from "../_shared/edge_runtime.ts";
 import { revealAddresses } from "../_shared/secrets.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 import { flagNeedsReauth } from "../_shared/instagram.ts";
 import {
   type ContactAddressInsert,
@@ -138,7 +139,9 @@ export async function handler(request: Request): Promise<Response> {
   return new Response("Method not implemented", { status: 501 });
 }
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("instagram-webhook", handler));
+}
 
 function verifyToken(request: Request): Response {
   if (!VERIFY_TOKEN) {

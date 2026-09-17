@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 import {
   createUnsecureClient,
   type EndpointMessage,
@@ -622,4 +623,6 @@ export async function handler(req: Request): Promise<Response> {
   return new Response();
 }
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("whatsapp-dispatcher", handler));
+}

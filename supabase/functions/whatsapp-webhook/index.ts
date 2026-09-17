@@ -2,6 +2,7 @@ import { insertLog } from "../_shared/logs.ts";
 import { waitUntil } from "../_shared/edge_runtime.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 import {
   type ContactAddressInsert,
   createUnsecureClient,
@@ -93,7 +94,9 @@ export async function handler(request: Request): Promise<Response> {
   return new Response("Method not implemented", { status: 501 });
 }
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("whatsapp-webhook", handler));
+}
 
 function verifyToken(request: Request): Response {
   if (!VERIFY_TOKEN) {

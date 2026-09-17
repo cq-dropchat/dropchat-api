@@ -19,6 +19,7 @@ import {
 import { downloadFromStorage, uploadToStorage } from "../_shared/media.ts";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 import { stringify } from "jsr:@std/csv/stringify";
 import { Json } from "../_shared/db_types.ts";
 
@@ -589,4 +590,6 @@ export async function handler(req: Request): Promise<Response> {
   return new Response();
 }
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("media-preprocessor", handler));
+}

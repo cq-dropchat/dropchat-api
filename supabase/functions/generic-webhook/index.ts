@@ -53,6 +53,7 @@
 // _shared/types/message_types.ts). Legacy TextPart kind 'reaction' payloads
 // from older bridge builds are still stored as-is; readers accept both.
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 import {
   type ContactAddressInsert,
   createUnsecureClient,
@@ -124,7 +125,9 @@ export async function handler(req: Request): Promise<Response> {
   }
 }
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("generic-webhook", handler));
+}
 
 async function handle(req: Request): Promise<Response> {
   if (req.method !== "POST") {

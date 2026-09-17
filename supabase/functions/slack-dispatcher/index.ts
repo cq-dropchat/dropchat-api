@@ -13,6 +13,7 @@
 // webhook uses — so the echo Slack sends back merges into this row (or, if
 // the echo lands first, commitDispatchedMessage folds the duplicate).
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 import {
   createUnsecureClient,
   type MessageRow,
@@ -433,4 +434,6 @@ export async function handler(req: Request): Promise<Response> {
   return new Response();
 }
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("slack-dispatcher", handler));
+}

@@ -18,6 +18,7 @@ import {
 } from "../_shared/supabase.ts";
 import { authBaseUrl, functionsBaseUrl } from "../_shared/urls.ts";
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 import * as tools from "./tools.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -371,4 +372,6 @@ app.all("*", async (c) => {
 // Exported for tests; served only as the entry module (edge runtime).
 export const handler = (req: Request) => app.fetch(req);
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("mcp", handler));
+}

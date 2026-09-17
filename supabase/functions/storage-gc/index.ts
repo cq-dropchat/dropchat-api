@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createUnsecureClient } from "../_shared/supabase.ts";
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 
 /**
  * Storage garbage collector.
@@ -163,4 +164,6 @@ export async function handler(req: Request): Promise<Response> {
   return Response.json({ orphans: orphans.length, drained, removed, done });
 }
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("storage-gc", handler));
+}

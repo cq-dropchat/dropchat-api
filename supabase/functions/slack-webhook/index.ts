@@ -14,6 +14,7 @@
 // connect time).
 import { waitUntil } from "../_shared/edge_runtime.ts";
 import * as log from "../_shared/logger.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 import { createUnsecureClient } from "../_shared/supabase.ts";
 import { handleEvent, type SlackEnvelope } from "./events.ts";
 
@@ -130,4 +131,6 @@ export async function handler(req: Request): Promise<Response> {
   return new Response();
 }
 
-if (import.meta.main) Deno.serve(handler);
+if (import.meta.main) {
+  Deno.serve(withRequestLogging("slack-webhook", handler));
+}
