@@ -48,7 +48,7 @@ export function getNewestIncomingMessage(
   incoming: MessageRow,
   messages: MessageRow[],
   fromPeer: (m: MessageRow) => boolean,
-) {
+): MessageRow {
   const incomingCreatedAt = new Date(incoming.created_at);
 
   const sortedMessages = messages
@@ -68,7 +68,30 @@ export function getNewestIncomingMessage(
       return 0;
     });
 
-  return sortedMessages[0];
+  // P1: the incoming row is the message this invocation was woken for, so it
+  // is the newest by definition — even when the window came back without it
+  // (a clock skew used to make that `undefined`, and the caller crashed on
+  // `.id`). Anything the window does carry still wins on its own merits.
+  return sortedMessages[0] ?? incoming;
+}
+
+/**
+ * The window's upper bound: scheduled messages must stay out, and the
+ * incoming one must stay in.
+ *
+ * P1: `timestamp` is stamped by the DATABASE (`now()`), and this process has
+ * its own clock. With the database ahead, `now()` here was already past —
+ * from the row's point of view — and the very message that woke this
+ * invocation read as "scheduled": it fell out of its own context window. The
+ * ceiling is therefore the later of the two instants, and the incoming row's
+ * string is used verbatim so its microseconds are not truncated below itself.
+ */
+function windowCeiling(incoming: MessageRow): string {
+  const now = new Date().toISOString();
+
+  return +new Date(incoming.timestamp) >= +new Date(now)
+    ? incoming.timestamp
+    : now;
 }
 
 /** The context window: up to 50 v1 messages of the last 7 days, oldest first. */
@@ -84,7 +107,7 @@ export async function loadRecentMessages(
       "timestamp",
       new Date(+new Date() - MESSAGES_TIME_LIMIT).toISOString(),
     ) // Time constraint for the conversation.
-    .lte("timestamp", new Date().toISOString()) // Scheduled messages have a future timestamp.
+    .lte("timestamp", windowCeiling(incoming)) // Scheduled messages have a future timestamp.
     .order("timestamp", { ascending: false })
     .limit(MESSAGES_QUANTITY_LIMIT) // Size constraint for the conversation.
     .throwOnError();

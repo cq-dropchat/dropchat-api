@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **An agent no longer goes silent when the database clock runs ahead** (P1).
+  agent-client read a conversation's history up to its own `now()`, while a
+  message's `timestamp` is stamped by the database. When the database clock was
+  ahead — even by milliseconds — the very message that woke the function fell
+  out of its context window, and the invocation ended in a 500 with no answer
+  sent (systematic for agents with `response_delay_seconds: 0`). The window now
+  ends at the later of the two instants, so the incoming message is always in
+  it, and scheduled messages (a `timestamp` further in the future) stay out.
+
 - **Realtime broadcast channels** (F10). Conversation and message changes are
   published to private Realtime channels: `org:<organization_id>` (a notice with
   `table`, `op`, `id`, `organization_id`, `conversation_id`, `updated_at` and,
