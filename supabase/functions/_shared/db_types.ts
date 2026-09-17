@@ -1356,6 +1356,10 @@ export type Database = {
         Returns: boolean
       }
       api_key_plaintext_cutover: { Args: never; Returns: string }
+      claim_message_dispatch: {
+        Args: { p_message_id: string }
+        Returns: boolean
+      }
       create_api_key: {
         Args: {
           p_expires_at?: string
@@ -1370,6 +1374,9 @@ export type Database = {
         }[]
       }
       deliver_webhooks: { Args: never; Returns: Json }
+      dispatch_lease_ttl: { Args: never; Returns: string }
+      dispatch_pending_messages: { Args: never; Returns: number }
+      dispatch_retry_delay: { Args: { attempt: number }; Returns: string }
       dispatch_webhook_deliveries: {
         Args: { p_batch?: number }
         Returns: number
@@ -1419,11 +1426,41 @@ export type Database = {
         Returns: Json
       }
       message_rate_limit_per_minute: { Args: never; Returns: number }
+      pending_dispatch_candidates: {
+        Args: never
+        Returns: {
+          agent_id: string | null
+          content: Json
+          conversation_address: string | null
+          conversation_id: string
+          created_at: string
+          external_id: string | null
+          id: string
+          organization_address: string
+          organization_id: string
+          sender_address: string | null
+          service: Database["public"]["Enums"]["service"]
+          status: Json
+          thread_id: string | null
+          timestamp: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "messages"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       record_webhook_result: {
         Args: { p_delivery_id: string; p_error?: string; p_status_code: number }
         Returns: undefined
       }
       reject_invitation: { Args: { invitation_id: string }; Returns: undefined }
+      release_message_dispatch: {
+        Args: { p_errors?: Json; p_message_id: string }
+        Returns: undefined
+      }
       settle_webhook_deliveries: { Args: never; Returns: number }
       webhook_max_attempts: { Args: never; Returns: number }
       webhook_retry_delay: { Args: { attempt: number }; Returns: string }

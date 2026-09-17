@@ -50,7 +50,13 @@ export async function commitDispatchedMessage({
 }): Promise<void> {
   // Caller-stated keys win, so a dispatcher that has a reason to keep the row
   // armed can say so.
-  const patch: Record<string, Json> = { pending: null, ...status };
+  // The lease and the backoff go with the arm bit (F11).
+  const patch: Record<string, Json> = {
+    pending: null,
+    dispatching: null,
+    retry_at: null,
+    ...status,
+  };
 
   const { error } = await client
     .from("messages")
@@ -107,5 +113,40 @@ export async function commitDispatchedMessage({
       status: { ...duplicateStatus, ...patch },
     })
     .eq("id", messageId)
+    .throwOnError();
+}
+
+/**
+ * F11. Takes the dispatch lease on an outgoing message: true for exactly one
+ * caller. The insert trigger and the retry sweep can both fire a dispatcher
+ * for the same row; without the lease a slow Meta round trip meant two sends.
+ * False also when the row is no longer armed or already has a delivery
+ * status — in every false case the caller has nothing to do.
+ */
+export async function claimDispatch(
+  client: SupabaseClient<Database>,
+  messageId: string,
+): Promise<boolean> {
+  const { data } = await client
+    .rpc("claim_message_dispatch", { p_message_id: messageId })
+    .throwOnError();
+  return data === true;
+}
+
+/**
+ * F11. A transient failure: records the error, counts the attempt, schedules
+ * the retry with exponential backoff (1, 2, 4 … 60 min) and releases the
+ * lease, keeping the row armed for the sweep.
+ */
+export async function releaseDispatch(
+  client: SupabaseClient<Database>,
+  messageId: string,
+  errors: Json[],
+): Promise<void> {
+  await client
+    .rpc("release_message_dispatch", {
+      p_message_id: messageId,
+      p_errors: errors,
+    })
     .throwOnError();
 }

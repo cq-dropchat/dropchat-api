@@ -107,9 +107,9 @@ create index messages_conversation_id_idx
 on public.messages
 using btree (conversation_id);
 
--- Serves the two per-minute sweeps (dispatch-outgoing-pending-messages,
--- preprocess-pending-messages), which scan a rolling 12-hour window by
--- timestamp. 728k scans, and the reason this index is not merely the
+-- Serves the per-minute preprocess-pending-messages sweep, which scans a
+-- rolling 12-hour window by timestamp (the dispatch sweep has its own partial
+-- index below since F11). 728k scans, and the reason this index is not merely the
 -- less-used sibling of created_at below.
 create index messages_timestamp_idx
 on public.messages
@@ -122,6 +122,16 @@ using btree (timestamp);
 create index messages_service_created_at_idx
 on public.messages
 using btree (service, created_at desc);
+
+-- The dispatch sweep's rows and nothing else (F11): armed, account-authored.
+-- messages_timestamp_idx above answered the same window by reading every
+-- message of the last 12 hours (789 buffers vs 68 measured in the audit, and
+-- ~1M rows per minute at 2M messages/day). The predicate matches
+-- pending_dispatch_candidates() word for word so the planner can use it.
+create index messages_dispatch_pending_idx
+on public.messages
+using btree (timestamp)
+where sender_address is null and (status ->> 'pending') is not null;
 
 create index messages_updated_at_idx
 on public.messages

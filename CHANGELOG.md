@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Outgoing dispatch has a lease and backoff** (F11). Dispatchers take
+  `status.dispatching` before calling the service, so the insert trigger and the
+  retry sweep never send one message twice. A transient failure records
+  `status.attempts` and `status.retry_at` (1, 2, 4 … 60 minutes) instead of
+  retrying every minute. Status webhooks can therefore show `dispatching`,
+  `attempts` and `retry_at` keys on outgoing rows; all are removed or left as
+  history once the message is accepted. The sweep runs
+  `public.dispatch_pending_messages()` over a partial index.
+
 - **Outgoing webhooks are queued, signed and retried** (F06/F12). The trigger no
   longer calls pg_net: it inserts one row per matching webhook in
   `public.webhook_deliveries`, and the `deliver-webhooks` pg_cron job (every 30

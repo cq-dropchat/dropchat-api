@@ -12,7 +12,11 @@ import {
   type WebhookPayload,
 } from "../_shared/supabase.ts";
 import { downloadFromStorage } from "../_shared/media.ts";
-import { commitDispatchedMessage } from "../_shared/dispatch.ts";
+import {
+  claimDispatch,
+  commitDispatchedMessage,
+  releaseDispatch,
+} from "../_shared/dispatch.ts";
 import { getAddressSecrets } from "../_shared/secrets.ts";
 import { Json } from "../_shared/db_types.ts";
 import { markdownToWhatsApp } from "../_shared/markdown.ts";
@@ -469,6 +473,15 @@ export async function handler(req: Request): Promise<Response> {
   // is a send; a contact's row only ever comes here for read receipts and
   // typing indicators.
   if (message.sender_address === null) {
+    // F11: one sender per message. The insert trigger and the retry sweep
+    // can both land here for the same row.
+    if (!(await claimDispatch(client, message.id))) {
+      log.info("Dispatch skipped: lease held or message no longer pending", {
+        message_id: message.id,
+      });
+      return new Response();
+    }
+
     try {
       const patchedMessage = await uploadMediaItem({
         message,
@@ -522,11 +535,8 @@ export async function handler(req: Request): Promise<Response> {
           error: errorMessage,
         });
 
-        await client
-          .from("messages")
-          .update({ status: { errors: [errorDetail] } })
-          .eq("id", message.id)
-          .throwOnError();
+        // F11: count the attempt, back off, release the lease.
+        await releaseDispatch(client, message.id, [errorDetail]);
 
         // Rethrow so the function returns 500 and the cron retries.
         throw error;
@@ -546,6 +556,7 @@ export async function handler(req: Request): Promise<Response> {
             // Terminal, so the arm bit goes with it — same reason
             // commitDispatchedMessage retracts on success.
             pending: null,
+            dispatching: null,
             failed: new Date().toISOString(),
             errors: [errorDetail],
           },

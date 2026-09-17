@@ -21,7 +21,11 @@ import {
 } from "../_shared/supabase.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Json } from "../_shared/db_types.ts";
-import { commitDispatchedMessage } from "../_shared/dispatch.ts";
+import {
+  claimDispatch,
+  commitDispatchedMessage,
+  releaseDispatch,
+} from "../_shared/dispatch.ts";
 import { downloadFromStorage } from "../_shared/media.ts";
 import { markdownToSlack } from "../_shared/markdown.ts";
 import {
@@ -310,6 +314,15 @@ export async function handler(req: Request): Promise<Response> {
     return new Response();
   }
 
+  // F11: one sender per message. The insert trigger and the retry sweep
+  // can both land here for the same row.
+  if (!(await claimDispatch(client, message.id))) {
+    log.info("Dispatch skipped: lease held or message no longer pending", {
+      message_id: message.id,
+    });
+    return new Response();
+  }
+
   let used: SlackConnection | undefined;
 
   try {
@@ -389,11 +402,8 @@ export async function handler(req: Request): Promise<Response> {
         error: errorMessage,
       });
 
-      await client
-        .from("messages")
-        .update({ status: { errors: [errorDetail] } })
-        .eq("id", message.id)
-        .throwOnError();
+      // F11: count the attempt, back off, release the lease.
+      await releaseDispatch(client, message.id, [errorDetail]);
 
       throw error;
     }
@@ -411,6 +421,7 @@ export async function handler(req: Request): Promise<Response> {
           // Terminal, so the arm bit goes with it — same reason
           // commitDispatchedMessage retracts on success.
           pending: null,
+          dispatching: null,
           failed: new Date().toISOString(),
           errors: [errorDetail],
         },
