@@ -2,13 +2,24 @@
 
 ## Unreleased
 
-- **Meta webhooks acknowledge before processing** (F05). `whatsapp-webhook`
-  and `instagram-webhook` validate the signature and answer `200`
-  immediately; tenant resolution, media download/upload and the upserts run
-  after the response under `EdgeRuntime.waitUntil`, as the Slack webhook
-  always did. Writes to `public.logs` no longer abort a batch. Nothing
-  changes for integrators; a `logs` row may now be missing where a webhook
-  used to fail whole.
+- **`init_data` walks an index instead of sorting the organization** (F07). New
+  index
+  `messages_org_timestamp_idx (organization_id, timestamp desc,
+  id desc)`,
+  built concurrently. Same parameters, same result set (the p_limit newest
+  messages, at most p_per_conversation per conversation, plus their
+  conversations); ties on `timestamp` are now broken by `id desc`, so the order
+  is total and a `p_until` follow-up never overlaps the previous page. Measured
+  at 60k messages / 300 conversations under RLS: 112 ms and 4,000 temp pages
+  before, 3.5 ms and no temp after.
+
+- **Meta webhooks acknowledge before processing** (F05). `whatsapp-webhook` and
+  `instagram-webhook` validate the signature and answer `200` immediately;
+  tenant resolution, media download/upload and the upserts run after the
+  response under `EdgeRuntime.waitUntil`, as the Slack webhook always did.
+  Writes to `public.logs` no longer abort a batch. Nothing changes for
+  integrators; a `logs` row may now be missing where a webhook used to fail
+  whole.
 
 - **API keys are stored hashed** (F14). `api_keys.key` is now a write-only slot:
   a key inserted there is turned into `key_hash` (sha256) and `key_prefix`

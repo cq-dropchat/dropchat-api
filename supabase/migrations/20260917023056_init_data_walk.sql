@@ -1,35 +1,14 @@
--- The first thing the UI loads: the p_limit newest messages of an
--- organization, keeping at most p_per_conversation per conversation, plus
--- the conversations they belong to.
---
--- Written as a walk, not a window (audit F07). The old form partitioned
--- EVERY message of the organization with row_number() before limiting —
--- O(N) with a sort on disk, 1.2 s at 200k rows, and it grew with the
--- organization's history rather than with what the screen shows. This one
--- reads messages_org_timestamp_idx newest-first and stops as soon as
--- p_limit rows are kept; the rows it skips are the ones past
--- p_per_conversation in busy conversations, so the scan is
--- p_limit + skipped, whatever the history behind it. The result is the
--- same set in the same order (pinned by supabase/tests/database/06_init_data).
---
--- Ties on timestamp are broken by id desc so the order is total and two
--- calls (phase 1 and the p_until phase 2 that follows) never overlap.
---
--- SECURITY INVOKER: RLS applies to the walk, so a caller only ever pages
--- through what the messages policy lets them see.
-create function public.init_data(
-  p_organization_id uuid,
-  p_limit integer default 200,
-  p_per_conversation integer default 10,
-  p_since timestamptz default null,
-  p_until timestamptz default null
-)
-returns json
-language plpgsql
-stable
-security invoker
-set search_path to ''
-as $$
+-- CONCURRENTLY: messages is the largest table (audit F07, F25).
+CREATE INDEX CONCURRENTLY messages_org_timestamp_idx ON public.messages USING btree (organization_id, "timestamp" DESC, id DESC);
+
+set check_function_bodies = off;
+
+CREATE OR REPLACE FUNCTION public.init_data(p_organization_id uuid, p_limit integer DEFAULT 200, p_per_conversation integer DEFAULT 10, p_since timestamp with time zone DEFAULT NULL::timestamp with time zone, p_until timestamp with time zone DEFAULT NULL::timestamp with time zone)
+ RETURNS json
+ LANGUAGE plpgsql
+ STABLE
+ SET search_path TO ''
+AS $function$
 declare
   _row record;
   _kept jsonb := '{}'::jsonb; -- conversation_id → rows kept so far
@@ -106,4 +85,7 @@ begin
     'messages', _messages
   );
 end;
-$$;
+$function$
+;
+
+

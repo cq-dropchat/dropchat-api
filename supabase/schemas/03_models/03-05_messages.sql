@@ -88,7 +88,17 @@ add constraint messages_content_schema check (
 ) not valid;
 
 -- No plain (organization_id) index: messages_org_conv_timestamp_idx below
--- leads with that column, so it serves the organization cascade too.
+-- leads with that column, so it serves the organization cascade too. What
+-- that composite cannot serve is "the newest N of this organization" — its
+-- second column is the conversation, so answering by time means reading the
+-- whole organization (or sweeping messages_timestamp_idx and discarding every
+-- other tenant's rows). That is what the index right below is for (audit
+-- F07): init_data walks it newest-first and stops after p_limit rows. `id`
+-- is in the key so the walk's total order (timestamp desc, id desc) is the
+-- index order and needs no sort.
+create index messages_org_timestamp_idx
+on public.messages
+using btree (organization_id, timestamp desc, id desc);
 
 -- Needed on its own even though the composite below mentions the column: that
 -- one leads with organization_id, so it cannot answer a conversation-only
