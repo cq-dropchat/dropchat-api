@@ -36,6 +36,13 @@ API key. Everything else is REST.
   Do **not** send `Authorization: Bearer <api-key>` — PostgREST would reject it
   as a non-JWT. See [AUTH.md](AUTH.md) for the full model.
 
+- An API key acts for the organization, not as a member of it. Internal
+  (`local`) conversations whose visibility comes from their participants
+  therefore cannot be created with one, and the attempt fails with `422`: a
+  `group` has no creator to record, and a `direct` needs its roster stated in
+  `conversation_address` as agent ids (`<id>:<id>`). Use `type: "channel"` for
+  an internal conversation the whole organization sees.
+
 ---
 
 ## 1. Create your organization (dashboard, one-time)

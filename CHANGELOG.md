@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **An API key can no longer create a `local` conversation nobody can see**
+  (P2). The participants of an internal conversation come from its shape: a
+  `direct` from its roster address, a `group` from the member who created it, a
+  `channel` from nobody — it is organization-wide. An API key is not a member,
+  so a `group` it created, or a `direct` it started with a peerless message,
+  landed with no participants: invisible to every member and owner, with no API
+  call that could repair it. Those two inserts now fail with `422` (`PT422`),
+  and the message says which shapes work. Unchanged: a `channel`, a `direct`
+  whose `conversation_address` states a roster of agent ids (`<id>:<id>`), and
+  everything a signed-in member does. Rows created before this are not touched.
+
 - **Realtime broadcast channels** (F10). Conversation and message changes are
   published to private Realtime channels: `org:<organization_id>` (a notice with
   `table`, `op`, `id`, `organization_id`, `conversation_id`, `updated_at` and,

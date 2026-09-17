@@ -396,10 +396,19 @@ $$;
 --                   everyone else arrives through 05-12.
 --
 -- SECURITY DEFINER: conversations_agents is service-managed for the shapes
--- that matter (05-12), so the caller has no INSERT of their own here. A
--- service-role or API-key insert has no auth.uid() and so no creator to
--- record — for group/channel that yields a conversation nobody is in (see
--- TODO).
+-- that matter (05-12), so the caller has no INSERT of their own here.
+--
+-- P2: a writer with no agent of its own — an API key, the service role — has
+-- no creator to record, and used to leave a conversation with zero
+-- participants. For every shape but `channel` that row is invisible to
+-- everyone, for good: get_participant_conversations does not return it, and
+-- get_restricted_conversations restricts it for being `local` without a
+-- channel. Not even the organization's owner could see it, and no API call
+-- repairs one. Both ways in reached it — a `group` created outright, and a
+-- peerless `local` message, which mints a `direct` addressed to itself. So
+-- the insert fails instead. The two shapes that carry their own participants
+-- are unaffected: a `direct` that states a roster takes them from it, and a
+-- `channel` needs none because it is organization-wide.
 create function public.after_insert_on_local_conversation() returns trigger
 language plpgsql
 security definer
@@ -427,6 +436,27 @@ begin
       else a.user_id = auth.uid()
     end
   on conflict do nothing;
+
+  -- PT422: PostgREST maps PT<status> to that HTTP status. The row is
+  -- well-formed; it is the result that cannot stand.
+  if new.type is distinct from 'channel' and not exists (
+    select 1
+    from public.conversations_agents ca
+    where ca.conversation_id = new.id
+  ) then
+    raise exception using
+      errcode = 'PT422',
+      message = format(
+        'A local %s with no participants would be invisible to everyone',
+        coalesce(new.type::text, 'conversation')
+      ),
+      detail =
+        'The writer has no agent of its own to record as a participant: API'
+        ' keys and the service role are not members.',
+      hint =
+        'Use type ''channel'' for an organization-wide conversation, or'
+        ' address a ''direct'' with a roster of agent ids (''<id>:<id>'').';
+  end if;
 
   return new;
 end;

@@ -69,10 +69,28 @@ Monetization
       belongs to the readers: UI member lists, and anything that ever counts
       seats.
 
-- [ ] API-key-created `local` conversations are invisible orphans — the insert
-      policy admits `anon`, but the participant trigger needs `auth.uid()`, so
-      the row lands with no participants and no one can ever see it. Either drop
-      `anon` from the policy or give the keyless path a `channel`.
+- [x] API-key-created `local` conversations are invisible orphans (P2) — the
+      insert now fails with `PT422` when the shape needs participants and the
+      writer has none to record (`after_insert_on_local_conversation`). A
+      `channel` and a roster-addressed `direct` are unaffected. **Still open:**
+      the rows already created. They are invisible and unrepairable through the
+      API; count them in production first —
+
+      ```sql
+      select c.type, count(*)
+      from public.conversations c
+      where c.service = 'local'
+        and c.type is distinct from 'channel'
+        and not exists (
+          select 1 from public.conversations_agents ca
+          where ca.conversation_id = c.id
+        )
+      group by c.type;
+      ```
+
+      — then decide the DML: add the organization's owners as participants
+      (keeps them private to owners), make them channels (organization-wide),
+      or delete them.
 
 - [ ] Uniform connection ownership — whatsapp/instagram already resolve the
       newest connected row, so reconnecting from another org steals the
