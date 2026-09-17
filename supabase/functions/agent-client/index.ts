@@ -32,6 +32,12 @@ import type {
   ResponseContext,
 } from "./protocols/base.ts";
 import { getFileMetadata } from "../_shared/media.ts";
+import {
+  beginAgentTurn,
+  releaseAgentTurn,
+  renewAgentTurn,
+  waitForAgentTurn,
+} from "../_shared/agent_turns.ts";
 
 const sanitizeLabel = (label: string) => {
   return label
@@ -290,6 +296,13 @@ export async function handler(req: Request): Promise<Response> {
       : fromContact(m);
 
   // WAIT FOR A NEWER MESSAGE
+  //
+  // F16: the debounce lives in public.agent_turns. Registering here, before
+  // the delay, makes this message the conversation's latest unless a newer
+  // one already registered; only the latest message's invocation can claim
+  // the turn below.
+
+  await beginAgentTurn(client, incoming);
 
   const delay = (agent?.extra?.response_delay_seconds ?? RESPONSE_DELAY_SECS) *
     1000;
@@ -300,507 +313,600 @@ export async function handler(req: Request): Promise<Response> {
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
-  // RETRIEVE MESSAGES
+  // CLAIM THE TURN
+  //
+  // One invocation answers per conversation at a time. A newer message
+  // exits here; a duplicate invocation of an answered message too; and a
+  // message that lands while the previous one is being answered waits, so
+  // it is answered with that reply already in the history (the holder
+  // yields before its next LLM call once it sees it was superseded).
 
-  const { data: messagesMixedVersions } = await client
-    .from("messages")
-    .select()
-    .eq("conversation_id", incoming.conversation_id)
-    .gt("timestamp", new Date(+new Date() - MESSAGES_TIME_LIMIT).toISOString()) // Time constraint for the conversation.
-    .lte("timestamp", new Date().toISOString()) // Scheduled messages have a future timestamp.
-    .order("timestamp", { ascending: false })
-    .limit(MESSAGES_QUANTITY_LIMIT) // Size constraint for the conversation.
-    .throwOnError();
+  const claim = await waitForAgentTurn(client, incoming);
 
-  // v0 is out of support: rows that predate the v1 content schema are
-  // simply not part of the context window any more.
-  const messages = messagesMixedVersions
-    .filter((m) => m.content.version === "1") as MessageRow[];
-
-  // Query was done in descending order to apply the limit.
-  // We need the messages in chronological order, though.
-  messages.reverse();
-
-  // CHECK IF THERE IS A NEWER MESSAGE
-  const newestMessage = getNewestIncomingMessage(incoming, messages, fromPeer);
-
-  if (newestMessage.id !== incoming.id) {
-    // Then the newest message is not the incoming one that triggered this edge function.
-    log.info(
-      `Newer message ${newestMessage.id} found for conversation ${conv.id}. Skipping response.`,
-    );
-
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  // SESSION RESTART if /new is found — USEFUL FOR WHATSAPP TESTING
-
-  // content.text may be absent despite type === "text": legacy whatsapp-web
-  // bridge builds emitted reactions as a TextPart with no text at all. One
-  // such row in the window crashed this scan — and with it every later
-  // inbound message of the conversation.
-  const firstMessageIndex = messages.findLastIndex(
-    (m) =>
-      fromPeer(m) &&
-      m.content.type === "text" &&
-      typeof m.content.text === "string" &&
-      m.content.text.startsWith("/new"),
-  );
-
-  if (firstMessageIndex > -1) {
-    const firstMessage = messages[firstMessageIndex].content as TextPart;
-
-    firstMessage.text = firstMessage.text.replace("/new", "");
-
-    messages.splice(0, firstMessageIndex);
-
-    // Also, reset the conversation memory
-    if (conv.extra.memory && Object.keys(conv.extra.memory).length) {
-      conv.extra.memory = {};
-
-      await client
-        .from("conversations")
-        .update({ extra: conv.extra })
-        .eq("id", incoming.conversation_id)
-        .throwOnError();
+  if (claim !== "claimed") {
+    const details = { conversation_id: conv.id, message_id: incoming.id };
+    if (claim === "timeout") {
+      log.warn(
+        "Timed out waiting for the agent turn. Skipping response.",
+        details,
+      );
+    } else {
+      log.info(`Agent turn ${claim}. Skipping response.`, details);
     }
-  }
 
-  log.info("Contact request", messages.at(-1)?.content);
-
-  // The agent was chosen before the delay, above.
-
-  if (!agent) {
-    log.info(
-      `No active AI agents found for conversation ${conv.id}. Skipping response.`,
-    );
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // WELCOME MESSAGE
-  //
-  // The agent's, not the organization's — so it needs an agent; without
-  // one, nobody greets. Still ahead of asking
-  // the agent anything: it replaces the first answer rather than preceding it.
-  //
-  // Not in a DM: the member opened it, and the first word is theirs.
+  // Everything below holds the turn; the finally releases it on every exit.
+  // `handled` marks the message answered, so a duplicate invocation of it
+  // does not answer again.
+  let handled = false;
+  let typingInterval: ReturnType<typeof setInterval> | undefined;
 
-  if (
-    conv.service !== "local" &&
-    agent.extra.welcome_message &&
-    !messages.some(spokenByUs)
-  ) {
-    const outgoing: MessageInsert = {
-      organization_id: conv.organization_id,
-      conversation_id: conv.id,
-      service: conv.service,
-      organization_address: conv.organization_address,
-      conversation_address: conv.address,
-      agent_id: agent.id,
-      content: {
-        version: "1",
-        type: "text",
-        kind: "text",
-        text: agent.extra.welcome_message,
-      },
-    };
+  try {
+    // RETRIEVE MESSAGES
 
-    log.info("Welcome message", (outgoing.content as TextPart).text);
-
-    await client
+    const { data: messagesMixedVersions } = await client
       .from("messages")
-      .insert(outgoing)
+      .select()
+      .eq("conversation_id", incoming.conversation_id)
+      .gt(
+        "timestamp",
+        new Date(+new Date() - MESSAGES_TIME_LIMIT).toISOString(),
+      ) // Time constraint for the conversation.
+      .lte("timestamp", new Date().toISOString()) // Scheduled messages have a future timestamp.
+      .order("timestamp", { ascending: false })
+      .limit(MESSAGES_QUANTITY_LIMIT) // Size constraint for the conversation.
       .throwOnError();
 
-    return new Response("ok", { headers: corsHeaders });
-  }
+    // v0 is out of support: rows that predate the v1 content schema are
+    // simply not part of the context window any more.
+    const messages = messagesMixedVersions
+      .filter((m) => m.content.version === "1") as MessageRow[];
 
-  //---------------------------------------------------------------------------
-  // Up to this point all checks passed. We can proceed with the response.
-  //---------------------------------------------------------------------------
+    // Query was done in descending order to apply the limit.
+    // We need the messages in chronological order, though.
+    messages.reverse();
 
-  // TYPING INDICATOR
+    // CHECK IF THERE IS A NEWER MESSAGE
+    const newestMessage = getNewestIncomingMessage(
+      incoming,
+      messages,
+      fromPeer,
+    );
 
-  const indicateTyping = async (unread?: boolean) => {
-    const ts = new Date().toISOString();
-
-    const { error: typingIndicatorError } = await client
-      .from("messages")
-      .update({
-        status: {
-          // In team chat a read belongs to ONE member, so it is a map keyed
-          // by the reader (the AI's agent id); outside it stays the scalar
-          // receipt the peer's service understands.
-          ...(unread && {
-            read: conv.service === "local" ? { [agent.id]: ts } : ts,
-          }),
-          typing: ts,
-        },
-      })
-      .eq("id", incoming.id);
-
-    if (typingIndicatorError) {
-      log.warn(
-        "Failed to update incoming message typing indicator status.",
-        typingIndicatorError,
+    if (newestMessage.id !== incoming.id) {
+      // Then the newest message is not the incoming one that triggered this edge function.
+      log.info(
+        `Newer message ${newestMessage.id} found for conversation ${conv.id}. Skipping response.`,
       );
+
+      return new Response("ok", { headers: corsHeaders });
     }
-  };
 
-  indicateTyping(true);
+    // SESSION RESTART if /new is found — USEFUL FOR WHATSAPP TESTING
 
-  // The typing indicator will be dismissed once an agent respond,
-  // or after 25 seconds. Hence, keep it alive. Some extra delay
-  // is added to avoid race conditions with the response.
-  const typingInterval = setInterval(indicateTyping, 30000);
+    // content.text may be absent despite type === "text": legacy whatsapp-web
+    // bridge builds emitted reactions as a TextPart with no text at all. One
+    // such row in the window crashed this scan — and with it every later
+    // inbound message of the conversation.
+    const firstMessageIndex = messages.findLastIndex(
+      (m) =>
+        fromPeer(m) &&
+        m.content.type === "text" &&
+        typeof m.content.text === "string" &&
+        m.content.text.startsWith("/new"),
+    );
 
-  // CONTEXT
+    if (firstMessageIndex > -1) {
+      const firstMessage = messages[firstMessageIndex].content as TextPart;
 
-  if (!agent.extra) {
-    agent.extra = {};
-  }
+      firstMessage.text = firstMessage.text.replace("/new", "");
 
-  const context = {
-    organization,
-    conversation,
-    messages,
-    contact,
-    agent: agent as AgentRowWithExtra,
-  };
+      messages.splice(0, firstMessageIndex);
 
-  if (agent.extra.tools) {
-    for (const tool of agent.extra.tools) {
-      if ("label" in tool) {
-        tool.label = sanitizeLabel(tool.label);
-      }
-    }
-  }
+      // Also, reset the conversation memory
+      if (conv.extra.memory && Object.keys(conv.extra.memory).length) {
+        conv.extra.memory = {};
 
-  // REQUEST LOOP
-
-  /**
-   * agent.extra.tools
-   *   - function
-   *   - mcp
-   *   - gemini: google_search, code_execution, url_context
-   *   - openai: mcp, web_search_preview, file_search, image_generation, code_interpreter, computer_use_preview
-   *   - anthropic: mcp*, bash, code_execution, computer, str_replace_based_edit_tool, web_search
-   *
-   * context.tools -> tools + expanded mcp tools
-   */
-
-  const mcpServers: Map<string, MCPServer> = new Map();
-
-  let iteration = 0;
-  const max_iterations = 10;
-  let shouldContinue = true;
-
-  // Basic ReAct algorithm: stop if no tool uses are found.
-  while (shouldContinue) {
-    iteration++;
-
-    let response: ResponseContext = {};
-
-    try {
-      if (iteration > max_iterations) {
-        throw new Error("Max LLM iterations reached!");
-      }
-
-      // CHECK FOR PENDING PREPROCESSING
-
-      while (org.extra.media_preprocessing?.mode === "active") {
-        const pendingPreprocessing = messages.filter(
-          (m) =>
-            m.content.type === "file" &&
-            m.status.pending && // Note: not using status.preprocessing to avoid race conditions with the media preprocessor Edge Function.
-            !m.status.preprocessed &&
-            +new Date(m.status.pending) >
-              +new Date() - MEDIA_PREPROCESSING_TIMEOUT,
-        );
-
-        if (!pendingPreprocessing.length) {
-          break;
-        }
-
-        // WAIT FOR THE PREPROCESSING TO COMPLETE
-
-        log.info(
-          `Waiting ${MEDIA_PREPROCESSING_POLLING_INTERVAL}ms for pending preprocessing to complete...`,
-        );
-
-        await new Promise((resolve) =>
-          setTimeout(resolve, MEDIA_PREPROCESSING_POLLING_INTERVAL)
-        );
-
-        // Note: we could check for newer messages here too, but it would bloat the code.
-
-        // RETRIEVE PROCESSED MESSAGES
-
-        const { data: pending_messages } = await client
-          .from("messages")
-          .select()
-          .in(
-            "id",
-            pendingPreprocessing.map((m) => m.id),
-          )
+        await client
+          .from("conversations")
+          .update({ extra: conv.extra })
+          .eq("id", incoming.conversation_id)
           .throwOnError();
-
-        // Update the messages with the pending processing.
-        for (const pm of pending_messages) {
-          const index = messages.findIndex((m) => m.id === pm.id);
-
-          if (index > -1) {
-            messages[index] = pm;
-          }
-        }
       }
+    }
 
-      // CHECK IF THERE IS A NEWER INCOMING MESSAGE (posterior to the incoming one)
+    log.info("Contact request", messages.at(-1)?.content);
 
-      const newerQuery = client
+    // The agent was chosen before the delay, above.
+
+    if (!agent) {
+      log.info(
+        `No active AI agents found for conversation ${conv.id}. Skipping response.`,
+      );
+      return new Response("ok", { headers: corsHeaders });
+    }
+
+    // WELCOME MESSAGE
+    //
+    // The agent's, not the organization's — so it needs an agent; without
+    // one, nobody greets. Still ahead of asking
+    // the agent anything: it replaces the first answer rather than preceding it.
+    //
+    // Not in a DM: the member opened it, and the first word is theirs.
+
+    if (
+      conv.service !== "local" &&
+      agent.extra.welcome_message &&
+      !messages.some(spokenByUs)
+    ) {
+      const outgoing: MessageInsert = {
+        organization_id: conv.organization_id,
+        conversation_id: conv.id,
+        service: conv.service,
+        organization_address: conv.organization_address,
+        conversation_address: conv.address,
+        agent_id: agent.id,
+        content: {
+          version: "1",
+          type: "text",
+          kind: "text",
+          text: agent.extra.welcome_message,
+        },
+      };
+
+      log.info("Welcome message", (outgoing.content as TextPart).text);
+
+      await client
         .from("messages")
-        .select()
-        .eq("conversation_id", incoming.conversation_id)
-        .gt("created_at", incoming.created_at);
-
-      // The fromPeer predicate, expressed as filters the database can apply.
-      if (conv.service === "local") {
-        newerQuery
-          .not("agent_id", "is", null)
-          .neq("agent_id", agent.id)
-          .is("content->internal", null);
-      } else {
-        newerQuery.not("sender_address", "is", null);
-      }
-
-      const { data: new_message } = await newerQuery
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle()
+        .insert(outgoing)
         .throwOnError();
 
-      if (new_message) {
-        log.info(
-          `Newer message ${new_message.id} for conversation ${conv.id} found while processing tool use messages and/or waiting for pending preprocessing. Skipping response.`,
+      handled = true;
+
+      return new Response("ok", { headers: corsHeaders });
+    }
+
+    //---------------------------------------------------------------------------
+    // Up to this point all checks passed. We can proceed with the response.
+    //---------------------------------------------------------------------------
+
+    // TYPING INDICATOR
+
+    const indicateTyping = async (unread?: boolean) => {
+      const ts = new Date().toISOString();
+
+      const { error: typingIndicatorError } = await client
+        .from("messages")
+        .update({
+          status: {
+            // In team chat a read belongs to ONE member, so it is a map keyed
+            // by the reader (the AI's agent id); outside it stays the scalar
+            // receipt the peer's service understands.
+            ...(unread && {
+              read: conv.service === "local" ? { [agent.id]: ts } : ts,
+            }),
+            typing: ts,
+          },
+        })
+        .eq("id", incoming.id);
+
+      if (typingIndicatorError) {
+        log.warn(
+          "Failed to update incoming message typing indicator status.",
+          typingIndicatorError,
+        );
+      }
+    };
+
+    indicateTyping(true);
+
+    // The typing indicator will be dismissed once an agent respond,
+    // or after 25 seconds. Hence, keep it alive. Some extra delay
+    // is added to avoid race conditions with the response.
+    //
+    // The same keep-alive renews the turn's 90-second lease, which a single
+    // LLM call with its retries can outlast.
+    typingInterval = setInterval(() => {
+      indicateTyping();
+      renewAgentTurn(client, incoming).catch((renewError) =>
+        log.warn("Failed to renew the agent turn.", renewError)
+      );
+    }, 30000);
+
+    // CONTEXT
+
+    if (!agent.extra) {
+      agent.extra = {};
+    }
+
+    const context = {
+      organization,
+      conversation,
+      messages,
+      contact,
+      agent: agent as AgentRowWithExtra,
+    };
+
+    if (agent.extra.tools) {
+      for (const tool of agent.extra.tools) {
+        if ("label" in tool) {
+          tool.label = sanitizeLabel(tool.label);
+        }
+      }
+    }
+
+    // REQUEST LOOP
+
+    /**
+     * agent.extra.tools
+     *   - function
+     *   - mcp
+     *   - gemini: google_search, code_execution, url_context
+     *   - openai: mcp, web_search_preview, file_search, image_generation, code_interpreter, computer_use_preview
+     *   - anthropic: mcp*, bash, code_execution, computer, str_replace_based_edit_tool, web_search
+     *
+     * context.tools -> tools + expanded mcp tools
+     */
+
+    const mcpServers: Map<string, MCPServer> = new Map();
+
+    let iteration = 0;
+    const max_iterations = 10;
+    let shouldContinue = true;
+
+    // Basic ReAct algorithm: stop if no tool uses are found.
+    while (shouldContinue) {
+      iteration++;
+
+      let response: ResponseContext = {};
+
+      try {
+        if (iteration > max_iterations) {
+          throw new Error("Max LLM iterations reached!");
+        }
+
+        // CHECK FOR PENDING PREPROCESSING
+
+        while (org.extra.media_preprocessing?.mode === "active") {
+          const pendingPreprocessing = messages.filter(
+            (m) =>
+              m.content.type === "file" &&
+              m.status.pending && // Note: not using status.preprocessing to avoid race conditions with the media preprocessor Edge Function.
+              !m.status.preprocessed &&
+              +new Date(m.status.pending) >
+                +new Date() - MEDIA_PREPROCESSING_TIMEOUT,
+          );
+
+          if (!pendingPreprocessing.length) {
+            break;
+          }
+
+          // WAIT FOR THE PREPROCESSING TO COMPLETE
+
+          log.info(
+            `Waiting ${MEDIA_PREPROCESSING_POLLING_INTERVAL}ms for pending preprocessing to complete...`,
+          );
+
+          await new Promise((resolve) =>
+            setTimeout(resolve, MEDIA_PREPROCESSING_POLLING_INTERVAL)
+          );
+
+          // Note: we could check for newer messages here too, but it would bloat the code.
+
+          // RETRIEVE PROCESSED MESSAGES
+
+          const { data: pending_messages } = await client
+            .from("messages")
+            .select()
+            .in(
+              "id",
+              pendingPreprocessing.map((m) => m.id),
+            )
+            .throwOnError();
+
+          // Update the messages with the pending processing.
+          for (const pm of pending_messages) {
+            const index = messages.findIndex((m) => m.id === pm.id);
+
+            if (index > -1) {
+              messages[index] = pm;
+            }
+          }
+        }
+
+        // STILL OUR TURN? (F16) Checked before every LLM call, so a message
+        // that arrived meanwhile costs at most the call already in flight.
+
+        const turn = await renewAgentTurn(client, incoming);
+
+        if (turn !== "renewed") {
+          log.info(
+            `Agent turn ${turn} for conversation ${conv.id}. Skipping response.`,
+            { conversation_id: conv.id, message_id: incoming.id },
+          );
+
+          return new Response("ok", { headers: corsHeaders });
+        }
+
+        // CHECK IF THERE IS A NEWER INCOMING MESSAGE (posterior to the incoming one)
+        //
+        // Covers a newer message whose own invocation has not registered yet.
+
+        const newerQuery = client
+          .from("messages")
+          .select()
+          .eq("conversation_id", incoming.conversation_id)
+          .gt("created_at", incoming.created_at);
+
+        // The fromPeer predicate, expressed as filters the database can apply.
+        if (conv.service === "local") {
+          newerQuery
+            .not("agent_id", "is", null)
+            .neq("agent_id", agent.id)
+            .is("content->internal", null);
+        } else {
+          newerQuery.not("sender_address", "is", null);
+        }
+
+        const { data: new_message } = await newerQuery
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle()
+          .throwOnError();
+
+        if (new_message) {
+          log.info(
+            `Newer message ${new_message.id} for conversation ${conv.id} found while processing tool use messages and/or waiting for pending preprocessing. Skipping response.`,
+          );
+
+          return new Response("ok", { headers: corsHeaders });
+        }
+
+        // MCP SERVERS INITIALIZATION
+        // It is here because of multi-agents, which we are not using by the time being.
+
+        const mcpServersToInit = agent.extra.tools?.filter(
+          (tool) =>
+            tool.provider === "local" &&
+            tool.type === "mcp" &&
+            !mcpServers.has(tool.label),
+        ) || [];
+
+        const mcpServersAux = await Promise.all(
+          mcpServersToInit.map((tool) =>
+            initMCP(tool as LocalMCPToolConfig, context)
+          ),
         );
 
-        // The one exit that bypasses the clearInterval below — without this,
-        // the keep-alive goes on stamping `typing` until the isolate dies.
-        clearInterval(typingInterval);
+        mcpServersAux.forEach((mcp) => {
+          mcpServers.set(mcp.label, mcp);
+        });
 
-        return new Response("ok", { headers: corsHeaders });
-      }
-
-      // MCP SERVERS INITIALIZATION
-      // It is here because of multi-agents, which we are not using by the time being.
-
-      const mcpServersToInit = agent.extra.tools?.filter(
-        (tool) =>
-          tool.provider === "local" &&
-          tool.type === "mcp" &&
-          !mcpServers.has(tool.label),
-      ) || [];
-
-      const mcpServersAux = await Promise.all(
-        mcpServersToInit.map((tool) =>
-          initMCP(tool as LocalMCPToolConfig, context)
-        ),
-      );
-
-      mcpServersAux.forEach((mcp) => {
-        mcpServers.set(mcp.label, mcp);
-      });
-
-      // CURRENT ITERATION TOOLS
-
-      /**
-       * Tools to be passed the agent are gruped in two main categories:
-       * 1. Local tools
-       * 2. External tools
-       *
-       * Local tools need to be passed to the agent with their input schema.
-       * External tools do not require more than their tool config as it comes.
-       *
-       * We have the following tool types:
-       * - `ToolInfo` to tag tool use/result messages with basic tool info (specially `label` and `name`).
-       * - `ToolConfig` for agents to declare their tools (`label`, `name` might be unknown for MCP tools and others).
-       * - `ToolDefinition`, which as its name suggests, defines the tool (`label` is unknown at definition, only `name`).
-       * - `AgentTool`, the combination of config and definition, to be passed to the agent.
-       */
-      const tools: AgentTool[] = [];
-
-      for (const toolConfig of agent.extra.tools || []) {
-        if (toolConfig.provider !== "local") {
-          continue;
-        }
-
-        switch (toolConfig.type) {
-          case "function": {
-            const unlabeledTool = Toolbox.function.find(
-              (t) => t.name === toolConfig.name,
-            );
-
-            if (!unlabeledTool) {
-              throw new Error(`Tool ${toolConfig.name} not found.`);
-            }
-
-            tools.push(unlabeledTool);
-
-            break;
-          }
-          case "mcp": {
-            const unlabeledTools = mcpServers.get(toolConfig.label)!.tools;
-
-            for (const unlabeledTool of unlabeledTools) {
-              const labeledTool = {
-                provider: toolConfig.provider,
-                type: toolConfig.type,
-                label: toolConfig.label,
-                name: unlabeledTool.name,
-                // F08: remote text, bounded and attributed.
-                description: describeRemoteTool(
-                  toolConfig.label,
-                  unlabeledTool.description,
-                ),
-                inputSchema: unlabeledTool
-                  .inputSchema as z.core.JSONSchema.JSONSchema,
-                outputSchema: unlabeledTool.outputSchema as
-                  | z.core.JSONSchema.JSONSchema
-                  | undefined,
-                config: toolConfig.config,
-              };
-
-              tools.push(labeledTool);
-            }
-
-            break;
-          }
-          case "http":
-          case "sql": {
-            const unlabeledTools = Toolbox[toolConfig.type];
-
-            for (const unlabeledTool of unlabeledTools) {
-              const labeledTool = {
-                ...unlabeledTool,
-                label: toolConfig.label,
-                config: toolConfig.config,
-              };
-
-              tools.push(labeledTool);
-            }
-
-            break;
-          }
-        }
-      }
-
-      // AGENT CLIENT REQUEST AND RESPONSE
-
-      const handler = ProtocolFactory.getHandler(tools, context, client);
-
-      const agentRequest = await handler.prepareRequest();
-
-      const agentResponse = await handler.sendRequest(agentRequest);
-
-      response = await handler.processResponse(agentResponse);
-
-      if (!response.messages?.length) {
-        response.messages = [];
-      }
-
-      // TOOL USES AND RESULTS
-
-      // A tool trace is one carrying `content.tool` — the same thing the
-      // database reads to call the row internal.
-      const toolUses = response.messages.filter(
-        (m) =>
-          isToolTrace(m) &&
-          m.content.tool.provider === "local" &&
-          m.content.type === "text",
-      ) || [];
-
-      for (const row of toolUses) {
-        // `content.tool` is the tag, not `direction`: the database derives the
-        // latter from the former, and a tool trace is the only content that
-        // carries it.
-        let content = row.content as InternalMessage;
-        const toolInfo = content.tool;
-
-        // Only needed to please the TypeScript compiler
-        if (
-          !toolInfo ||
-          toolInfo.provider !== "local" ||
-          content.type !== "text"
-        ) {
-          continue;
-        }
+        // CURRENT ITERATION TOOLS
 
         /**
-         * # Tool uses and results within parallel tool use
+         * Tools to be passed the agent are gruped in two main categories:
+         * 1. Local tools
+         * 2. External tools
          *
-         * Chat Completions API produces a single message with several tool choices.
-         * It expects tool results as single messages.
+         * Local tools need to be passed to the agent with their input schema.
+         * External tools do not require more than their tool config as it comes.
          *
-         * On the other hand, Responses API and Messages API also produce a single with several tool uses.
-         * But on the contrary, they expect tool results as a single message.
-         *
-         * Here, the adopted policy is to adhere to the WhatsApp API, this is one message per part.
-         * A tool use/result is considered a part.
+         * We have the following tool types:
+         * - `ToolInfo` to tag tool use/result messages with basic tool info (specially `label` and `name`).
+         * - `ToolConfig` for agents to declare their tools (`label`, `name` might be unknown for MCP tools and others).
+         * - `ToolDefinition`, which as its name suggests, defines the tool (`label` is unknown at definition, only `name`).
+         * - `AgentTool`, the combination of config and definition, to be passed to the agent.
          */
+        const tools: AgentTool[] = [];
 
-        let parts: (Part & ToolInfo)[] = [];
-
-        const agentTool = tools.find(
-          (t) =>
-            t.provider === toolInfo.provider &&
-            t.type === toolInfo.type &&
-            ("label" in toolInfo ? t.label === toolInfo.label : true) &&
-            t.name === toolInfo.name,
-        );
-
-        try {
-          if (!agentTool) {
-            throw new Error(
-              `Tool ${toolInfo.name} not found between available tools.`,
-            );
+        for (const toolConfig of agent.extra.tools || []) {
+          if (toolConfig.provider !== "local") {
+            continue;
           }
 
-          const ajv = new Ajv2020();
-          // Strip $schema since MCP SDK (via Zod) produces draft-07 schemas,
-          // but Ajv is imported as the 2020-12 build and rejects unknown drafts.
-          // deno-lint-ignore no-explicit-any
-          const { $schema: _, ...schema } = agentTool.inputSchema as any;
-
-          const args = JSON.parse(content.text);
-
-          // When JSON parsing is done, the message is converted to a data part.
-          content = {
-            version: "1",
-            internal: true,
-            task: content.task,
-            tool: toolInfo,
-            type: "data",
-            kind: "data",
-            data: args,
-          };
-
-          row.content = content;
-
-          const valid = ajv.validate(schema, args);
-
-          if (!valid) {
-            throw new Error(
-              `Tool input validation failed: ${JSON.stringify(ajv.errors)}`,
-            );
-          }
-
-          switch (toolInfo.type) {
-            case "custom":
+          switch (toolConfig.type) {
             case "function": {
-              const result = await agentTool.implementation(args);
+              const unlabeledTool = Toolbox.function.find(
+                (t) => t.name === toolConfig.name,
+              );
 
-              parts = [
-                {
+              if (!unlabeledTool) {
+                throw new Error(`Tool ${toolConfig.name} not found.`);
+              }
+
+              tools.push(unlabeledTool);
+
+              break;
+            }
+            case "mcp": {
+              const unlabeledTools = mcpServers.get(toolConfig.label)!.tools;
+
+              for (const unlabeledTool of unlabeledTools) {
+                const labeledTool = {
+                  provider: toolConfig.provider,
+                  type: toolConfig.type,
+                  label: toolConfig.label,
+                  name: unlabeledTool.name,
+                  // F08: remote text, bounded and attributed.
+                  description: describeRemoteTool(
+                    toolConfig.label,
+                    unlabeledTool.description,
+                  ),
+                  inputSchema: unlabeledTool
+                    .inputSchema as z.core.JSONSchema.JSONSchema,
+                  outputSchema: unlabeledTool.outputSchema as
+                    | z.core.JSONSchema.JSONSchema
+                    | undefined,
+                  config: toolConfig.config,
+                };
+
+                tools.push(labeledTool);
+              }
+
+              break;
+            }
+            case "http":
+            case "sql": {
+              const unlabeledTools = Toolbox[toolConfig.type];
+
+              for (const unlabeledTool of unlabeledTools) {
+                const labeledTool = {
+                  ...unlabeledTool,
+                  label: toolConfig.label,
+                  config: toolConfig.config,
+                };
+
+                tools.push(labeledTool);
+              }
+
+              break;
+            }
+          }
+        }
+
+        // AGENT CLIENT REQUEST AND RESPONSE
+
+        const handler = ProtocolFactory.getHandler(tools, context, client);
+
+        const agentRequest = await handler.prepareRequest();
+
+        const agentResponse = await handler.sendRequest(agentRequest);
+
+        response = await handler.processResponse(agentResponse);
+
+        if (!response.messages?.length) {
+          response.messages = [];
+        }
+
+        // TOOL USES AND RESULTS
+
+        // A tool trace is one carrying `content.tool` — the same thing the
+        // database reads to call the row internal.
+        const toolUses = response.messages.filter(
+          (m) =>
+            isToolTrace(m) &&
+            m.content.tool.provider === "local" &&
+            m.content.type === "text",
+        ) || [];
+
+        for (const row of toolUses) {
+          // `content.tool` is the tag, not `direction`: the database derives the
+          // latter from the former, and a tool trace is the only content that
+          // carries it.
+          let content = row.content as InternalMessage;
+          const toolInfo = content.tool;
+
+          // Only needed to please the TypeScript compiler
+          if (
+            !toolInfo ||
+            toolInfo.provider !== "local" ||
+            content.type !== "text"
+          ) {
+            continue;
+          }
+
+          /**
+           * # Tool uses and results within parallel tool use
+           *
+           * Chat Completions API produces a single message with several tool choices.
+           * It expects tool results as single messages.
+           *
+           * On the other hand, Responses API and Messages API also produce a single with several tool uses.
+           * But on the contrary, they expect tool results as a single message.
+           *
+           * Here, the adopted policy is to adhere to the WhatsApp API, this is one message per part.
+           * A tool use/result is considered a part.
+           */
+
+          let parts: (Part & ToolInfo)[] = [];
+
+          const agentTool = tools.find(
+            (t) =>
+              t.provider === toolInfo.provider &&
+              t.type === toolInfo.type &&
+              ("label" in toolInfo ? t.label === toolInfo.label : true) &&
+              t.name === toolInfo.name,
+          );
+
+          try {
+            if (!agentTool) {
+              throw new Error(
+                `Tool ${toolInfo.name} not found between available tools.`,
+              );
+            }
+
+            const ajv = new Ajv2020();
+            // Strip $schema since MCP SDK (via Zod) produces draft-07 schemas,
+            // but Ajv is imported as the 2020-12 build and rejects unknown drafts.
+            // deno-lint-ignore no-explicit-any
+            const { $schema: _, ...schema } = agentTool.inputSchema as any;
+
+            const args = JSON.parse(content.text);
+
+            // When JSON parsing is done, the message is converted to a data part.
+            content = {
+              version: "1",
+              internal: true,
+              task: content.task,
+              tool: toolInfo,
+              type: "data",
+              kind: "data",
+              data: args,
+            };
+
+            row.content = content;
+
+            const valid = ajv.validate(schema, args);
+
+            if (!valid) {
+              throw new Error(
+                `Tool input validation failed: ${JSON.stringify(ajv.errors)}`,
+              );
+            }
+
+            switch (toolInfo.type) {
+              case "custom":
+              case "function": {
+                const result = await agentTool.implementation(args);
+
+                parts = [
+                  {
+                    tool: {
+                      ...toolInfo,
+                      event: "result" as const,
+                    },
+                    type: "data",
+                    kind: "data",
+                    data: result,
+                  },
+                ];
+
+                break;
+              }
+              case "mcp": {
+                const mcp = mcpServers.get(agentTool.label!);
+
+                if (!mcp) {
+                  throw new Error(`MCP server ${agentTool.label} not found.`);
+                }
+
+                parts = await callTool(mcp, content, context, client);
+
+                break;
+              }
+              case "http":
+              case "sql": {
+                const result = await agentTool.implementation(
+                  args,
+                  agentTool.config,
+                  context,
+                  client,
+                );
+
+                const part: DataPart & ToolInfo = {
                   tool: {
                     ...toolInfo,
                     event: "result" as const,
@@ -808,183 +914,147 @@ export async function handler(req: Request): Promise<Response> {
                   type: "data",
                   kind: "data",
                   data: result,
-                },
-              ];
+                };
 
-              break;
-            }
-            case "mcp": {
-              const mcp = mcpServers.get(agentTool.label!);
+                parts = [part];
 
-              if (!mcp) {
-                throw new Error(`MCP server ${agentTool.label} not found.`);
+                if (result.file_uri) {
+                  part.artifacts = [
+                    {
+                      type: "file",
+                      kind: "document",
+                      file: await getFileMetadata(client, result.file_uri),
+                    },
+                  ];
+                }
+
+                break;
               }
-
-              parts = await callTool(mcp, content, context, client);
-
-              break;
             }
-            case "http":
-            case "sql": {
-              const result = await agentTool.implementation(
-                args,
-                agentTool.config,
-                context,
-                client,
-              );
+          } catch (error) {
+            const errorMessage = (error as Error).message || String(error);
 
-              const part: DataPart & ToolInfo = {
+            log.warn("Tool error", { tool: toolInfo, error });
+
+            parts = [
+              {
                 tool: {
                   ...toolInfo,
+                  is_error: true,
                   event: "result" as const,
                 },
-                type: "data",
-                kind: "data",
-                data: result,
+                type: "text",
+                kind: "text",
+                text: errorMessage,
+              },
+            ];
+          }
+
+          // TODO: Mutating the response object is not the most recommended way to do this
+          // but it will be improved soon.
+          const taskId = content.task?.id || crypto.randomUUID();
+
+          for (const part of parts) {
+            const message = part.type === "file"
+              ? {
+                organization_id,
+                service: conv.service,
+                organization_address: conv.organization_address,
+                conversation_address: conv.address,
+                agent_id: agent.id,
+                content: {
+                  version: "1" as const,
+                  task: { id: taskId },
+                  ...part,
+                } as OutgoingMessage,
+              }
+              : {
+                organization_id,
+                service: conv.service,
+                organization_address: conv.organization_address,
+                conversation_address: conv.address,
+                agent_id: agent.id,
+                content: {
+                  version: "1" as const,
+                  internal: true as const,
+                  task: { id: taskId },
+                  ...part,
+                } as InternalMessage,
               };
 
-              parts = [part];
-
-              if (result.file_uri) {
-                part.artifacts = [
-                  {
-                    type: "file",
-                    kind: "document",
-                    file: await getFileMetadata(client, result.file_uri),
-                  },
-                ];
-              }
-
-              break;
-            }
+            response.messages.push(message);
           }
-        } catch (error) {
-          const errorMessage = (error as Error).message || String(error);
+        }
 
-          log.warn("Tool error", { tool: toolInfo, error });
+        if (!toolUses.length) {
+          shouldContinue = false;
+        }
+      } catch (error) {
+        shouldContinue = false;
 
-          parts = [
-            {
-              tool: {
-                ...toolInfo,
-                is_error: true,
-                event: "result" as const,
-              },
+        log.error("Error in agent client", error as Error);
+
+        response.messages = [
+          {
+            organization_id,
+            service: conv.service,
+            organization_address: conv.organization_address,
+            conversation_address: conv.address,
+            // Agent errors are record-only: OpenBSP is a communication layer,
+            // and internal rows never dispatch — errors are never spoken to
+            // the end user.
+            agent_id: agent.id,
+            content: {
+              version: "1" as const,
+              // The declared record-only marker — this is the row that had no
+              // other way to say it (an error carries no `tool`).
+              internal: true as const,
               type: "text",
               kind: "text",
-              text: errorMessage,
+              text: error instanceof Error ? error.message : String(error),
             },
-          ];
-        }
-
-        // TODO: Mutating the response object is not the most recommended way to do this
-        // but it will be improved soon.
-        const taskId = content.task?.id || crypto.randomUUID();
-
-        for (const part of parts) {
-          const message = part.type === "file"
-            ? {
-              organization_id,
-              service: conv.service,
-              organization_address: conv.organization_address,
-              conversation_address: conv.address,
-              agent_id: agent.id,
-              content: {
-                version: "1" as const,
-                task: { id: taskId },
-                ...part,
-              } as OutgoingMessage,
-            }
-            : {
-              organization_id,
-              service: conv.service,
-              organization_address: conv.organization_address,
-              conversation_address: conv.address,
-              agent_id: agent.id,
-              content: {
-                version: "1" as const,
-                internal: true as const,
-                task: { id: taskId },
-                ...part,
-              } as InternalMessage,
-            };
-
-          response.messages.push(message);
-        }
+          },
+        ];
       }
 
-      if (!toolUses.length) {
-        shouldContinue = false;
-      }
-    } catch (error) {
-      shouldContinue = false;
+      // STORE CURRENT ITERATION MESSAGES
 
-      log.error("Error in agent client", error as Error);
+      if (response.messages?.length) {
+        log.info("Agent response", response.messages.at(-1)?.content);
 
-      response.messages = [
-        {
-          organization_id,
-          service: conv.service,
+        const output_messages = response.messages.map((message, index) => ({
+          ...message,
+          ...(isInternal(message) && { status: {} }),
+          // Make sure the messages have the correct addressing
+          organization_id: conv.organization_id,
+          conversation_id: conv.id,
           organization_address: conv.organization_address,
           conversation_address: conv.address,
-          // Agent errors are record-only: OpenBSP is a communication layer,
-          // and internal rows never dispatch — errors are never spoken to
-          // the end user.
-          agent_id: agent.id,
-          content: {
-            version: "1" as const,
-            // The declared record-only marker — this is the row that had no
-            // other way to say it (an error carries no `tool`).
-            internal: true as const,
-            type: "text",
-            kind: "text",
-            text: error instanceof Error ? error.message : String(error),
-          },
-        },
-      ];
-    }
+          // Disambiguate by milliseconds index to ensure the insertion order.
+          timestamp: new Date(Date.now() + index).toISOString(),
+        }));
 
-    // STORE CURRENT ITERATION MESSAGES
+        try {
+          // Insert and select the inserted messages
+          const { data: inserted_messages } = await client
+            .from("messages")
+            .insert(output_messages)
+            .select()
+            .order("timestamp")
+            .throwOnError();
 
-    if (response.messages?.length) {
-      log.info("Agent response", response.messages.at(-1)?.content);
-
-      const output_messages = response.messages.map((message, index) => ({
-        ...message,
-        ...(isInternal(message) && { status: {} }),
-        // Make sure the messages have the correct addressing
-        organization_id: conv.organization_id,
-        conversation_id: conv.id,
-        organization_address: conv.organization_address,
-        conversation_address: conv.address,
-        // Disambiguate by milliseconds index to ensure the insertion order.
-        timestamp: new Date(Date.now() + index).toISOString(),
-      }));
-
-      try {
-        // Insert and select the inserted messages
-        const { data: inserted_messages } = await client
-          .from("messages")
-          .insert(output_messages)
-          .select()
-          .order("timestamp")
-          .throwOnError();
-
-        // Append generated messages to the context
-        messages.push(...inserted_messages);
-      } catch (storageError) {
-        log.error("Failed to store agent response", storageError as Error);
-        shouldContinue = false;
+          // Append generated messages to the context
+          messages.push(...inserted_messages);
+        } catch (storageError) {
+          log.error("Failed to store agent response", storageError as Error);
+          shouldContinue = false;
+        }
       }
     }
-  }
 
-  // TODO: take care of the typing interval corner cases
-  clearInterval(typingInterval);
+    // STORE RESPONSE
 
-  // STORE RESPONSE
-
-  /*
+    /*
   if (response?.conversation) {
     const { error } = await client
       .from("conversations")
@@ -999,9 +1069,20 @@ export async function handler(req: Request): Promise<Response> {
   }
   */
 
-  // The caller is pg_net, which discards the body — don't serialize the
-  // whole conversation into it.
-  return new Response("ok", { headers: corsHeaders });
+    handled = true;
+
+    // The caller is pg_net, which discards the body — don't serialize the
+    // whole conversation into it.
+    return new Response("ok", { headers: corsHeaders });
+  } finally {
+    // Every exit — answered, superseded mid-loop, or thrown — stops the
+    // keep-alive and drops the lease, so the next message is not left
+    // waiting for it to lapse.
+    clearInterval(typingInterval);
+    await releaseAgentTurn(client, incoming, handled).catch((releaseError) =>
+      log.warn("Failed to release the agent turn.", releaseError)
+    );
+  }
 }
 
 if (import.meta.main) {

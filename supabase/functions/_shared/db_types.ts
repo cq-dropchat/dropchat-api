@@ -587,6 +587,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_turns: {
+        Row: {
+          conversation_id: string
+          handled_message_id: string | null
+          holder_message_id: string | null
+          latest_created_at: string
+          latest_message_id: string
+          lease_until: string | null
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          conversation_id: string
+          handled_message_id?: string | null
+          holder_message_id?: string | null
+          latest_created_at: string
+          latest_message_id: string
+          lease_until?: string | null
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string
+          handled_message_id?: string | null
+          holder_message_id?: string | null
+          latest_created_at?: string
+          latest_message_id?: string
+          lease_until?: string | null
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_turns_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_turns_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           created_at: string
@@ -1367,7 +1415,20 @@ export type Database = {
         Args: { p_id: string; p_organization_id: string; p_user_id: string }
         Returns: boolean
       }
+      agent_turn_lease: { Args: never; Returns: string }
       api_key_plaintext_cutover: { Args: never; Returns: string }
+      begin_agent_turn: {
+        Args: {
+          _conversation_id: string
+          _created_at: string
+          _message_id: string
+        }
+        Returns: undefined
+      }
+      claim_agent_turn: {
+        Args: { _conversation_id: string; _message_id: string }
+        Returns: string
+      }
       claim_message_dispatch: {
         Args: { p_message_id: string }
         Returns: boolean
@@ -1469,9 +1530,21 @@ export type Database = {
         Returns: undefined
       }
       reject_invitation: { Args: { invitation_id: string }; Returns: undefined }
+      release_agent_turn: {
+        Args: {
+          _conversation_id: string
+          _handled: boolean
+          _message_id: string
+        }
+        Returns: undefined
+      }
       release_message_dispatch: {
         Args: { p_errors?: Json; p_message_id: string }
         Returns: undefined
+      }
+      renew_agent_turn: {
+        Args: { _conversation_id: string; _message_id: string }
+        Returns: string
       }
       settle_webhook_deliveries: { Args: never; Returns: number }
       webhook_max_attempts: { Args: never; Returns: number }
