@@ -51,7 +51,7 @@
 -- service is in the tuple because it is in the account key: the same address
 -- string can name a shared 'whatsapp' account and a personal 'whatsapp-web'
 -- one, and matching on the pair alone would let either decide for both.
-create function public.get_visible_addresses()
+create function rls.get_visible_addresses()
 returns table (organization_id uuid, service public.service, address text)
 language sql
 stable
@@ -63,16 +63,17 @@ as $$
   -- key can satisfy.
   --
   -- The org filter is redundant with every policy that calls this — each one
-  -- already ANDs `organization_id in get_authorized_orgs(…)`. It is here
-  -- because policies are not the only caller: this is a public, SECURITY
-  -- DEFINER function, so PostgREST publishes it at /rpc/get_visible_addresses,
-  -- where nothing wraps it and RLS does not apply. Without the filter that
-  -- call answers with every shared inbox in the DATABASE — other tenants' org
-  -- ids and account addresses, WhatsApp business numbers among them.
+  -- already ANDs `organization_id in get_authorized_orgs(…)`. It stays because
+  -- it is what makes the function safe on its own: SECURITY DEFINER, so RLS
+  -- does not apply inside it, and without the filter it answers with every
+  -- shared inbox in the DATABASE — other tenants' org ids and account
+  -- addresses, WhatsApp business numbers among them. Until P8 moved it to the
+  -- `rls` schema that was not hypothetical: PostgREST published it at
+  -- /rpc/get_visible_addresses for anyone with the anon key.
   select oa.organization_id, oa.service, oa.address
   from public.organizations_addresses oa
   where oa.agent_id is null
-    and oa.organization_id in (select public.get_authorized_orgs('member'))
+    and oa.organization_id in (select rls.get_authorized_orgs('member'))
   union
   -- Personal accounts owned by the caller (their Slack identity, a personal
   -- WhatsApp/mailbox).
@@ -85,7 +86,7 @@ $$;
 -- Conversations the caller participates in: a conversations_agents row names
 -- an agent that is the caller. Mirrors channel/DM membership on the external
 -- service, and is the only way into a restricted conversation.
-create function public.get_participant_conversations()
+create function rls.get_participant_conversations()
 returns setof uuid
 language sql
 stable
@@ -110,7 +111,7 @@ $$;
 -- The restriction rule for one conversation's columns (F10: shared with the
 -- realtime broadcast trigger, so the two cannot drift). Immutable SQL: inlined
 -- into get_restricted_conversations.
-create function public.is_restricted_conversation(
+create function rls.is_restricted_conversation(
   conv_service public.service,
   conv_type text,
   conv_extra jsonb
@@ -132,7 +133,7 @@ as $$
     );
 $$;
 
-create function public.get_restricted_conversations()
+create function rls.get_restricted_conversations()
 returns setof uuid
 language sql
 stable
@@ -141,15 +142,15 @@ set search_path to ''
 as $$
   select c.id
   from public.conversations c
-  where c.organization_id in (select public.get_authorized_orgs('member'))
-    and public.is_restricted_conversation(c.service, c.type, c.extra);
+  where c.organization_id in (select rls.get_authorized_orgs('member'))
+    and rls.is_restricted_conversation(c.service, c.type, c.extra);
 $$;
 
 -- Boolean form, for callers that hold a single row rather than a query to
 -- filter (is_media_visible). Same rules, expressed through the same two
 -- functions so the two forms cannot drift apart. Do NOT use this in a policy
 -- over a large table: per-row arguments defeat the InitPlan.
-create function public.is_conversation_visible(
+create function rls.is_conversation_visible(
   conv_id uuid,
   conv_org uuid,
   conv_addr text,
@@ -164,11 +165,11 @@ as $$
     (
       (conv_org, conv_service, conv_addr) in (
         select v.organization_id, v.service, v.address
-        from public.get_visible_addresses() v
+        from rls.get_visible_addresses() v
       )
-      and conv_id not in (select public.get_restricted_conversations())
+      and conv_id not in (select rls.get_restricted_conversations())
     )
-    or conv_id in (select public.get_participant_conversations());
+    or conv_id in (select rls.get_participant_conversations());
 $$;
 
 -- Whether the caller may download a media object (storage path
@@ -180,7 +181,7 @@ $$;
 -- purpose: with invoker rights the invisible referencing messages would be
 -- hidden by RLS and the check could not distinguish "unreferenced" from
 -- "referenced but private".
-create function public.is_media_visible(object_name text) returns boolean
+create function rls.is_media_visible(object_name text) returns boolean
 language sql
 stable
 security definer
@@ -195,7 +196,7 @@ as $$
     not exists (select 1 from refs)
     or exists (
       select 1 from refs r
-      where public.is_conversation_visible(
+      where rls.is_conversation_visible(
         r.conversation_id, r.organization_id, r.organization_address, r.service
       )
     );

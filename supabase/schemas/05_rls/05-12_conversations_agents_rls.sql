@@ -64,7 +64,7 @@ on public.conversations_agents
 for update
 to authenticated
 using (
-  agent_id in (select public.get_own_agents())
+  agent_id in (select rls.get_own_agents())
   and exists (
     select 1 from public.conversations c
     where c.id = conversation_id
@@ -72,7 +72,7 @@ using (
   )
 )
 with check (
-  agent_id in (select public.get_own_agents())
+  agent_id in (select rls.get_own_agents())
   and exists (
     select 1 from public.conversations c
     where c.id = conversation_id
@@ -122,13 +122,13 @@ with check (
         -- group in the database, other tenants' included.
         (
           c.type = 'group'
-          and conversation_id in (select public.get_participant_conversations())
+          and conversation_id in (select rls.get_participant_conversations())
         )
         -- Joining: self-service, since a local channel is open to the
         -- organization by shape. Naming your own agent is the authority.
         or (
           c.type = 'channel'
-          and agent_id in (select public.get_own_agents())
+          and agent_id in (select rls.get_own_agents())
         )
       )
   )
@@ -154,12 +154,12 @@ using (
         -- would let anyone empty any group in the database.
         (
           c.type = 'group'
-          and conversation_id in (select public.get_participant_conversations())
+          and conversation_id in (select rls.get_participant_conversations())
         )
         -- Leaving: naming your own agent is the authority.
         or (
           c.type = 'channel'
-          and agent_id in (select public.get_own_agents())
+          and agent_id in (select rls.get_own_agents())
         )
       )
   )

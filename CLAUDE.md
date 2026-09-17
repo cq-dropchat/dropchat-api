@@ -100,10 +100,28 @@ round-robin across organizations, retries with backoff (5 s, 30 s, 2 min, 10
 min), `failed` after 5 attempts or on a non-retryable 4xx. A pg_net timeout
 counts as done: the function keeps running after pg_net stops waiting.
 
+Since P5 the safety net queues too. `sweep-pending-media` (every minute) runs
+`public.sweep_pending_media()`, which enqueues a `media-preprocessor` call for
+every armed file message that is still not preprocessed and whose claim is
+absent or older than ten minutes — skipping any message that already has a call
+pending or in flight, so the sweep and the trigger cannot queue the same message
+twice. It replaces `preprocess-pending-messages`, which posted to the function
+with pg_net directly; that job no longer exists. So `edge_calls` is now the only
+way either function is invoked, and the queue's metric covers retries as well as
+first attempts.
+
 ```sql
 -- Backlog per function and organization (alert: pending growing, or
 -- oldest_pending_at more than a minute old)
 select * from public.edge_calls_health order by pending desc;
+
+-- What the media sweep would pick up right now (it queues at most 500 a run)
+select count(*) from public.messages
+where timestamp >= now() - interval '12 hours'
+  and timestamp <= now() - interval '1 minute'
+  and content ->> 'type' = 'file'
+  and status ->> 'pending' is not null
+  and status ->> 'preprocessed' is null;
 
 -- Why calls fail
 select function, last_status_code, last_error, count(*)
@@ -135,7 +153,16 @@ Runbook for the production rollout of `…_f12_edge_calls.sql`:
    restores `local_message_to_agent`'s `net.http_post` (see
    `20260917163830_f26_forward_request_id.sql` for the previous bodies); keep
    `deliver-edge-calls` scheduled until `edge_calls_health` shows nothing
-   pending, then unschedule it.
+   pending, then unschedule it. A rollback of P5 also restores
+   `preprocess-pending-messages` (body in
+   `20260129131456_annotator_refactor_to_media_preprocessor.sql`) and
+   unschedules `sweep-pending-media`.
+6. Interval, once there is traffic: watch `edge_calls_health` and the agent's
+   p95 for a week before touching the 5-second job. Locally, insert → request
+   went from 0.5 s / 1.0 s (pg_net straight from the trigger) to 2.6–3.1 s /
+   4.9–6.6 s at 5 seconds, and 0.7 s / 1.2 s at 1 second — at ~86k
+   `cron.job_run_details` rows a day. Media preprocessing now pays that same
+   queue latency; it did not before P5.
 
 ### Querying HTTP-level logs (status codes, execution time)
 

@@ -22,7 +22,7 @@ declare
   _id uuid;
 begin
   if _organization_id is null
-    or _organization_id not in (select public.get_authorized_orgs('owner'))
+    or _organization_id not in (select rls.get_authorized_orgs('owner'))
   then
     raise exception using
       errcode = '42501',

@@ -24,7 +24,7 @@ for select
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
   -- Account rule, minus the restricted set; or participation. All three
   -- subqueries are InitPlans (evaluated once, then hash-probed per row). See
@@ -33,11 +33,11 @@ using (
     (
       (organization_id, service, organization_address) in (
         select v.organization_id, v.service, v.address
-        from public.get_visible_addresses() v
+        from rls.get_visible_addresses() v
       )
-      and id not in (select public.get_restricted_conversations())
+      and id not in (select rls.get_restricted_conversations())
     )
-    or id in (select public.get_participant_conversations())
+    or id in (select rls.get_participant_conversations())
   )
 );
 
@@ -55,7 +55,7 @@ for insert
 to authenticated, anon
 with check (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
   and service = 'local'::public.service
 );
@@ -66,23 +66,23 @@ for update
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
   and service = 'local'::public.service
   and (
     (
       (organization_id, service, organization_address) in (
         select v.organization_id, v.service, v.address
-        from public.get_visible_addresses() v
+        from rls.get_visible_addresses() v
       )
-      and id not in (select public.get_restricted_conversations())
+      and id not in (select rls.get_restricted_conversations())
     )
-    or id in (select public.get_participant_conversations())
+    or id in (select rls.get_participant_conversations())
   )
 )
 with check (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
   and service = 'local'::public.service
 );
@@ -93,17 +93,17 @@ for delete
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
   and service = 'local'::public.service
   and (
     (
       (organization_id, service, organization_address) in (
         select v.organization_id, v.service, v.address
-        from public.get_visible_addresses() v
+        from rls.get_visible_addresses() v
       )
-      and id not in (select public.get_restricted_conversations())
+      and id not in (select rls.get_restricted_conversations())
     )
-    or id in (select public.get_participant_conversations())
+    or id in (select rls.get_participant_conversations())
   )
 );

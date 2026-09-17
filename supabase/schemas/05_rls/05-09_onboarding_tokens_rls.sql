@@ -6,7 +6,7 @@ for select
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('admin')
+    select rls.get_authorized_orgs('admin')
   )
 );
 
@@ -16,7 +16,7 @@ for insert
 to authenticated, anon
 with check (
   organization_id in (
-    select public.get_authorized_orgs('admin')
+    select rls.get_authorized_orgs('admin')
   )
 );
 
@@ -26,6 +26,6 @@ for delete
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('admin')
+    select rls.get_authorized_orgs('admin')
   )
 );

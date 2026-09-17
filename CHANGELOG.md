@@ -21,6 +21,46 @@
   and the message says which shapes work. Unchanged: a `channel`, a `direct`
   whose `conversation_address` states a roster of agent ids (`<id>:<id>`), and
   everything a signed-in member does. Rows created before this are not touched.
+- **The RLS helpers moved to the `rls` schema** (P8). The SECURITY DEFINER
+  functions the policies call — `get_authorized_orgs`, `get_visible_addresses`,
+  `get_participant_conversations`, `get_restricted_conversations`,
+  `is_restricted_conversation`, `is_conversation_visible`, `is_media_visible`,
+  `get_own_agents` and the two agent-identity guards — were in `public`, which
+  PostgREST exposes, so each one was reachable at `/rest/v1/rpc/<name>` with the
+  anon key. They answer about their caller, so they leaked nothing about other
+  tenants, but they are internal machinery. They now live in a schema PostgREST
+  does not serve; the policies are unchanged apart from the qualification. If
+  you were calling one over REST — nothing here ever did — it is gone.
+
+- **`api_keys.key` is gone, and so is the plaintext fallback** (P8, closing
+  F14). The write-only `key` column — where a client could still hand the
+  database a plain key for it to hash — no longer exists, and
+  `get_authorized_orgs` compares `key_hash` and nothing else: a row without a
+  hash authenticates nothing, whatever it holds. `create_api_key` (owners) is
+  the only way to mint a key and still returns it exactly once. Announced for
+  2026-11-01; brought forward because no deployment holds such a row. If you
+  were inserting into `api_keys` yourself, that insert now fails with `42703`
+  (undefined column) — use the RPC.
+
+- **Media preprocessing is queued like everything else** (P5). The per-minute
+  safety net that picked up messages whose media was never preprocessed called
+  the function with pg_net directly — no retry, no fairness between
+  organizations, no metric — on exactly the messages that had already failed
+  once. It now files the call in `public.edge_calls` like the trigger does, and
+  skips any message that already has one pending or in flight, so nothing is
+  queued twice. `public.edge_calls` is the only way agent-client and
+  media-preprocessor are invoked now. Preprocessing a file can start a few
+  seconds later than before (the queue runs every 5 seconds); nothing changes
+  for REST clients.
+
+- **Every message's `content` is guaranteed to follow the v1 schema** (P3,
+  §5.2). `messages_content_schema` was `NOT VALID`: it checked every new row but
+  could say nothing about the legacy ones that predate the v1 shape (no
+  `version`, no `kind`). The backfill has run and the constraint is now
+  validated, so a reader can assume the shape for every row in the table instead
+  of testing for it. `rpc/backfill_message_contents` (service role only) is gone
+  with it. Nothing changes for REST clients: the same contents were already
+  refused on insert.
 
 - **Realtime broadcast channels** (F10). Conversation and message changes are
   published to private Realtime channels: `org:<organization_id>` (a notice with

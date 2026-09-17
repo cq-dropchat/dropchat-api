@@ -26,7 +26,7 @@ for select
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
 );
 
@@ -41,7 +41,7 @@ using (
 )
 with check (
   user_id = (select auth.uid())
-  and public.agent_identity_and_role_unchanged(id, user_id, organization_id, role)
+  and rls.agent_identity_and_role_unchanged(id, user_id, organization_id, role)
 );
 
 -- Admins maintain the roster: renaming a colleague, retiring an AI agent's
@@ -52,14 +52,14 @@ for update
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('admin')
+    select rls.get_authorized_orgs('admin')
   )
 )
 with check (
   organization_id in (
-    select public.get_authorized_orgs('admin')
+    select rls.get_authorized_orgs('admin')
   )
-  and public.agent_identity_and_role_unchanged(id, user_id, organization_id, role)
+  and rls.agent_identity_and_role_unchanged(id, user_id, organization_id, role)
 );
 
 -- `user_id is null` here is what makes invitations the only door for people.
@@ -73,7 +73,7 @@ for insert
 to authenticated, anon
 with check (
   organization_id in (
-    select public.get_authorized_orgs('admin')
+    select rls.get_authorized_orgs('admin')
   )
   and user_id is null
 );
@@ -86,7 +86,7 @@ for delete
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('admin')
+    select rls.get_authorized_orgs('admin')
   )
   and user_id is null
 );
@@ -99,14 +99,14 @@ for update
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('owner')
+    select rls.get_authorized_orgs('owner')
   )
 )
 with check (
   organization_id in (
-    select public.get_authorized_orgs('owner')
+    select rls.get_authorized_orgs('owner')
   )
-  and public.agent_identity_unchanged(id, user_id, organization_id)
+  and rls.agent_identity_unchanged(id, user_id, organization_id)
 );
 
 create policy "owners can delete their orgs agents"
@@ -115,7 +115,7 @@ for delete
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('owner')
+    select rls.get_authorized_orgs('owner')
   )
 );
 

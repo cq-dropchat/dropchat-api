@@ -62,12 +62,20 @@ Monetization
       references (`media.id` without the `internal://media/` prefix), which the
       §5.2 backfill has not converted in production yet.
 
-- [ ] Move the RLS helpers out of `public`.
+- [x] Move the RLS helpers out of `public` (P8) — the ten SECURITY DEFINER
+      helpers the policies call (`get_authorized_orgs`, `get_own_agents`, the
+      six visibility helpers, the two agent-identity guards) live in the `rls`
+      schema, which PostgREST does not serve. `25_rls_helpers_schema` pins where
+      they are and that the five actors still see exactly what they saw.
 
-- [ ] Members' lists still show deleted agents — the SELECT policies keep them
-      readable on purpose (message authorship, roster names), so the filtering
-      belongs to the readers: UI member lists, and anything that ever counts
-      seats.
+- [x] Members' lists still show deleted agents (P8) — checked, and the readers
+      already filter: `useCurrentAgents`, `useCurrentAgent` and the initial
+      fetch all pass `deleted_at is null`, and so do the Edge Functions that
+      resolve a membership (`management_auth`, `mcp/organization`,
+      `slack-management`). The ones that do not are the authorship readers —
+      `useAgentProfile` and the Slack mention resolver — which is the case the
+      policy keeps the row readable for. Nothing counts seats. Pinned by two
+      cases in `useAgents.test.tsx`.
 
 - [x] API-key-created `local` conversations are invisible orphans (P2) — the
       insert now fails with `PT422` when the shape needs participants and the
@@ -91,6 +99,33 @@ Monetization
       — then decide the DML: add the organization's owners as participants
       (keeps them private to owners), make them channels (organization-wide),
       or delete them.
+
+- [ ] Organization export in parts (P4) — the `org-export` worker builds the
+      whole ZIP in memory and uploads it in one request, so an organization
+      large enough to exceed the function's memory or Storage's single-request
+      upload limit ends `failed` with the reason (INTEGRATING.md §9 says so).
+      Deferred on purpose: there is no deployment to measure, and every fix
+      changes the contract. Measure first — rows and bytes of the largest
+      organization —
+
+      ```sql
+      select count(*) as messages,
+             pg_size_pretty(sum(pg_column_size(m.*))) as raw
+      from public.messages m
+      where m.organization_id = '<org>';
+      ```
+
+      — then pick: parts bounded by bytes with the manifest naming them
+      (`object_name` becomes several objects: migration, RPC, INTEGRATING §9
+      and the owner's screen), or a resumable upload of one streamed ZIP.
+      Whichever, the export stops being one object per row.
+
+- [ ] Edge call backlog for owners (P5) — `public.edge_calls_health` is service
+      role only. If the product ever wants it on a dashboard, expose a summary
+      per organization to owners: counts and the oldest pending timestamp, never
+      `payload` or `last_error` (they carry message content and third-party
+      messages). Deferred: nobody has asked, and there is no deployment to watch
+      yet.
 
 - [ ] Uniform connection ownership — whatsapp/instagram already resolve the
       newest connected row, so reconnecting from another org steals the

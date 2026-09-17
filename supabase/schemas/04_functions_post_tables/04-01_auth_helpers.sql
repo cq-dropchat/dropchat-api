@@ -1,4 +1,4 @@
-create function public.get_authorized_orgs(role public.role default 'member') returns setof uuid
+create function rls.get_authorized_orgs(role public.role default 'member') returns setof uuid
 language plpgsql
 security definer
 set search_path to ''
@@ -58,18 +58,12 @@ begin
 
   if api_key is not null then
     -- F14: the secret is compared as sha256 (api_keys_key_hash_key serves
-    -- the probe). A row that still carries a plain key and no hash is only
-    -- honoured until the cutover; an expired key is never honoured.
+    -- the probe) and nothing else — P8 removed the plaintext fallback the
+    -- cutover allowed. A row without a hash matches nothing, and an expired
+    -- key is never honoured.
     select a.organization_id, a.id into org_id, key_id
     from public.api_keys a
-    where (
-      a.key_hash = extensions.digest(api_key, 'sha256')
-      or (
-        a.key_hash is null
-        and a.key = api_key
-        and now() < public.api_key_plaintext_cutover()
-      )
-    )
+    where a.key_hash = extensions.digest(api_key, 'sha256')
     and (a.expires_at is null or a.expires_at > now())
     and not exists (
       select 1 from public.organizations o
@@ -122,7 +116,7 @@ $$;
 -- organization_id would be a tenant escape, and one that could change user_id
 -- would be an impersonation. (`user_id` doubles as the AI test, so pinning
 -- it also pins that.)
-create function public.agent_identity_unchanged(
+create function rls.agent_identity_unchanged(
   p_id uuid,
   p_user_id uuid,
   p_organization_id uuid
@@ -145,7 +139,7 @@ $$;
 -- promote anyone: a member editing themselves, and an admin editing a
 -- colleague. Granting a role is an owner's privilege, so owners get the
 -- function above instead.
-create function public.agent_identity_and_role_unchanged(
+create function rls.agent_identity_and_role_unchanged(
   p_id uuid,
   p_user_id uuid,
   p_organization_id uuid,
@@ -173,7 +167,7 @@ $$;
 --
 -- Empty for API keys — they authenticate without auth.uid() and are nobody in
 -- particular, so no policy branch that means "my own row" can ever match one.
-create function public.get_own_agents() returns setof uuid
+create function rls.get_own_agents() returns setof uuid
 language sql
 stable
 security definer
@@ -201,7 +195,7 @@ declare
   _key text;
   _id uuid;
 begin
-  if p_organization_id not in (select public.get_authorized_orgs('owner')) then
+  if p_organization_id not in (select rls.get_authorized_orgs('owner')) then
     raise exception using
       errcode = '42501',
       message = 'only owners can create api keys';
@@ -216,8 +210,16 @@ begin
   -- 24 random bytes → 48 hex chars; `sk_` marks it as an OpenBSP secret.
   _key := 'sk_' || encode(extensions.gen_random_bytes(24), 'hex');
 
-  insert into public.api_keys (organization_id, name, role, key, expires_at)
-  values (p_organization_id, p_name, p_role, _key, p_expires_at)
+  -- Hashed here rather than by a trigger on a write-only column (P8): this
+  -- function is the only way a key is created, so the plaintext never leaves
+  -- this block except in the reply.
+  insert into public.api_keys (
+    organization_id, name, role, key_hash, key_prefix, expires_at
+  )
+  values (
+    p_organization_id, p_name, p_role,
+    extensions.digest(_key, 'sha256'), left(_key, 8), p_expires_at
+  )
   returning public.api_keys.id into _id;
 
   return query select _id, _key, left(_key, 8);

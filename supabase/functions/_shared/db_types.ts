@@ -703,7 +703,6 @@ export type Database = {
           created_at: string
           expires_at: string | null
           id: string
-          key: string | null
           key_hash: string | null
           key_prefix: string | null
           last_used_at: string | null
@@ -716,7 +715,6 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
-          key?: string | null
           key_hash?: string | null
           key_prefix?: string | null
           last_used_at?: string | null
@@ -729,7 +727,6 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
-          key?: string | null
           key_hash?: string | null
           key_prefix?: string | null
           last_used_at?: string | null
@@ -1598,22 +1595,7 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { invitation_id: string }; Returns: string }
-      agent_identity_and_role_unchanged: {
-        Args: {
-          p_id: string
-          p_organization_id: string
-          p_role: Database["public"]["Enums"]["role"]
-          p_user_id: string
-        }
-        Returns: boolean
-      }
-      agent_identity_unchanged: {
-        Args: { p_id: string; p_organization_id: string; p_user_id: string }
-        Returns: boolean
-      }
       agent_turn_lease: { Args: never; Returns: string }
-      api_key_plaintext_cutover: { Args: never; Returns: string }
-      backfill_message_contents: { Args: { _rows: Json }; Returns: number }
       begin_agent_turn: {
         Args: {
           _conversation_id: string
@@ -1710,21 +1692,6 @@ export type Database = {
         Args: { _object_names: string[]; _organization_id: string }
         Returns: number
       }
-      get_authorized_orgs: {
-        Args: { role?: Database["public"]["Enums"]["role"] }
-        Returns: string[]
-      }
-      get_own_agents: { Args: never; Returns: string[] }
-      get_participant_conversations: { Args: never; Returns: string[] }
-      get_restricted_conversations: { Args: never; Returns: string[] }
-      get_visible_addresses: {
-        Args: never
-        Returns: {
-          address: string
-          organization_id: string
-          service: Database["public"]["Enums"]["service"]
-        }[]
-      }
       init_data: {
         Args: {
           p_limit?: number
@@ -1735,25 +1702,7 @@ export type Database = {
         }
         Returns: Json
       }
-      is_conversation_visible: {
-        Args: {
-          conv_addr: string
-          conv_id: string
-          conv_org: string
-          conv_service: Database["public"]["Enums"]["service"]
-        }
-        Returns: boolean
-      }
-      is_media_visible: { Args: { object_name: string }; Returns: boolean }
       is_public_https_url: { Args: { url: string }; Returns: boolean }
-      is_restricted_conversation: {
-        Args: {
-          conv_extra: Json
-          conv_service: Database["public"]["Enums"]["service"]
-          conv_type: string
-        }
-        Returns: boolean
-      }
       jsonb_deep_set: {
         Args: { path: string[]; target: Json; value: Json }
         Returns: Json
@@ -1851,6 +1800,7 @@ export type Database = {
       settle_edge_calls: { Args: never; Returns: number }
       settle_webhook_deliveries: { Args: never; Returns: number }
       sweep_deletions: { Args: { _budget?: number }; Returns: Json }
+      sweep_pending_media: { Args: { _limit?: number }; Returns: number }
       webhook_max_attempts: { Args: never; Returns: number }
       webhook_retry_delay: { Args: { attempt: number }; Returns: string }
     }

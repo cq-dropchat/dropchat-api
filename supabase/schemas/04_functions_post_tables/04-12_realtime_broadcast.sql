@@ -82,7 +82,7 @@ begin
     );
   end if;
 
-  if not public.is_restricted_conversation(_conv.service, _conv.type, _conv.extra)
+  if not rls.is_restricted_conversation(_conv.service, _conv.type, _conv.extra)
     and exists (
       select 1 from public.organizations_addresses oa
       where oa.organization_id = _conv.organization_id
@@ -103,7 +103,7 @@ begin
         and oa.address = _conv.organization_address
         and a.user_id is not null
         and a.deleted_at is null
-        and not public.is_restricted_conversation(_conv.service, _conv.type, _conv.extra)
+        and not rls.is_restricted_conversation(_conv.service, _conv.type, _conv.extra)
       union
       -- …and the human participants.
       select ca.agent_id
