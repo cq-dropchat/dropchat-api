@@ -51,6 +51,7 @@ insert into service_only values
   ('public.settle_edge_calls()'),
   ('public.dispatch_edge_calls(integer, integer)'),
   ('public.deliver_edge_calls()'),
+  ('public.sweep_pending_media(integer)'),
   ('public.finish_organization_export(uuid, text, text)'),
   ('public.expired_organization_exports(integer)'),
   ('public.mark_organization_export_expired(uuid)'),

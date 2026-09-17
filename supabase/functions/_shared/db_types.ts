@@ -1850,6 +1850,7 @@ export type Database = {
       settle_edge_calls: { Args: never; Returns: number }
       settle_webhook_deliveries: { Args: never; Returns: number }
       sweep_deletions: { Args: { _budget?: number }; Returns: Json }
+      sweep_pending_media: { Args: { _limit?: number }; Returns: number }
       webhook_max_attempts: { Args: never; Returns: number }
       webhook_retry_delay: { Args: { attempt: number }; Returns: string }
     }

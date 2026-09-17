@@ -94,6 +94,13 @@ Monetization
       and the owner's screen), or a resumable upload of one streamed ZIP.
       Whichever, the export stops being one object per row.
 
+- [ ] Edge call backlog for owners (P5) — `public.edge_calls_health` is service
+      role only. If the product ever wants it on a dashboard, expose a summary
+      per organization to owners: counts and the oldest pending timestamp, never
+      `payload` or `last_error` (they carry message content and third-party
+      messages). Deferred: nobody has asked, and there is no deployment to watch
+      yet.
+
 - [ ] Uniform connection ownership — whatsapp/instagram already resolve the
       newest connected row, so reconnecting from another org steals the
       connection (fine: whoever owns the account may move it). Do the same for

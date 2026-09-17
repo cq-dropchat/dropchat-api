@@ -13,7 +13,7 @@
 -- _per_org calls per organization per tick, retrying with backoff and
 -- failing after the fifth attempt. edge_calls_health shows the backlog.
 begin;
-select plan(39);
+select plan(48);
 
 create temp table marks as
 select (select coalesce(max(id), 0) from net.http_request_queue) as queue_id;
@@ -252,6 +252,100 @@ select is(
   (select count(*)::int from cron.job where jobname = 'deliver-edge-calls' and schedule = '5 seconds'),
   1,
   'deliver-edge-calls runs every 5 seconds'
+);
+
+-- P5: one way in for media preprocessing. The old job posted to the function
+-- with pg_net; the new one queues.
+select is(
+  (select count(*)::int from cron.job where jobname = 'preprocess-pending-messages'),
+  0,
+  'the pg_net media sweep is gone'
+);
+select is(
+  (select count(*)::int from cron.job
+   where jobname = 'sweep-pending-media' and schedule = '* * * * *'),
+  1,
+  'and sweep-pending-media runs every minute in its place'
+);
+
+-- ---------------------------------------------------------------------------
+-- P5 — the media sweep enqueues here too.
+--
+-- F12 moved the triggers to this queue but left the per-minute safety net
+-- (`preprocess-pending-messages`) calling media-preprocessor with pg_net: two
+-- ways to invoke one function, and the one with no retry, no fairness and no
+-- metric was the one that ran on everything the triggers had already missed.
+-- ---------------------------------------------------------------------------
+
+-- Eligible and unqueued: the trigger is held, so only the sweep can find it.
+alter table public.messages disable trigger handle_message_to_media_preprocessor;
+insert into public.messages (
+  id, organization_id, service, organization_address, conversation_address,
+  sender_address, content, status, timestamp
+) values (
+  'aaaaaaaa-0000-4000-8000-00000000f5a1', tests.id('org_a'), 'whatsapp',
+  tests.val('wa_a'), tests.val('contact_a2'), tests.val('contact_a2'),
+  '{"version": "1", "type": "file", "kind": "image", "file": {"uri": "internal://media/p5"}}',
+  jsonb_build_object('pending', now() - interval '5 minutes'),
+  now() - interval '5 minutes'
+);
+alter table public.messages enable trigger handle_message_to_media_preprocessor;
+
+select is(
+  public.sweep_pending_media(),
+  1,
+  'the sweep enqueues the message the trigger missed'
+);
+select is(
+  (select count(*)::int from public.edge_calls
+   where record_id = 'aaaaaaaa-0000-4000-8000-00000000f5a1'
+     and function = 'media-preprocessor' and status = 'pending'),
+  1,
+  'one media-preprocessor call, pending'
+);
+select is(
+  (select payload #>> '{record,id}' from public.edge_calls
+   where record_id = 'aaaaaaaa-0000-4000-8000-00000000f5a1'
+     and function = 'media-preprocessor'),
+  'aaaaaaaa-0000-4000-8000-00000000f5a1',
+  'with the same payload shape the trigger sends'
+);
+
+-- Run again: the call it just filed is pending, so there is nothing to do.
+select is(
+  public.sweep_pending_media(),
+  0,
+  'running it twice does not queue the message twice'
+);
+
+-- A message the trigger DID queue is not queued again either.
+insert into public.messages (
+  id, organization_id, service, organization_address, conversation_address,
+  sender_address, content, status, timestamp
+) values (
+  'aaaaaaaa-0000-4000-8000-00000000f5a2', tests.id('org_a'), 'whatsapp',
+  tests.val('wa_a'), tests.val('contact_a2'), tests.val('contact_a2'),
+  '{"version": "1", "type": "file", "kind": "image", "file": {"uri": "internal://media/p5b"}}',
+  jsonb_build_object('pending', now() - interval '5 minutes'),
+  now() - interval '5 minutes'
+);
+select is(
+  public.sweep_pending_media(),
+  0,
+  'a message the trigger already queued is not queued again'
+);
+select is(
+  (select count(*)::int from public.edge_calls
+   where record_id = 'aaaaaaaa-0000-4000-8000-00000000f5a2'
+     and function = 'media-preprocessor'),
+  1,
+  'it still has exactly one call'
+);
+
+select is(
+  pg_temp.requests('/media-preprocessor'),
+  0::bigint,
+  'and no media-preprocessor request went to pg_net'
 );
 
 -- ---------------------------------------------------------------------------

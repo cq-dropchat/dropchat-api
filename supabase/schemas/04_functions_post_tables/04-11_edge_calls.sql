@@ -229,3 +229,82 @@ revoke execute on function public.record_edge_call_result(uuid, integer, boolean
 revoke execute on function public.settle_edge_calls() from public, anon, authenticated;
 revoke execute on function public.dispatch_edge_calls(integer, integer) from public, anon, authenticated;
 revoke execute on function public.deliver_edge_calls() from public, anon, authenticated;
+
+-- P5: the safety net for media preprocessing, as a queue producer.
+--
+-- A message whose media never got preprocessed — the trigger's call was lost,
+-- the function died after claiming it, the row arrived while the worker was
+-- down — is picked up here and queued like any other call. This used to be a
+-- pg_cron job calling net.http_post directly (preprocess-pending-messages):
+-- the one path that still bypassed the queue, and so the one with no retry,
+-- no fairness between organizations and no metric, running on exactly the
+-- messages that had already failed once.
+--
+-- The condition is the old job's, unchanged: armed, a file, not preprocessed,
+-- and either never claimed or claimed more than ten minutes ago (a claim that
+-- old belonged to an invocation that is not coming back). What is new is the
+-- dedupe — a message with a call already pending or in flight is left alone,
+-- so a sweep that overlaps the previous one, or the trigger, does not queue
+-- the same message twice.
+--
+-- Ordered oldest first: the message that has been waiting longest goes first.
+create function public.sweep_pending_media(_limit integer default 500)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  _queued integer;
+begin
+  with due as (
+    select m.*
+    from public.messages m
+    where m.timestamp >= now() - interval '12 hours'
+      and m.timestamp <= now() - interval '1 minute'
+      and m.content ->> 'type' = 'file'
+      and m.status ->> 'pending' is not null
+      and m.status ->> 'preprocessed' is null
+      and (
+        m.status ->> 'preprocessing' is null
+        or (m.status ->> 'preprocessing')::timestamptz
+             < now() - interval '10 minutes'
+      )
+      and not exists (
+        select 1
+        from public.edge_calls c
+        where c.record_id = m.id
+          and c.function = 'media-preprocessor'
+          and c.status in ('pending', 'sending')
+      )
+    order by m.timestamp
+    limit _limit
+  ), queued as (
+    insert into public.edge_calls (
+      organization_id, function, record_id, payload, forward_headers
+    )
+    select
+      d.organization_id,
+      'media-preprocessor',
+      d.id,
+      jsonb_build_object(
+        'old_record', null,
+        'record', to_jsonb(d),
+        'type', 'INSERT',
+        'table', 'messages',
+        'schema', 'public'
+      ),
+      -- A sweep has no incoming request to inherit an id from; the sender
+      -- mints one per request (F26).
+      '{}'::jsonb
+    from due d
+    returning 1
+  )
+  select count(*) into _queued from queued;
+
+  return _queued;
+end;
+$$;
+
+revoke execute on function public.sweep_pending_media(integer)
+from public, anon, authenticated;
