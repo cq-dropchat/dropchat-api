@@ -56,10 +56,11 @@ Monetization
       `deletion_requests`, `sweep_deletions` every minute (5,000 rows/run). The
       Meta callbacks verify `signed_request` and act on the owning organization
       only. An organization's media files go with the hourly `storage-gc` once
-      the sweep has deleted the organization row. Still open: an account-scoped
-      deletion (Meta data deletion) leaves that account's media files in Storage
-      (its organization still exists, so `storage-gc` keeps them), and there is
-      no per-organization export yet.
+      the sweep has deleted the organization row. An account-scoped deletion
+      (Meta data deletion) records its media (`deletion_media`) and `storage-gc`
+      removes what no remaining message references (F18). Still open: v0 media
+      references (`media.id` without the `internal://media/` prefix), which the
+      §5.2 backfill has not converted in production yet.
 
 - [ ] Move the RLS helpers out of `public`.
 
@@ -80,7 +81,11 @@ Monetization
       is a device login, so several tenants can hold live sessions for one
       number at once. Optional: tenant discrimination in generic-webhook.
 
-- [ ] Data export / DB dump
+- [x] Data export / DB dump — `rpc/request_organization_export` (owners) and the
+      `org-export` worker write a ZIP with one NDJSON per table to the private
+      `exports` bucket, without secrets or media, for 7 days (F18,
+      INTEGRATING.md §9). Still open: a UI for it, and an export bigger than the
+      function's memory or Storage's upload limit ends `failed`.
 
 - [x] Encrypt API keys — stored as sha256 + prefix (F14)
 
