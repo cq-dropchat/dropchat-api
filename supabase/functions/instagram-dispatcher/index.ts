@@ -1,3 +1,4 @@
+import { getAddressSecrets } from "../_shared/secrets.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
 import {
@@ -238,15 +239,17 @@ export async function handler(req: Request): Promise<Response> {
     );
   }
 
-  const { data: account } = await client
-    .from("organizations_addresses")
-    .select("extra->>access_token")
-    .eq("organization_id", message.organization_id)
-    .eq("address", message.organization_address)
-    .single()
-    .throwOnError();
+  // F02: the token lives in public.secrets, not in extra.
+  const secrets = await getAddressSecrets(
+    client,
+    message.organization_id,
+    "instagram",
+    message.organization_address,
+  );
 
-  const access_token = account.access_token;
+  const access_token = typeof secrets?.access_token === "string"
+    ? secrets.access_token
+    : null;
 
   if (!access_token) {
     throw new Error(

@@ -1,3 +1,4 @@
+import { revealAddresses } from "../_shared/secrets.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
 import { flagNeedsReauth } from "../_shared/instagram.ts";
@@ -64,7 +65,8 @@ async function buildOrgAddressMap(
 
   const map = new Map<string, OrganizationAddressRow>();
 
-  for (const row of data) {
+  // F02: extra carries the mask; the access_token comes from public.secrets.
+  for (const row of await revealAddresses(client, data)) {
     if (!map.has(row.address)) {
       map.set(row.address, row);
     }

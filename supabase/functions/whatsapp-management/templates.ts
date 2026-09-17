@@ -1,6 +1,7 @@
 import type { Database, TemplateData } from "../_shared/supabase.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
+import { getAddressSecrets } from "../_shared/secrets.ts";
 import { HTTPException } from "jsr:@hono/hono/http-exception";
 import { ContentfulStatusCode } from "jsr:@hono/hono/utils/http-status";
 
@@ -13,9 +14,10 @@ async function getBusinessCredentials(
 ): Promise<{ waba_id: string; access_token: string }> {
   const { data, error } = await client
     .from("organizations_addresses")
-    .select("extra->>waba_id, extra->>access_token")
+    .select("extra->>waba_id")
     .eq("organization_id", organization_id)
     .eq("address", organization_address)
+    .eq("service", "whatsapp")
     .single();
 
   if (error || !data) {
@@ -26,7 +28,20 @@ async function getBusinessCredentials(
     });
   }
 
-  return data;
+  // F02: the token lives in public.secrets, not in extra.
+  const secrets = await getAddressSecrets(
+    client,
+    organization_id,
+    "whatsapp",
+    organization_address,
+  );
+
+  return {
+    waba_id: data.waba_id,
+    access_token: typeof secrets?.access_token === "string"
+      ? secrets.access_token
+      : "",
+  };
 }
 
 export async function listTemplates(

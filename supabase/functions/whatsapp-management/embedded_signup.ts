@@ -1,3 +1,4 @@
+import { revealAddress } from "../_shared/secrets.ts";
 import * as log from "../_shared/logger.ts";
 import { Json } from "../_shared/db_types.ts";
 import { HTTPException } from "jsr:@hono/hono/http-exception";
@@ -448,8 +449,9 @@ export async function deleteSignup(
     .single()
     .throwOnError();
 
-  const extra =
-    (organization_address.extra as WhatsAppOrganizationAddressExtra | null) ||
+  // F02: extra carries the mask; the access_token comes from public.secrets.
+  const revealed = await revealAddress(client, organization_address);
+  const extra = (revealed.extra as WhatsAppOrganizationAddressExtra | null) ||
     {};
 
   if (extra.flow_type !== "new_phone_number") {

@@ -13,6 +13,7 @@ import {
 } from "../_shared/supabase.ts";
 import { downloadFromStorage } from "../_shared/media.ts";
 import { commitDispatchedMessage } from "../_shared/dispatch.ts";
+import { getAddressSecrets } from "../_shared/secrets.ts";
 import { Json } from "../_shared/db_types.ts";
 import { markdownToWhatsApp } from "../_shared/markdown.ts";
 
@@ -430,15 +431,16 @@ export async function handler(req: Request): Promise<Response> {
     );
   }
 
-  const { data: account } = await client
-    .from("organizations_addresses")
-    .select("extra->>access_token")
-    .eq("organization_id", message.organization_id)
-    .eq("address", message.organization_address)
-    .single()
-    .throwOnError();
+  // F02: the token lives in public.secrets, not in extra.
+  const secrets = await getAddressSecrets(
+    client,
+    message.organization_id,
+    "whatsapp",
+    message.organization_address,
+  );
 
-  const access_token = account.access_token || DEFAULT_ACCESS_TOKEN;
+  const access_token = (typeof secrets?.access_token === "string" &&
+    secrets.access_token) || DEFAULT_ACCESS_TOKEN;
 
   let to: string | undefined;
   let recipient: string | undefined;

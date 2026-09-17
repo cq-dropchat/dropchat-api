@@ -9,6 +9,7 @@
 // ChatPostMessageResponse with no annotation, so every call site is checked
 // against the real API instead of the `Record<string, unknown>` we used to
 // cast our way out of. Adding a method means adding a line to that map.
+import { revealAddress } from "./secrets.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   AppsEventAuthorizationsListResponse,
@@ -375,7 +376,15 @@ export async function ensureFreshToken(
   connection: SlackConnection,
   thresholdMs = 60 * 1000,
 ): Promise<string> {
-  const { access_token, refresh_token, expires_at } = connection.extra;
+  // F02: extra carries the mask; the tokens come from public.secrets.
+  const revealed = await revealAddress(client, {
+    organization_id,
+    service: "slack" as const,
+    address: connection.address,
+    extra: connection.extra,
+  });
+  const { access_token, refresh_token, expires_at } = revealed
+    .extra as SlackConnection["extra"];
 
   // No refresh_token = rotation off, the token never expires. With one, an
   // absent expires_at is anomalous — treat it as expiring (refresh now).

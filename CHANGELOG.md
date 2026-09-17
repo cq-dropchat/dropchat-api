@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **Credentials leave `extra`** (F02). `organizations_addresses.extra`
+  (`access_token`, `refresh_token`), `agents.extra` (`api_key`,
+  `tools[].config.password`, `tools[].config.token`, `tools[].config.headers`)
+  and `organizations.extra` (`media_preprocessing.api_key`) now read back as the
+  mask `********` for every API role, owners included. The values live in
+  `public.secrets`, which only the service role can read. Writing keeps working
+  as before: patch `extra` with the credential and the trigger stores it; write
+  the mask back and nothing changes; write `null` to revoke. Tool credentials
+  are keyed by `type:label` — renaming a tool asks for its credentials again.
+  Webhook payloads for `organizations_addresses` carry the mask. Integrations
+  that read a token out of `extra` through PostgREST must move to the service
+  role and `functions/_shared/secrets.ts`.
+
 ## v1
 
 - `messages.direction` and `contact_address` (conversations, messages) are

@@ -1,3 +1,4 @@
+import { revealOrganization } from "../_shared/secrets.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   createUnsecureClient,
@@ -148,7 +149,9 @@ export async function handler(req: Request): Promise<Response> {
     .single()
     .throwOnError();
 
-  const org = conv.organizations;
+  // F02: organizations.extra carries the mask; media_preprocessing.api_key
+  // comes from public.secrets.
+  const org = await revealOrganization(client, conv.organizations);
 
   if (!conv.extra) {
     conv.extra = {};

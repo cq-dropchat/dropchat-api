@@ -16,6 +16,7 @@
 // when other members' UIs can attribute the message — clients should prefer
 // not to render unechoed (sender null) rows in Slack conversations to avoid
 // mis-attributing them as their own.
+import { revealAddress } from "../_shared/secrets.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Context, Hono } from "@hono/hono";
 import { cors } from "jsr:@hono/hono/cors";
@@ -161,7 +162,8 @@ async function getOwnConnection(agent_id: string, organization_id: string) {
     });
   }
 
-  return data;
+  // F02: extra carries the mask; the tokens come from public.secrets.
+  return await revealAddress(createUnsecureClient(), data);
 }
 
 // Authorize URL helper — centralizes client_id + scopes for the frontend.

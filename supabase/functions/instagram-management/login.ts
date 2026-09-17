@@ -1,3 +1,4 @@
+import { revealAddress, revealAddresses } from "../_shared/secrets.ts";
 import * as log from "../_shared/logger.ts";
 import { HTTPException } from "jsr:@hono/hono/http-exception";
 import { ContentfulStatusCode } from "jsr:@hono/hono/utils/http-status";
@@ -400,12 +401,15 @@ export async function performInstagramLogin(
  * (service-role authenticated). One failed account does not abort the rest.
  */
 export async function refreshTokens(client: Client) {
-  const { data: rows } = await client
+  const { data: connected } = await client
     .from("organizations_addresses")
     .select("organization_id, address, service, extra")
     .eq("service", "instagram")
     .eq("status", "connected")
     .throwOnError();
+
+  // F02: extra carries the mask; the access_token comes from public.secrets.
+  const rows = await revealAddresses(client, connected);
 
   const now = Date.now();
   let refreshed = 0;
@@ -502,14 +506,17 @@ export async function disconnect(
 ) {
   const { organization_id, ig_user_id } = payload;
 
-  const { data: row } = await client
+  const { data: stored } = await client
     .from("organizations_addresses")
-    .select("extra, service")
+    .select("organization_id, address, service, extra")
     .eq("organization_id", organization_id)
     .eq("address", ig_user_id)
     .eq("service", "instagram")
     .single()
     .throwOnError();
+
+  // F02: extra carries the mask; the access_token comes from public.secrets.
+  const row = await revealAddress(client, stored);
 
   const token = (row.extra as InstagramOrganizationAddressExtra | null)
     ?.access_token;

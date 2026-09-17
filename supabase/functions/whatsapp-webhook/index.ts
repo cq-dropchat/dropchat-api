@@ -22,6 +22,7 @@ import {
   uploadToStorage,
 } from "../_shared/media.ts";
 import { whatsappToMarkdown } from "../_shared/markdown.ts";
+import { revealAddresses } from "../_shared/secrets.ts";
 
 const API_VERSION = "v24.0";
 const VERIFY_TOKEN = Deno.env.get("WHATSAPP_VERIFY_TOKEN");
@@ -50,7 +51,8 @@ async function buildOrgAddressMap(
   // Build map, keeping only the first (most recent) address per address value
   const map = new Map<string, OrganizationAddressRow>();
 
-  for (const row of data) {
+  // F02: extra carries the mask; the access_token comes from public.secrets.
+  for (const row of await revealAddresses(client, data)) {
     // Narrow the discriminated union — SELECT filtered to "whatsapp".
     //if (row.service !== "whatsapp") continue;
     if (!map.has(row.address)) {

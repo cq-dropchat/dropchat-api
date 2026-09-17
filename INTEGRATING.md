@@ -136,7 +136,9 @@ developer setup needed). On success:
 
 - the onboarding token flips to `used`;
 - a row appears in `organizations_addresses` (`status = connected`) whose
-  `extra` holds `waba_id`, `phone_number`, and the **`access_token`**;
+  `extra` holds `waba_id` and `phone_number`. The **`access_token`** is stored
+  server-side (`public.secrets`, service role only) and reads back through the
+  API as the mask `********`;
 - if you set a `callback_url`, that WABA's message webhooks are pointed at it.
 
 You learn about it via your `organizations_addresses` webhook (step 4) or by
@@ -192,8 +194,12 @@ from OpenBSP via the `organizations_addresses` / `logs` channels. OpenBSP does
   `organization_address` (the `phone_number_id`), `conversation_address`, and a
   `content` object. See [MIGRATING_FROM_TWILIO.md](MIGRATING_FROM_TWILIO.md) for
   the message shapes.
-- **Directly to Meta** (fully autonomous): read `extra.access_token` from
-  `organizations_addresses` and call the WhatsApp Cloud API yourself.
+- **Directly to Meta** (fully autonomous): call the WhatsApp Cloud API yourself
+  with the account's token. The token is not readable through the API
+  (`extra.access_token` is the mask `********` for every API role): it is the
+  system-user token your own Meta app issued during Embedded Signup, so keep it
+  on your side — or, if you self-host OpenBSP, read it with the service role
+  from `public.secrets` (`functions/_shared/secrets.ts`).
 
 ## 8. (Optional) Poll instead of webhooks
 

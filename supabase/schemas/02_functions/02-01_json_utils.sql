@@ -96,3 +96,30 @@ begin
   return NEW;
 end;
 $$;
+
+-- jsonb_set that creates the objects along the way. `jsonb_set(target, path,
+-- value, true)` only creates the LAST key: with '{}' and path {a,b} it
+-- returns '{}' untouched, because there is no `a` to put `b` in. Every
+-- missing prefix becomes an empty object here first.
+create function public.jsonb_deep_set(target jsonb, path text[], value jsonb) returns jsonb
+language plpgsql
+immutable
+set search_path to ''
+as $$
+declare
+  _i int;
+  _prefix text[];
+begin
+  target := coalesce(target, '{}'::jsonb);
+
+  for _i in 1 .. coalesce(array_length(path, 1), 0) - 1 loop
+    _prefix := path[1:_i];
+
+    if jsonb_typeof(target #> _prefix) is distinct from 'object' then
+      target := jsonb_set(target, _prefix, '{}'::jsonb, true);
+    end if;
+  end loop;
+
+  return jsonb_set(target, path, value, true);
+end;
+$$;

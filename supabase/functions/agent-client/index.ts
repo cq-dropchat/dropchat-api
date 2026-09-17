@@ -1,3 +1,4 @@
+import { revealAgents } from "../_shared/secrets.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import * as log from "../_shared/logger.ts";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -178,7 +179,10 @@ export async function handler(req: Request): Promise<Response> {
     org.extra = {};
   }
 
-  const { agents, ...organization } = org;
+  // F02: agents.extra carries masks; the LLM key and tool credentials come
+  // from public.secrets.
+  const { agents: maskedAgents, ...organization } = org;
+  const agents = await revealAgents(client, maskedAgents);
 
   // AI DM DETECTION (local only)
   //
