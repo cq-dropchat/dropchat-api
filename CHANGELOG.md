@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **A versioned contract for message content** (F29).
+  `contracts/message-content.v1.schema.json` is the JSON Schema of
+  `messages.content` for version `"1"`: text, file, the data kinds (reaction,
+  location, contacts, template, media placeholder, …) and record-only tool
+  traces. It is generated from the types the Edge Functions compile against, and
+  CI fails when it is stale. `openapi.json` remains PostgREST's dump of the REST
+  surface, where `content` is only `jsonb`: validate against the schema instead.
+
 - **WhatsApp: a rejected token stops outgoing sends for that account** (F28).
   When Meta answers a send with code 190 (token expired or revoked) on an
   account with its own token, the dispatcher sets

@@ -1123,6 +1123,14 @@ Fetch the OpenAPI spec from PostgREST (requires the service role key):
 curl "https://<project-id>.supabase.co/rest/v1/" -H "apikey: <service_role_key>" > openapi.json
 ```
 
+That spec describes tables and columns; `messages.content` appears only as
+`jsonb`. Its format is versioned in
+[`contracts/message-content.v1.schema.json`](contracts/message-content.v1.schema.json)
+(JSON Schema, generated from
+`supabase/functions/_shared/types/message_types.ts`). After changing those
+types, regenerate it with `deno task contracts` in `supabase/functions`; CI
+fails while it is stale.
+
 ## Related open-source projects
 
 ### Official (Meta Cloud API)

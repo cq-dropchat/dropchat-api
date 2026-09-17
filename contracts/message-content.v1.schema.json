@@ -1,0 +1,4508 @@
+{
+  "$id": "https://openbsp.dev/contracts/message-content.v1.schema.json",
+  "title": "OpenBSP message content, version 1",
+  "description": "The `content` column of public.messages for rows with version \"1\". Generated from supabase/functions/_shared/types/message_types.ts; do not edit by hand.",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/MessageContentV1",
+  "definitions": {
+    "MessageContentV1": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/IncomingMessage"
+        },
+        {
+          "$ref": "#/definitions/OutgoingMessage"
+        },
+        {
+          "$ref": "#/definitions/InternalMessage"
+        }
+      ],
+      "description": "`messages.content` for version \"1\": what any direction can store."
+    },
+    "IncomingMessage": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "text"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "text",
+                "reaction",
+                "caption",
+                "transcription",
+                "description"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "text",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "file"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "audio",
+                "image",
+                "video",
+                "document",
+                "sticker",
+                "file",
+                "media",
+                "story",
+                "ig_story",
+                "story_mention",
+                "story_reply"
+              ]
+            },
+            "file": {
+              "type": "object",
+              "properties": {
+                "mime_type": {
+                  "type": "string"
+                },
+                "uri": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "mime_type",
+                "uri"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "file",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "contacts"
+            },
+            "data": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Contact"
+              }
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "location"
+            },
+            "data": {
+              "$ref": "#/definitions/Location"
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "order"
+            },
+            "data": {
+              "$ref": "#/definitions/Order"
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "interactive"
+            },
+            "data": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "button_reply"
+                    },
+                    "button_reply": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "button_reply"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "list_reply"
+                    },
+                    "list_reply": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "list_reply"
+                  ]
+                }
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "button"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "payload": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "payload"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "object",
+              "properties": {
+                "mime_type": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "mime_type"
+              ],
+              "description": "Construct a type with the properties of T except for those in type K."
+            },
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "media_placeholder"
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              },
+              "description": "Construct a type with a set of properties K of type T"
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "unsupported"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "edit",
+                    "poll",
+                    "button"
+                  ]
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "referral"
+            },
+            "data": {
+              "$ref": "#/definitions/InstagramReferral"
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "reaction"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "added",
+                    "removed"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Service-native emoji id, e.g. Slack \"thumbsup\", Discord custom-emoji id; for Meta the Unicode emoji itself."
+                },
+                "unicode": {
+                  "type": "string",
+                  "description": "Unicode rendering, e.g. \"👍\" — absent only for emoji with no Unicode form (custom workspace emoji) and Meta removals."
+                }
+              },
+              "required": [
+                "action"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "share"
+            },
+            "data": {
+              "$ref": "#/definitions/ShareData"
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "parts"
+            },
+            "kind": {
+              "type": "string",
+              "const": "parts"
+            },
+            "parts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "referred_product": {
+              "type": "object",
+              "properties": {
+                "catalog_id": {
+                  "type": "string"
+                },
+                "product_retailer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalog_id",
+                "product_retailer_id"
+              ]
+            },
+            "referral": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/WhatsAppReferral"
+                },
+                {
+                  "$ref": "#/definitions/InstagramReferral"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "parts",
+            "type",
+            "version"
+          ]
+        }
+      ],
+      "description": "WhatsApp Messages Text (caption for media types) Media (File) Data\n\nText and/or Media (up to two parts), or Data (one part)\n\nExcepting Reaction, Contacts and Location, all other types differ depending on the direction (incoming or outgoing)"
+    },
+    "Part": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/TextPart"
+        },
+        {
+          "$ref": "#/definitions/DataPart"
+        },
+        {
+          "$ref": "#/definitions/FilePart"
+        },
+        {
+          "$ref": "#/definitions/SharePart"
+        }
+      ]
+    },
+    "TextPart": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "text"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "text",
+            "reaction",
+            "caption",
+            "transcription",
+            "description"
+          ]
+        },
+        "text": {
+          "type": "string"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Part"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "kind",
+        "text"
+      ]
+    },
+    "DataPart": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "data"
+        },
+        "kind": {
+          "type": "string",
+          "const": "data"
+        },
+        "data": {
+          "$ref": "#/definitions/Json"
+        },
+        "text": {
+          "type": "string"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Part"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "kind",
+        "data"
+      ]
+    },
+    "Json": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/Json"
+              },
+              {
+                "not": {}
+              }
+            ]
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Json"
+          }
+        }
+      ]
+    },
+    "FilePart": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "file"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "audio",
+            "image",
+            "video",
+            "document",
+            "sticker",
+            "file",
+            "media",
+            "story",
+            "ig_story",
+            "story_mention",
+            "story_reply"
+          ]
+        },
+        "file": {
+          "type": "object",
+          "properties": {
+            "mime_type": {
+              "type": "string"
+            },
+            "uri": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "size": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "mime_type",
+            "uri"
+          ]
+        },
+        "text": {
+          "type": "string"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Part"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "kind",
+        "file"
+      ],
+      "description": "Represents a file, such as an image, video, or document. WhatsApp allows media messages to include an accompanying text caption. For now, this caption is embedded directly within the `text` attribute of the `FilePart`. A more structured approach, leveraging the `Parts` type, would involve separate `FilePart` and `TextPart` components for such messages in the future."
+    },
+    "SharePart": {
+      "$ref": "#/definitions/DataPart%3C%22share%22%2CShareData%3E"
+    },
+    "DataPart<\"share\",ShareData>": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "data"
+        },
+        "kind": {
+          "type": "string",
+          "const": "share"
+        },
+        "data": {
+          "$ref": "#/definitions/ShareData"
+        },
+        "text": {
+          "type": "string"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Part"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "kind",
+        "data"
+      ]
+    },
+    "ShareData": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ig_post",
+            "ig_reel",
+            "reel"
+          ]
+        },
+        "url": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "url"
+      ]
+    },
+    "TaskState": {
+      "type": "string",
+      "enum": [
+        "submitted",
+        "working",
+        "input-required",
+        "completed",
+        "canceled",
+        "failed",
+        "unknown"
+      ]
+    },
+    "Mention": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "agent_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "description": "A mention — who the text calls out. Dual-keyed the way authorship is: `address` in contact space (a WhatsApp participant's digits, a Slack user id), `agent_id` in member space; either or both may be set. `name` is the display text as it appears in `text` (\"@Ana\" ⇒ name \"Ana\"), which is also how dispatchers find the token to re-encode natively (Slack `<@U…>`, WhatsApp `@digits` + MentionedJID). Soft references like `re_message_id`: tolerant of absence, never a FK."
+    },
+    "WhatsAppReferral": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "media_type": {
+              "type": "string",
+              "const": "image"
+            },
+            "image_url": {
+              "type": "string"
+            },
+            "source_url": {
+              "type": "string"
+            },
+            "source_type": {
+              "type": "string",
+              "enum": [
+                "ad",
+                "post"
+              ]
+            },
+            "source_id": {
+              "type": "string"
+            },
+            "headline": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "ctwa_clid": {
+              "type": "string"
+            },
+            "welcome_message": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ]
+            }
+          },
+          "required": [
+            "body",
+            "headline",
+            "image_url",
+            "media_type",
+            "source_id",
+            "source_type",
+            "source_url",
+            "welcome_message"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "media_type": {
+              "type": "string",
+              "const": "video"
+            },
+            "video_url": {
+              "type": "string"
+            },
+            "thumbnail_url": {
+              "type": "string"
+            },
+            "source_url": {
+              "type": "string"
+            },
+            "source_type": {
+              "type": "string",
+              "enum": [
+                "ad",
+                "post"
+              ]
+            },
+            "source_id": {
+              "type": "string"
+            },
+            "headline": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "ctwa_clid": {
+              "type": "string"
+            },
+            "welcome_message": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ]
+            }
+          },
+          "required": [
+            "body",
+            "headline",
+            "media_type",
+            "source_id",
+            "source_type",
+            "source_url",
+            "video_url",
+            "welcome_message"
+          ]
+        }
+      ]
+    },
+    "InstagramReferral": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "ad_id": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "OPEN_THREAD"
+        },
+        "ads_context_data": {
+          "type": "object",
+          "properties": {
+            "ad_title": {
+              "type": "string"
+            },
+            "photo_url": {
+              "type": "string"
+            },
+            "video_url": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "required": [
+        "source"
+      ]
+    },
+    "Contact": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "object",
+          "properties": {
+            "first_name": {
+              "type": "string"
+            },
+            "formatted_name": {
+              "type": "string"
+            },
+            "last_name": {
+              "type": "string"
+            },
+            "middle_name": {
+              "type": "string"
+            },
+            "suffix": {
+              "type": "string"
+            },
+            "prefix": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "formatted_name"
+          ]
+        },
+        "phones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "phone": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "wa_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "phone",
+              "type"
+            ]
+          }
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "Location": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "latitude": {
+          "type": "number"
+        },
+        "longitude": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "address",
+        "latitude",
+        "longitude",
+        "name"
+      ]
+    },
+    "Order": {
+      "type": "object",
+      "properties": {
+        "catalog_id": {
+          "type": "string"
+        },
+        "product_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "product_retailer_id": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "string"
+              },
+              "item_price": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "product_retailer_id",
+              "quantity",
+              "item_price",
+              "currency"
+            ]
+          }
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "catalog_id",
+        "product_items",
+        "text"
+      ]
+    },
+    "OutgoingMessage": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "text"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "text",
+                "reaction",
+                "caption",
+                "transcription",
+                "description"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "text",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "file"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "audio",
+                "image",
+                "video",
+                "document",
+                "sticker",
+                "file",
+                "media",
+                "story",
+                "ig_story",
+                "story_mention",
+                "story_reply"
+              ]
+            },
+            "file": {
+              "type": "object",
+              "properties": {
+                "mime_type": {
+                  "type": "string"
+                },
+                "uri": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "mime_type",
+                "uri"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            }
+          },
+          "required": [
+            "file",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "contacts"
+            },
+            "data": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Contact"
+              }
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "location"
+            },
+            "data": {
+              "$ref": "#/definitions/Location"
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "template"
+            },
+            "data": {
+              "$ref": "#/definitions/Template"
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "reaction"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "added",
+                    "removed"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Service-native emoji id, e.g. Slack \"thumbsup\", Discord custom-emoji id; for Meta the Unicode emoji itself."
+                },
+                "unicode": {
+                  "type": "string",
+                  "description": "Unicode rendering, e.g. \"👍\" — absent only for emoji with no Unicode form (custom workspace emoji) and Meta removals."
+                }
+              },
+              "required": [
+                "action"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        }
+      ]
+    },
+    "Template": {
+      "type": "object",
+      "properties": {
+        "components": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "header"
+                  },
+                  "parameters": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "currency"
+                            },
+                            "currency": {
+                              "type": "object",
+                              "properties": {
+                                "fallback_value": {
+                                  "type": "string"
+                                },
+                                "code": {
+                                  "type": "string"
+                                },
+                                "amount_1000": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "fallback_value",
+                                "code",
+                                "amount_1000"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "currency"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "date_time"
+                            },
+                            "date_time": {
+                              "type": "object",
+                              "properties": {
+                                "fallback_value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "fallback_value"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "date_time"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "text"
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "text"
+                          ]
+                        },
+                        {
+                          "$ref": "#/definitions/OutgoingImage"
+                        },
+                        {
+                          "$ref": "#/definitions/OutgoingVideo"
+                        },
+                        {
+                          "$ref": "#/definitions/OutgoingDocument"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "body"
+                  },
+                  "parameters": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "currency"
+                            },
+                            "currency": {
+                              "type": "object",
+                              "properties": {
+                                "fallback_value": {
+                                  "type": "string"
+                                },
+                                "code": {
+                                  "type": "string"
+                                },
+                                "amount_1000": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "fallback_value",
+                                "code",
+                                "amount_1000"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "currency"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "date_time"
+                            },
+                            "date_time": {
+                              "type": "object",
+                              "properties": {
+                                "fallback_value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "fallback_value"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "date_time"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "text"
+                            },
+                            "text": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "text"
+                          ]
+                        },
+                        {
+                          "$ref": "#/definitions/OutgoingImage"
+                        },
+                        {
+                          "$ref": "#/definitions/OutgoingVideo"
+                        },
+                        {
+                          "$ref": "#/definitions/OutgoingDocument"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "sub_type": {
+                    "type": "string",
+                    "const": "quick_reply"
+                  },
+                  "parameters": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "payload"
+                        },
+                        "payload": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "payload"
+                      ]
+                    }
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "button"
+                  },
+                  "index": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "index",
+                  "parameters",
+                  "sub_type",
+                  "type"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "sub_type": {
+                    "type": "string",
+                    "const": "url"
+                  },
+                  "parameters": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "url"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "text"
+                      ]
+                    }
+                  },
+                  "type": {
+                    "type": "string",
+                    "const": "button"
+                  },
+                  "index": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "index",
+                  "parameters",
+                  "sub_type",
+                  "type"
+                ]
+              }
+            ]
+          }
+        },
+        "language": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "policy": {
+              "type": "string",
+              "const": "deterministic"
+            }
+          },
+          "required": [
+            "code",
+            "policy"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "language",
+        "name"
+      ]
+    },
+    "OutgoingImage": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "image"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "caption": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "caption": {
+                  "type": "string"
+                },
+                "link": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "link"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "image"
+      ]
+    },
+    "OutgoingVideo": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "video"
+        },
+        "video": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "caption": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "caption": {
+                  "type": "string"
+                },
+                "link": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "link"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "video"
+      ]
+    },
+    "OutgoingDocument": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "document"
+        },
+        "document": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "caption": {
+                  "type": "string"
+                },
+                "filename": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "caption": {
+                  "type": "string"
+                },
+                "filename": {
+                  "type": "string"
+                },
+                "link": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "link"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "document"
+      ]
+    },
+    "InternalMessage": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "text"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "text",
+                "reaction",
+                "caption",
+                "transcription",
+                "description"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "tool": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "function",
+                        "custom"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "sql",
+                        "http"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "label",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "google"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "google_search",
+                        "code_execution",
+                        "url_context"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "openai"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "web_search_preview",
+                        "file_search",
+                        "image_generation",
+                        "code_interpreter",
+                        "computer_use_preview"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "anthropic"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "bash",
+                        "code_execution",
+                        "computer",
+                        "str_replace_based_edit_tool",
+                        "web_search"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "function",
+                        "custom"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "sql",
+                        "http"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "label",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "google"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "google_search",
+                        "code_execution",
+                        "url_context"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "openai"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "web_search_preview",
+                        "file_search",
+                        "image_generation",
+                        "code_interpreter",
+                        "computer_use_preview"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "anthropic"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "bash",
+                        "code_execution",
+                        "computer",
+                        "str_replace_based_edit_tool",
+                        "web_search"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                }
+              ]
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "internal": {
+              "type": "boolean",
+              "const": true,
+              "description": "Record-only: this row is never dispatched, to anyone. Declared here so the marker travels with the content instead of living in a column readers must know to consult. Writers set it themselves AND insert the row unarmed (status {}, no pending) — agent-client does both on tool traces and errors; the database reads the marker (dispatch and agent triggers refuse it) but never stamps or strips anything."
+            }
+          },
+          "required": [
+            "kind",
+            "text",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "data"
+            },
+            "data": {
+              "$ref": "#/definitions/Json"
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "tool": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "function",
+                        "custom"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "sql",
+                        "http"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "label",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "google"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "google_search",
+                        "code_execution",
+                        "url_context"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "openai"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "web_search_preview",
+                        "file_search",
+                        "image_generation",
+                        "code_interpreter",
+                        "computer_use_preview"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "anthropic"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "bash",
+                        "code_execution",
+                        "computer",
+                        "str_replace_based_edit_tool",
+                        "web_search"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "function",
+                        "custom"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "sql",
+                        "http"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "label",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "google"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "google_search",
+                        "code_execution",
+                        "url_context"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "openai"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "web_search_preview",
+                        "file_search",
+                        "image_generation",
+                        "code_interpreter",
+                        "computer_use_preview"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "anthropic"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "bash",
+                        "code_execution",
+                        "computer",
+                        "str_replace_based_edit_tool",
+                        "web_search"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                }
+              ]
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "internal": {
+              "type": "boolean",
+              "const": true,
+              "description": "Record-only: this row is never dispatched, to anyone. Declared here so the marker travels with the content instead of living in a column readers must know to consult. Writers set it themselves AND insert the row unarmed (status {}, no pending) — agent-client does both on tool traces and errors; the database reads the marker (dispatch and agent triggers refuse it) but never stamps or strips anything."
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "file"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "audio",
+                "image",
+                "video",
+                "document",
+                "sticker",
+                "file",
+                "media",
+                "story",
+                "ig_story",
+                "story_mention",
+                "story_reply"
+              ]
+            },
+            "file": {
+              "type": "object",
+              "properties": {
+                "mime_type": {
+                  "type": "string"
+                },
+                "uri": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "mime_type",
+                "uri"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "tool": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "function",
+                        "custom"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "sql",
+                        "http"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "label",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "google"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "google_search",
+                        "code_execution",
+                        "url_context"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "openai"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "web_search_preview",
+                        "file_search",
+                        "image_generation",
+                        "code_interpreter",
+                        "computer_use_preview"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "anthropic"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "bash",
+                        "code_execution",
+                        "computer",
+                        "str_replace_based_edit_tool",
+                        "web_search"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "function",
+                        "custom"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "sql",
+                        "http"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "label",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "google"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "google_search",
+                        "code_execution",
+                        "url_context"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "openai"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "web_search_preview",
+                        "file_search",
+                        "image_generation",
+                        "code_interpreter",
+                        "computer_use_preview"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "anthropic"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "bash",
+                        "code_execution",
+                        "computer",
+                        "str_replace_based_edit_tool",
+                        "web_search"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                }
+              ]
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "internal": {
+              "type": "boolean",
+              "const": true,
+              "description": "Record-only: this row is never dispatched, to anyone. Declared here so the marker travels with the content instead of living in a column readers must know to consult. Writers set it themselves AND insert the row unarmed (status {}, no pending) — agent-client does both on tool traces and errors; the database reads the marker (dispatch and agent triggers refuse it) but never stamps or strips anything."
+            }
+          },
+          "required": [
+            "file",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "share"
+            },
+            "data": {
+              "$ref": "#/definitions/ShareData"
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "tool": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "function",
+                        "custom"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "sql",
+                        "http"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "label",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "google"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "google_search",
+                        "code_execution",
+                        "url_context"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "openai"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "web_search_preview",
+                        "file_search",
+                        "image_generation",
+                        "code_interpreter",
+                        "computer_use_preview"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "anthropic"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "bash",
+                        "code_execution",
+                        "computer",
+                        "str_replace_based_edit_tool",
+                        "web_search"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "function",
+                        "custom"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "sql",
+                        "http"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "label",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "google"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "google_search",
+                        "code_execution",
+                        "url_context"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "openai"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "web_search_preview",
+                        "file_search",
+                        "image_generation",
+                        "code_interpreter",
+                        "computer_use_preview"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "anthropic"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "bash",
+                        "code_execution",
+                        "computer",
+                        "str_replace_based_edit_tool",
+                        "web_search"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                }
+              ]
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "internal": {
+              "type": "boolean",
+              "const": true,
+              "description": "Record-only: this row is never dispatched, to anyone. Declared here so the marker travels with the content instead of living in a column readers must know to consult. Writers set it themselves AND insert the row unarmed (status {}, no pending) — agent-client does both on tool traces and errors; the database reads the marker (dispatch and agent triggers refuse it) but never stamps or strips anything."
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        }
+      ]
+    }
+  }
+}

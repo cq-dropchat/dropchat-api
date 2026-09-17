@@ -227,11 +227,13 @@ export type ReactionPart = DataPart<"reaction", {
 // link card — and skipped by media download. `data.type` keeps the original
 // attachment type so consumers can label it (post vs reel); `url` is the
 // permalink and `title` the shared item's caption when provided.
-export type SharePart = DataPart<"share", {
+export type ShareData = {
   type: "ig_post" | "ig_reel" | "reel";
   url: string;
   title?: string;
-}>;
+};
+
+export type SharePart = DataPart<"share", ShareData>;
 
 // Multi-part messages
 

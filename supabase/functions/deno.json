@@ -1,5 +1,6 @@
 {
   "tasks": {
+    "contracts": "deno run --allow-read --allow-write --allow-env --allow-sys --allow-net _shared/contracts/generate.ts",
     "test": "deno test --allow-all --coverage=coverage",
     "test:coverage": "deno test --allow-all --coverage=coverage && deno coverage coverage --lcov --output=coverage/lcov.info --exclude='\\.test\\.ts$|_shared/db_types\\.ts|__fixtures__|_shared/testing/' && deno run --allow-read _shared/testing/coverage_gate.ts coverage/lcov.info"
   },
