@@ -23,3 +23,8 @@
 revoke execute on all functions in schema billing from public;
 
 grant execute on all functions in schema billing to service_role;
+
+-- F17: the renewal and its grant helper run only from pg_cron and the
+-- organization trigger (as the owner); not even service_role calls them.
+revoke execute on function billing.renew_subscriptions(integer) from service_role;
+revoke execute on function billing.grant_included_products(uuid, text, timestamp with time zone) from service_role;

@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- **Billing periods renew** (F17). A pg_cron job (`renew-subscriptions`, every 5
+  minutes) renews every subscription whose `current_period_end` has passed: the
+  period advances to the current one (missed periods are skipped, not granted),
+  the unspent part of the previous period's included balance products (AI
+  credits) expires as a ledger entry of the new type `expiration`, and the
+  plan's included amount is granted again. Included credits do not accumulate;
+  credits bought as top-ups are kept (included credits count as spent first).
+  New columns: `billing.subscriptions.canceled_at` (a subscription canceled on
+  or before the end of its period is not renewed) and
+  `billing.ledger.period_start` (grants and expirations are unique per
+  organization, product and period). New subscriptions get `current_period_end`;
+  existing ones are backfilled to one cycle after their start, so those older
+  than a cycle are renewed on the first run. Plans without `billing_cycle` renew
+  monthly.
+
 - **Instagram: a rejected token stops outgoing sends too** (F28). While an
   Instagram account carries `extra.needs_reauth`, outgoing messages fail at once
   with a `190` error, without calling Graph, and read receipts and typing

@@ -44,7 +44,9 @@ insert into service_only values
   ('public.sweep_deletions(integer)'),
   ('public.purge_expired_rows(integer)'),
   ('public.backfill_message_contents(jsonb)'),
-  ('public.request_id_header()');
+  ('public.request_id_header()'),
+  ('billing.renew_subscriptions(integer)'),
+  ('billing.grant_included_products(uuid, text, timestamp with time zone)');
 
 select is(
   (select array_agg(fn order by fn) from service_only
@@ -61,7 +63,8 @@ select is(
 select ok(
   (select bool_and(has_function_privilege('service_role', fn::regprocedure, 'execute')) from service_only
    where fn not like '%agent_turn%' and fn not like '%sweep_deletions%' and fn not like '%purge_expired_rows%'
-     and fn not like '%request_id_header%'),
+     and fn not like '%request_id_header%'
+     and fn not like 'billing.%'),
   'service_role still executes them'
 );
 

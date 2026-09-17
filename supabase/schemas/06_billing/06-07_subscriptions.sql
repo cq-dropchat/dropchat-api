@@ -5,6 +5,10 @@ create table billing.subscriptions (
   account_id uuid,
   current_period_start timestamp with time zone,
   current_period_end timestamp with time zone,
+  -- F17: when the subscription stops renewing. A cancellation at the end of
+  -- the period sets it to current_period_end; renew_subscriptions skips a
+  -- subscription canceled on or before the end of its current period.
+  canceled_at timestamp with time zone,
   created_at timestamp with time zone default now() not null,
   updated_at timestamp with time zone default now() not null
 );
@@ -39,3 +43,9 @@ before update
 on billing.subscriptions
 for each row
 execute function public.moddatetime('updated_at');
+
+-- F17: renew_subscriptions starts from the due subscriptions
+-- (current_period_end <= now()) instead of probing every organization.
+create index subscriptions_current_period_end_idx
+on billing.subscriptions
+using btree (current_period_end);

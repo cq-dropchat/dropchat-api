@@ -4,8 +4,9 @@
 
 Core billing
 
-- [ ] Renewal cron job — at period end, call change_plan to re-grant balance
-      products, rotate current_period_start/end
+- [x] Renewal cron job — `billing.renew_subscriptions` every 5 minutes rotates
+      current_period_start/end, expires unspent included credits and re-grants
+      the plan's balance products (F17; there is no `change_plan` function)
 - [ ] WhatsApp template billing — record template send costs in the ledger
       (costs table is ready, just needs the ledger insert in the dispatcher)
 - [ ] Plan downgrade scheduling — store pending plan change, apply at period end

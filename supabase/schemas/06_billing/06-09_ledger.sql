@@ -13,6 +13,10 @@ create table billing.ledger (
   -- `chatcmpl-…`, a Gemini `responseId`). With provider, the idempotency key
   -- (F17): a retried insert of the same response charges once.
   external_id text,
+  -- F17: the billing period a grant or an expiration belongs to (null for
+  -- consumption and top-ups). With the organization, product and type, the
+  -- idempotency key of the renewal.
+  period_start timestamp with time zone,
   metadata jsonb,
   billable boolean,
   created_at timestamp with time zone default now() not null,
@@ -57,7 +61,13 @@ using btree (message_id);
 
 alter table only billing.ledger
 add constraint ledger_type_check
-check (type in ('grant', 'consumption', 'topup'));
+check (type in ('grant', 'consumption', 'topup', 'expiration'));
+
+-- F17: one grant and one expiration per product per period. Nulls are
+-- distinct: consumption and top-ups (no period_start) are unaffected.
+create unique index ledger_period_entry_key
+on billing.ledger
+using btree (organization_id, product_id, type, period_start);
 
 create index ledger_organization_id_idx
 on billing.ledger

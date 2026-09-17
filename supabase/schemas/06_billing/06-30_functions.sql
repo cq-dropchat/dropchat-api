@@ -349,10 +349,51 @@ begin
 end;
 $$;
 
+-- F17. Length of a plan's billing period. A plan without a cycle (the free
+-- plan) renews monthly: its included credits come back every month.
+create function billing.plan_period(_billing_cycle text) returns interval
+language sql
+immutable
+set search_path to ''
+as $$
+  select case _billing_cycle when 'year' then interval '1 year' else interval '1 month' end;
+$$;
+
+-- F17. Grants a plan's included balance products (AI credits) for one
+-- period. Shared by initialize_subscription and renew_subscriptions. Keyed by
+-- (organization, product, 'grant', period_start): granting a period twice is
+-- a no-op. Returns the number of grants written.
+create function billing.grant_included_products(
+  _organization_id uuid,
+  _plan_id text,
+  _period_start timestamp with time zone
+) returns integer
+language plpgsql
+security definer
+set search_path to ''
+as $$
+declare
+  _count integer;
+begin
+  insert into billing.ledger (organization_id, product_id, type, quantity, period_start)
+  select _organization_id, pp.product_id, 'grant', pp.included, _period_start
+  from billing.plans_products pp
+  join billing.products p on p.id = pp.product_id
+  where pp.plan_id = _plan_id
+    and p.kind = 'balance'
+    and pp.included is not null
+    and pp.included > 0
+  on conflict (organization_id, product_id, type, period_start) do nothing;
+
+  get diagnostics _count = row_count;
+  return _count;
+end;
+$$;
+
 -- Trigger: initialize subscription on organization insert.
 -- Assigns the lowest-level active tier, then the default plan if one exists:
--- tier from the plan's min_tier, period start, and a ledger grant for each
--- balance product the plan includes.
+-- tier from the plan's min_tier, the first period (F17: start and end), and a
+-- ledger grant for each balance product the plan includes.
 -- No tiers = no billing.
 --
 -- Changing plan later (upgrades, purchases) is an app-layer concern — an edge
@@ -368,7 +409,7 @@ as $$
 declare
   _tier_id text;
   _plan billing.plans%rowtype;
-  _pp record;
+  _start timestamp with time zone := now();
 begin
   select t.id into _tier_id
   from billing.tiers t
@@ -410,24 +451,125 @@ begin
   update billing.subscriptions
   set tier_id = _tier_id,
       plan_id = _plan.id,
-      current_period_start = now()
+      current_period_start = _start,
+      current_period_end = _start + billing.plan_period(_plan.billing_cycle)
   where organization_id = new.id;
 
-  -- Grant balance products included in the plan
-  for _pp in
-    select pp.product_id, pp.included
-    from billing.plans_products pp
-    join billing.products p on p.id = pp.product_id
-    where pp.plan_id = _plan.id
-      and p.kind = 'balance'
-      and pp.included is not null
-      and pp.included > 0
-  loop
-    insert into billing.ledger (organization_id, product_id, type, quantity)
-    values (new.id, _pp.product_id, 'grant', _pp.included);
-  end loop;
+  perform billing.grant_included_products(new.id, _plan.id, _start);
 
   return new;
+end;
+$$;
+
+-- F17. The renewal, run by pg_cron (`renew-subscriptions`, every 5 minutes).
+--
+-- Takes up to _batch subscriptions whose period has ended, FOR UPDATE SKIP
+-- LOCKED (two overlapping runs never take the same row), skipping plan-less
+-- ones, canceled ones and organizations being deleted. For each:
+--
+--   1. The period advances to the one containing now(): if the cron was down
+--      for several periods they are skipped, not granted.
+--   2. Included credits do not accumulate. What is left of the included
+--      amount granted in the closing period expires (a negative
+--      `expiration` entry): included credits are spent first, so the
+--      remainder is the grants since the period started minus the
+--      consumption since then, never more than the balance. Top-ups beyond
+--      that are untouched.
+--   3. The plan's included amount is granted for the new period.
+--
+-- Expirations and grants are keyed by period_start (ledger_period_entry_key),
+-- so a repeated run cannot write them twice. Returns the subscriptions
+-- renewed. Month arithmetic clamps to the month's last day: a period
+-- anchored on the 31st moves to the 28th after February.
+create function billing.renew_subscriptions(_batch integer default 500) returns integer
+language plpgsql
+security definer
+set search_path to ''
+as $$
+declare
+  _sub record;
+  _step interval;
+  _start timestamp with time zone;
+  _end timestamp with time zone;
+  _pp record;
+  _granted numeric;
+  _consumed numeric;
+  _balance numeric;
+  _expire numeric;
+  _count integer := 0;
+begin
+  for _sub in
+    select s.organization_id, s.plan_id, s.current_period_start, s.current_period_end,
+           p.billing_cycle
+    from billing.subscriptions s
+    join billing.plans p on p.id = s.plan_id
+    join public.organizations o on o.id = s.organization_id
+    where s.current_period_end <= now()
+      and (s.canceled_at is null or s.canceled_at > s.current_period_end)
+      and o.deletion_requested_at is null
+    order by s.current_period_end
+    limit _batch
+    for update of s skip locked
+  loop
+    _step := billing.plan_period(_sub.billing_cycle);
+    _start := _sub.current_period_end;
+    _end := _start + _step;
+    while _end <= now() loop
+      _start := _end;
+      _end := _start + _step;
+    end loop;
+
+    for _pp in
+      select pp.product_id
+      from billing.plans_products pp
+      join billing.products p on p.id = pp.product_id
+      where pp.plan_id = _sub.plan_id
+        and p.kind = 'balance'
+        and pp.included is not null
+        and pp.included > 0
+    loop
+      select
+        coalesce(sum(l.quantity) filter (where l.type = 'grant'), 0),
+        coalesce(-sum(l.quantity) filter (
+          where l.type = 'consumption' and l.billable is distinct from false
+        ), 0)
+      into _granted, _consumed
+      from billing.ledger l
+      where l.organization_id = _sub.organization_id
+        and l.product_id = _pp.product_id
+        and l.created_at >= coalesce(_sub.current_period_start, '-infinity');
+
+      select u.quantity into _balance
+      from billing.usage u
+      where u.organization_id = _sub.organization_id
+        and u.product_id = _pp.product_id
+        and u.interval = 'lifetime'
+        and u.period = '1970-01-01';
+
+      _expire := greatest(0, least(_granted - _consumed, coalesce(_balance, 0)));
+
+      if _expire > 0 then
+        insert into billing.ledger (
+          organization_id, product_id, type, quantity, period_start, metadata
+        ) values (
+          _sub.organization_id, _pp.product_id, 'expiration', -_expire, _start,
+          jsonb_build_object('expired_period_start', _sub.current_period_start)
+        )
+        on conflict (organization_id, product_id, type, period_start) do nothing;
+      end if;
+    end loop;
+
+    perform billing.grant_included_products(_sub.organization_id, _sub.plan_id, _start);
+
+    update billing.subscriptions
+    set current_period_start = _start,
+        current_period_end = _end
+    where organization_id = _sub.organization_id;
+
+    _count := _count + 1;
+  end loop;
+
+  return _count;
 end;
 $$;
 

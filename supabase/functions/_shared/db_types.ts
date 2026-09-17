@@ -178,6 +178,7 @@ export type Database = {
           metadata: Json | null
           model: string | null
           organization_id: string
+          period_start: string | null
           product_id: string
           provider: string | null
           quantity: number
@@ -194,6 +195,7 @@ export type Database = {
           metadata?: Json | null
           model?: string | null
           organization_id: string
+          period_start?: string | null
           product_id: string
           provider?: string | null
           quantity: number
@@ -210,6 +212,7 @@ export type Database = {
           metadata?: Json | null
           model?: string | null
           organization_id?: string
+          period_start?: string | null
           product_id?: string
           provider?: string | null
           quantity?: number
@@ -388,6 +391,7 @@ export type Database = {
       subscriptions: {
         Row: {
           account_id: string | null
+          canceled_at: string | null
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
@@ -398,6 +402,7 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          canceled_at?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
@@ -408,6 +413,7 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          canceled_at?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
@@ -569,6 +575,16 @@ export type Database = {
         }
         Returns: number
       }
+      grant_included_products: {
+        Args: {
+          _organization_id: string
+          _period_start: string
+          _plan_id: string
+        }
+        Returns: number
+      }
+      plan_period: { Args: { _billing_cycle: string }; Returns: string }
+      renew_subscriptions: { Args: { _batch?: number }; Returns: number }
       update_usage: {
         Args: {
           _organization_id: string
