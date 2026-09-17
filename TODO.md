@@ -120,6 +120,14 @@ Monetization
       and the owner's screen), or a resumable upload of one streamed ZIP.
       Whichever, the export stops being one object per row.
 
+- [ ] Secrets in Vault instead of `public.secrets` (F02, P8) — a decision before
+      it is code. `public.secrets` is service-role only with no policies, and
+      the audit left Vault as an improvement, not a finding. Vault costs one
+      decrypted read per access (see F24's measurement) and moves the keys out
+      of a table a service-role leak would read whole. Not taken in the P1–P8
+      batch: nothing is deployed, so there is no operational experience to weigh
+      the cost against.
+
 - [ ] Edge call backlog for owners (P5) — `public.edge_calls_health` is service
       role only. If the product ever wants it on a dashboard, expose a summary
       per organization to owners: counts and the oldest pending timestamp, never
