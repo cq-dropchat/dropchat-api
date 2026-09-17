@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Retention for logs and onboarding tokens; no more `hooks` rows** (F15).
+  `public.logs` rows older than 90 days and `onboarding_tokens` expired more
+  than 30 days ago are deleted by the hourly `purge-expired-rows` job. The Edge
+  Function triggers no longer insert into `supabase_functions.hooks` (one row
+  per call, never read); the job empties what it already holds. To follow a
+  request, use `net._http_response` (pg_net's TTL) or the function's
+  `x-request-id` logs.
+
 - **Deleting an organization is asynchronous** (F18). `DELETE` on
   `organizations` (owners, as before) no longer runs the cascade in the request:
   it sets `organizations.deletion_requested_at`, files a row in

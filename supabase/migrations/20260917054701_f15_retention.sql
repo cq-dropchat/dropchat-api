@@ -1,12 +1,53 @@
--- F15: these triggers only enqueue their pg_net request. They used to also
--- insert a row per call in supabase_functions.hooks, which nothing read (~3 M
--- rows/day at 2 M messages/day); net._http_response keeps the outcome of each
--- request for pg_net's TTL. purge_expired_rows (04-08) empties the old rows.
+set check_function_bodies = off;
 
-create function public.dispatcher_edge_function() returns trigger
-language plpgsql
-security definer
-as $$
+CREATE OR REPLACE FUNCTION public.purge_expired_rows(_batch integer DEFAULT 10000)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  _hooks integer;
+  _logs integer;
+  _tokens integer;
+begin
+  delete from supabase_functions.hooks
+  where id in (
+    select h.id from supabase_functions.hooks h order by h.id limit _batch
+  );
+  get diagnostics _hooks = row_count;
+
+  delete from public.logs
+  where id in (
+    select l.id from public.logs l
+    where l.created_at < now() - interval '90 days'
+    order by l.created_at
+    limit _batch
+  );
+  get diagnostics _logs = row_count;
+
+  delete from public.onboarding_tokens
+  where id in (
+    select t.id from public.onboarding_tokens t
+    where t.expires_at < now() - interval '30 days'
+    limit _batch
+  );
+  get diagnostics _tokens = row_count;
+
+  return jsonb_build_object(
+    'hooks', _hooks,
+    'logs', _logs,
+    'onboarding_tokens', _tokens
+  );
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.dispatcher_edge_function()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
 declare
   service text := new.service::text;
   path text := concat('/', service, '-dispatcher');
@@ -48,12 +89,14 @@ begin
 
   return new;
 end;
-$$;
+$function$
+;
 
-create function public.edge_function() returns trigger
-language plpgsql
-security definer
-as $$
+CREATE OR REPLACE FUNCTION public.edge_function()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
 declare
   payload jsonb;
   base_url text;
@@ -121,26 +164,15 @@ begin
 
   return new;
 end
-$$;
+$function$
+;
 
--- The internal mirror of edge_function('/agent-client', 'post'), for the
--- AI-DM flow (see handle_local_message_to_agent on messages). The trigger's
--- WHEN prefilters — local, a member author, armed — and the one fact a WHEN
--- cannot express lives here: is the other roster slot an AI agent?
---
--- A local direct's address IS its roster (agent ids, sorted, ':'-joined),
--- and RLS only allows roster edits on `group` — so "the AI answers where its
--- own id is in the address" is safe by construction: a member cannot pull
--- the AI into a real team conversation, and DMing the AI is not a mode, it
--- is just a conversation. Excluding the author (`a.id <> new.agent_id`) also
--- makes the AI's own replies a no-op here, with no special case. Everything
--- that enters and is not an AI DM — a group message, a human-human DM —
--- costs one indexed exists and exits.
-create function public.local_message_to_agent() returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
+CREATE OR REPLACE FUNCTION public.local_message_to_agent()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 declare
   segments text[] := string_to_array(new.conversation_address, ':');
   base_url text;
@@ -188,4 +220,17 @@ begin
 
   return new;
 end
-$$; 
+$function$
+;
+
+
+
+-- Hand-written: execute privileges (db diff does not model them).
+revoke execute on function public.purge_expired_rows(integer) from public, anon, authenticated;
+
+-- Hand-written: pg_cron schedules are imperative, db diff cannot model them.
+select cron.schedule(
+  'purge-expired-rows',
+  '17 * * * *',
+  $$ select public.purge_expired_rows(); $$
+);

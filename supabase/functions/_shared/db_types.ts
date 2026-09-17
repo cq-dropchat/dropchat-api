@@ -1564,6 +1564,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      purge_expired_rows: { Args: { _batch?: number }; Returns: Json }
       record_webhook_result: {
         Args: { p_delivery_id: string; p_error?: string; p_status_code: number }
         Returns: undefined

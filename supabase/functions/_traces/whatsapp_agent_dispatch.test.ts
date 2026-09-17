@@ -1,20 +1,21 @@
 // Trace (a), end to end on a local Supabase with supabase/tests/fixtures
 // loaded (IMPLEMENTATION_PROMPT §5):
 //
-//   signed WhatsApp webhook → row in `messages` → trigger enqueues
-//   agent-client → agent reply inserted → trigger enqueues the dispatcher →
+//   signed WhatsApp webhook → row in `messages` → (trigger enqueues)
+//   agent-client → agent reply inserted → (trigger enqueues) the dispatcher →
 //   a status webhook lands while the dispatcher is still committing (the
 //   commitDispatchedMessage race) → a later `read` merges into the same row.
 //
 // The local edge runtime does not serve functions to pg_net (its requests
-// fail with 503), so this test is the worker: it proves each trigger enqueued
-// its request through supabase_functions.hooks, then runs that function's
-// handler in-process with the payload the trigger sends. Only the outside
-// world is stubbed: the LLM provider and the Graph API.
+// fail with 503), so this test is the worker: it runs each function's handler
+// in-process with the payload its trigger sends. That the triggers enqueue
+// exactly that payload (URL and `record`) is asserted by pgTAP
+// 14_retention.test.sql, where the queue row is visible before pg_net's worker
+// takes it. Only the outside world is stubbed: the LLM provider and the Graph
+// API.
 import "../_shared/testing/env.ts"; // before the handlers: keys are read at import
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { createClient } from "@supabase/supabase-js";
-import postgres from "postgres";
 import type { Database, MessageRow } from "../_shared/types/database_types.ts";
 import { env, fixture, supabaseIsUp } from "../_shared/testing/env.ts";
 import { metaRequest } from "../_shared/testing/sign.ts";
@@ -113,23 +114,10 @@ Deno.test({
   sanitizeOps: false,
   async fn() {
     const client = service();
-    const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { max: 1 });
     const run = crypto.randomUUID();
     const inboundWamid = `wamid.TRACE-A.in.${run}`;
     const outboundWamid = `wamid.TRACE-A.out.${run}`;
     const since = new Date(Date.now() - 1000).toISOString();
-
-    const hooksSince = async (watermark: bigint, name: string) => {
-      const [row] = await sql`
-        select count(*)::int as n from supabase_functions.hooks
-        where id > ${watermark.toString()} and hook_name = ${name}`;
-      return row.n as number;
-    };
-    const watermark = async () => {
-      const [row] = await sql`
-        select coalesce(max(id), 0)::bigint as id from supabase_functions.hooks`;
-      return BigInt(row.id);
-    };
 
     const llm = stubLlm(50);
     // Captured after the LLM stub: the Graph stub below falls through to it.
@@ -138,7 +126,6 @@ Deno.test({
     try {
       await withTestAgent(client, async () => {
         // 1. A signed inbound message.
-        let mark = await watermark();
         await deliverWebhook(change({
           contacts: [{ profile: { name: "Dario" }, wa_id: CONTACT }],
           messages: [{
@@ -163,16 +150,8 @@ Deno.test({
           "inbound row armed",
         );
 
-        // 2. The insert enqueued agent-client.
-        assertEquals(
-          await hooksSince(mark, "handle_incoming_message_to_agent"),
-          1,
-          "agent-client was not enqueued for the inbound row",
-        );
-
-        // 3. agent-client answers (the database clock can run ahead: settle).
+        // 2. agent-client answers (the database clock can run ahead: settle).
         await wait(500);
-        mark = await watermark();
         const response = await agentClient(
           triggerRequest(
             "http://localhost/agent-client",
@@ -195,14 +174,7 @@ Deno.test({
           "respuesta de prueba",
         );
 
-        // 4. The reply enqueued the dispatcher.
-        assertEquals(
-          await hooksSince(mark, "handle_outgoing_message_to_dispatcher"),
-          1,
-          "the dispatcher was not enqueued for the reply",
-        );
-
-        // 5. Dispatch. Meta answers with the wamid, and its `sent` status
+        // 3. Dispatch. Meta answers with the wamid, and its `sent` status
         //    webhook lands BEFORE the dispatcher commits it to the row.
         let graphSends = 0;
         globalThis.fetch = async (input, init) => {
@@ -233,7 +205,7 @@ Deno.test({
         assertEquals(dispatched.status, 200);
         assertEquals(graphSends, 1);
 
-        // 6. A `read` after the commit.
+        // 4. A `read` after the commit.
         await deliverWebhook(
           statusChange(outboundWamid, "read", Date.now() + 1000),
         );
@@ -277,7 +249,6 @@ Deno.test({
         .eq("organization_id", fixture.orgA)
         .eq("conversation_address", CONTACT)
         .gte("created_at", since);
-      await sql.end();
     }
   },
 });
