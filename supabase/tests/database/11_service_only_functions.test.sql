@@ -43,7 +43,6 @@ insert into service_only values
   ('public.request_address_deletion(uuid, public.service, text, text)'),
   ('public.sweep_deletions(integer)'),
   ('public.purge_expired_rows(integer)'),
-  ('public.backfill_message_contents(jsonb)'),
   ('public.request_id_header()'),
   ('public.pending_deletion_media(integer)'),
   ('public.forget_deletion_media(uuid, text[])'),

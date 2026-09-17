@@ -71,12 +71,15 @@ create unique index messages_org_external_id_key
 on public.messages
 using btree (organization_id, external_id);
 
--- Declared NOT VALID (not inline) to match the deployed state. ~46k legacy
--- messages predate the v1 content schema (no version/kind) and were never
--- checked, so the constraint cannot be validated; it still enforces the shape
--- for every new row. Declaring NOT VALID here keeps `supabase db diff` from
--- re-emitting a drop/re-add on every run. See migration
--- 20260424132025_fix_messages_content_schema_allow_empty.
+-- Validated since §5.2 (P3): it was declared NOT VALID because the deployed
+-- database held legacy messages whose content predates the v1 schema (no
+-- version, no kind), so it could only speak for rows written after it. The
+-- backfill converted them (functions/_scripts/backfill_messages_v1.ts) and
+-- the migration that validated it also dropped the writer it used. Every row
+-- in the table now satisfies this, which is what lets readers assume the
+-- shape instead of testing for it. Declared out of line (not inline) to keep
+-- `supabase db diff` from re-emitting a drop/re-add on every run. See
+-- migration 20260424132025_fix_messages_content_schema_allow_empty.
 alter table only public.messages
 add constraint messages_content_schema check (
   content = '{}'::jsonb -- status-only upserts (content merged later)
@@ -85,7 +88,7 @@ add constraint messages_content_schema check (
     and content->>'type' in ('text', 'file', 'data')
     and content->>'kind' is not null
   )
-) not valid;
+);
 
 -- No plain (organization_id) index: messages_org_conv_timestamp_idx below
 -- leads with that column, so it serves the organization cascade too. What

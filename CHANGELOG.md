@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Every message's `content` is guaranteed to follow the v1 schema** (P3,
+  §5.2). `messages_content_schema` was `NOT VALID`: it checked every new row but
+  could say nothing about the legacy ones that predate the v1 shape (no
+  `version`, no `kind`). The backfill has run and the constraint is now
+  validated, so a reader can assume the shape for every row in the table instead
+  of testing for it. `rpc/backfill_message_contents` (service role only) is gone
+  with it. Nothing changes for REST clients: the same contents were already
+  refused on insert.
+
 - **Realtime broadcast channels** (F10). Conversation and message changes are
   published to private Realtime channels: `org:<organization_id>` (a notice with
   `table`, `op`, `id`, `organization_id`, `conversation_id`, `updated_at` and,
