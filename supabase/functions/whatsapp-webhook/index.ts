@@ -1223,7 +1223,14 @@ export async function processPayload(
 
     const { error } = await client
       .from("messages")
-      .upsert(rows, { onConflict: "organization_id,external_id" });
+      // defaultToNull: false — rows in one batch carry different keys (a
+      // media item that failed adds `status`); PostgREST would otherwise
+      // write null for a column a row omits, and a single row with `status`
+      // rejected the whole batch (not-null). Omitted columns take defaults.
+      .upsert(rows, {
+        onConflict: "organization_id,external_id",
+        defaultToNull: false,
+      });
 
     if (error) {
       log.error(`Failed to upsert ${label}`, {

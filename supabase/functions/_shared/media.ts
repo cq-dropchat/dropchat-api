@@ -27,6 +27,43 @@ export function base64ToBlob(base64: string, mime_type?: string) {
   return new Blob([buffer], { type: mime_type || "application/octet-stream" });
 }
 
+// Uploads in flight in this isolate, by key: identical files in one webhook
+// batch share one request (see below).
+const inFlight = new Map<string, Promise<void>>();
+
+function isDeadlock(error: { message: string }) {
+  return /40P01/.test(error.message);
+}
+
+async function putObject(
+  client: SupabaseClient,
+  key: string,
+  file: Blob,
+  name?: string,
+) {
+  for (let attempt = 1;; attempt++) {
+    const { error } = await client.storage.from("media").upload(key, file, {
+      upsert: true,
+      metadata: { name },
+    });
+
+    // The key is the content hash: an object that "already exists" holds
+    // these same bytes.
+    if (!error || /already exists/i.test(error.message)) return;
+
+    // Concurrent upserts of one key (from other isolates) can deadlock in
+    // Storage's database; the retry finds the object written.
+    if (isDeadlock(error) && attempt < 3) {
+      await new Promise((r) =>
+        setTimeout(r, 50 * attempt + Math.random() * 50)
+      );
+      continue;
+    }
+
+    throw error;
+  }
+}
+
 export async function uploadToStorage(
   client: SupabaseClient,
   organization_id: string,
@@ -40,14 +77,17 @@ export async function uploadToStorage(
 
   const key = `/organizations/${organization_id}/attachments/${file_hash}`;
 
-  const { error } = await client.storage.from("media").upload(key, file, {
-    upsert: true,
-    metadata: { name },
-  });
-
-  if (error) {
-    throw error;
+  // Identical files uploaded at once (a batch of the same sticker) raced to
+  // create one object: Storage refused the losers ("already exists") or
+  // deadlocked (40P01), and those messages kept their Graph reference.
+  let upload = inFlight.get(key);
+  if (!upload) {
+    upload = putObject(client, key, file, name).finally(() =>
+      inFlight.delete(key)
+    );
+    inFlight.set(key, upload);
   }
+  await upload;
 
   return BASE_URI + key;
 }
