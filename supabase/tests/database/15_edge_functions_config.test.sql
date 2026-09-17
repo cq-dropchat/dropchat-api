@@ -80,12 +80,15 @@ insert into public.messages (
   jsonb_build_object('pending', now())
 );
 
+-- F12: agent-client calls are queued (edge_calls) and sent by the worker,
+-- which reads the token through edge_functions_config.
+select public.dispatch_edge_calls(1000, 1000);
 select is(
   (select q.headers ->> 'authorization' from net.http_request_queue q
    where q.id > (select queue_id from marks) and q.url like '%/agent-client'
    order by q.id desc limit 1),
   'Bearer ' || (select token from public.edge_functions_config()),
-  'the agent-client request (edge_function) carries the token'
+  'the agent-client request (sent by the edge call worker) carries the token'
 );
 
 insert into public.messages (
@@ -103,12 +106,13 @@ from public.organizations_addresses oa
 where oa.organization_id = tests.id('org_a') and oa.service = 'local'
 limit 1;
 
+select public.dispatch_edge_calls(1000, 1000);
 select is(
   (select count(*)::int from net.http_request_queue q
    where q.id > (select queue_id from marks) and q.url like '%/agent-client'
      and q.headers ->> 'authorization' = 'Bearer ' || (select token from public.edge_functions_config())),
   2,
-  'the local AI DM request (local_message_to_agent) carries the token'
+  'the local AI DM request (queued by local_message_to_agent) carries the token'
 );
 
 -- ---------------------------------------------------------------------------

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Agent and media preprocessing calls are queued and retried** (F12).
+  agent-client and media-preprocessor are no longer called with pg_net from the
+  message triggers: calls go to `public.edge_calls` and a pg_cron worker sends
+  them every 5 seconds, round-robin across organizations, retrying
+  5xx/429/connection failures with backoff and giving up after 5 attempts.
+  `public.edge_calls_health` (service role) shows the backlog per function and
+  organization. A reply from the agent can start ~2–5 s later than before.
+  media-preprocessor now claims a message before working on it, so a repeated
+  call does not transcribe it twice. Nothing changes for REST clients.
+
 - **Organization export** (F18). `rpc/request_organization_export` with
   `{"_organization_id"}` (owners and owner API keys only; `42501` otherwise)
   files an export and returns its id; while one is pending or processing, the

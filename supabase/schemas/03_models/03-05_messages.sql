@@ -170,7 +170,8 @@ when (
   and new.service not in ('local'::public.service, 'slack'::public.service)
   and (new.status ->> 'pending') is not null
 )
-execute function public.edge_function('/agent-client', 'post');
+-- F12: queued (edge_calls), not posted from the trigger.
+execute function public.enqueue_edge_call('agent-client');
 
 -- The internal mirror of the trigger above: `agent_id` is authorship in
 -- member space the way `sender_address` is in contact space. Only `local`
@@ -242,7 +243,8 @@ when (
   (new.status ->> 'pending') is not null
   and (new.content ->> 'type') = 'file'
 )
-execute function public.edge_function('/media-preprocessor', 'post');
+-- F12: queued (edge_calls), not posted from the trigger.
+execute function public.enqueue_edge_call('media-preprocessor');
 
 create trigger z_notify_webhook_messages
 after insert or update

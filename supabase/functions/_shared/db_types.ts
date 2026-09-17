@@ -969,6 +969,68 @@ export type Database = {
         }
         Relationships: []
       }
+      edge_calls: {
+        Row: {
+          attempts: number
+          created_at: string
+          forward_headers: Json
+          function: string
+          id: string
+          last_error: string | null
+          last_status_code: number | null
+          locked_until: string | null
+          next_attempt_at: string
+          organization_id: string
+          payload: Json
+          record_id: string
+          request_id: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          forward_headers?: Json
+          function: string
+          id?: string
+          last_error?: string | null
+          last_status_code?: number | null
+          locked_until?: string | null
+          next_attempt_at?: string
+          organization_id: string
+          payload: Json
+          record_id: string
+          request_id?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          forward_headers?: Json
+          function?: string
+          id?: string
+          last_error?: string | null
+          last_status_code?: number | null
+          locked_until?: string | null
+          next_attempt_at?: string
+          organization_id?: string
+          payload?: Json
+          record_id?: string
+          request_id?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "edge_calls_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invitations: {
         Row: {
           created_at: string
@@ -1513,7 +1575,26 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      edge_calls_health: {
+        Row: {
+          failed: number | null
+          function: string | null
+          last_done_at: string | null
+          oldest_pending_at: string | null
+          organization_id: string | null
+          pending: number | null
+          sending: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "edge_calls_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_invitation: { Args: { invitation_id: string }; Returns: string }
@@ -1583,7 +1664,12 @@ export type Database = {
           key_prefix: string
         }[]
       }
+      deliver_edge_calls: { Args: never; Returns: Json }
       deliver_webhooks: { Args: never; Returns: Json }
+      dispatch_edge_calls: {
+        Args: { _batch?: number; _per_org?: number }
+        Returns: number
+      }
       dispatch_lease_ttl: { Args: never; Returns: string }
       dispatch_pending_messages: { Args: never; Returns: number }
       dispatch_retry_delay: { Args: { attempt: number }; Returns: string }
@@ -1591,6 +1677,9 @@ export type Database = {
         Args: { p_batch?: number }
         Returns: number
       }
+      edge_call_lease: { Args: never; Returns: string }
+      edge_call_max_attempts: { Args: never; Returns: number }
+      edge_call_retry_delay: { Args: { attempt: number }; Returns: string }
       edge_functions_config: { Args: never; Returns: Record<string, unknown> }
       expired_organization_exports: {
         Args: { _limit?: number }
@@ -1706,6 +1795,15 @@ export type Database = {
         }
       }
       purge_expired_rows: { Args: { _batch?: number }; Returns: Json }
+      record_edge_call_result: {
+        Args: {
+          _error: string
+          _id: string
+          _status_code: number
+          _timed_out: boolean
+        }
+        Returns: undefined
+      }
       record_webhook_result: {
         Args: { p_delivery_id: string; p_error?: string; p_status_code: number }
         Returns: undefined
@@ -1741,6 +1839,7 @@ export type Database = {
         Args: { _organization_id: string }
         Returns: string
       }
+      settle_edge_calls: { Args: never; Returns: number }
       settle_webhook_deliveries: { Args: never; Returns: number }
       sweep_deletions: { Args: { _budget?: number }; Returns: Json }
       webhook_max_attempts: { Args: never; Returns: number }

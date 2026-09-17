@@ -181,7 +181,7 @@ begin
 end
 $$;
 
--- The internal mirror of edge_function('/agent-client', 'post'), for the
+-- The internal mirror of enqueue_edge_call('agent-client') (F12), for the
 -- AI-DM flow (see handle_local_message_to_agent on messages). The trigger's
 -- WHEN prefilters — local, a member author, armed — and the one fact a WHEN
 -- cannot express lives here: is the other roster slot an AI agent?
@@ -201,8 +201,6 @@ set search_path = ''
 as $$
 declare
   segments text[] := string_to_array(new.conversation_address, ':');
-  base_url text;
-  auth_token text;
 begin
   -- Two-member rosters only, for now: deleting this guard is the entire
   -- multi-party extension. Group/channel addresses are a single uuid and fail
@@ -222,11 +220,12 @@ begin
     return new;
   end if;
 
-  select * into base_url, auth_token
-  from public.edge_functions_config();
-
-  perform net.http_post(
-    base_url || '/agent-client',
+  -- F12: queued like the contact-space trigger (edge_calls), not posted.
+  insert into public.edge_calls (organization_id, function, record_id, payload, forward_headers)
+  values (
+    new.organization_id,
+    'agent-client',
+    new.id,
     jsonb_build_object(
       'old_record', old,
       'record', new,
@@ -234,14 +233,38 @@ begin
       'table', tg_table_name,
       'schema', tg_table_schema
     ),
-    '{}'::jsonb,
-    jsonb_build_object(
-      'content-type', 'application/json',
-      'authorization', 'Bearer ' || auth_token
-    ) || public.request_id_header(),
-    10000
+    public.request_id_header()
   );
 
   return new;
 end
 $$; 
+
+-- F12. Trigger: queue a call to the Edge Function named in tg_argv[0] with the
+-- payload the old net.http_post trigger sent.
+create function public.enqueue_edge_call() returns trigger
+language plpgsql
+security definer
+set search_path to ''
+as $$
+begin
+  insert into public.edge_calls (organization_id, function, record_id, payload, forward_headers)
+  values (
+    new.organization_id,
+    tg_argv[0],
+    new.id,
+    jsonb_build_object(
+      'old_record', old,
+      'record', new,
+      'type', tg_op,
+      'table', tg_table_name,
+      'schema', tg_table_schema
+    ),
+    public.request_id_header()
+  );
+
+  return new;
+end;
+$$;
+
+revoke execute on function public.enqueue_edge_call() from public, anon, authenticated, service_role;

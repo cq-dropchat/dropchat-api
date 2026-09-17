@@ -34,11 +34,12 @@ insert into public.messages (
   jsonb_build_object('pending', now())
 );
 
+-- F12: agent-client calls go through edge_calls (19_edge_calls covers the
+-- worker that sends them).
 select is(
-  (select count(*)::int from net.http_request_queue q
-   where q.id > (select queue_id from marks)
-     and q.url like '%/agent-client'
-     and convert_from(q.body, 'utf8')::jsonb #>> '{record,id}' = 'aaaaaaaa-0000-4000-8000-00000000f15a'),
+  (select count(*)::int from public.edge_calls c
+   where c.function = 'agent-client'
+     and c.payload #>> '{record,id}' = 'aaaaaaaa-0000-4000-8000-00000000f15a'),
   1,
   'an armed inbound message enqueues agent-client with the row as record'
 );
@@ -80,8 +81,7 @@ where oa.organization_id = tests.id('org_a') and oa.service = 'local'
 limit 1;
 
 select ok(
-  (select count(*) from net.http_request_queue q
-   where q.id > (select queue_id from marks) and q.url like '%/agent-client') >= 2,
+  (select count(*) from public.edge_calls c where c.function = 'agent-client') >= 2,
   'a local AI DM enqueues agent-client'
 );
 

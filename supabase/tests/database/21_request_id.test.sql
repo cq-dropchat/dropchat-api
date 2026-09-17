@@ -49,10 +49,13 @@ insert into public.messages (
   jsonb_build_object('pending', now())
 );
 
+-- F12: agent-client is queued (edge_calls) with the id to forward; the
+-- worker adds it to the request (19_edge_calls).
 select is(
-  pg_temp.forwarded('/agent-client', 'aaaaaaaa-0000-4000-8000-00000000f26a'),
-  array['0f26f26f-0000-4000-8000-00000000a001'],
-  'edge_function forwards x-request-id to agent-client'
+  (select forward_headers ->> 'x-request-id' from public.edge_calls
+   where record_id = 'aaaaaaaa-0000-4000-8000-00000000f26a' and function = 'agent-client'),
+  '0f26f26f-0000-4000-8000-00000000a001',
+  'the agent-client call is queued with x-request-id to forward'
 );
 
 -- dispatcher_edge_function: an armed outgoing message.
@@ -97,9 +100,10 @@ where oa.organization_id = tests.id('org_a') and oa.service = 'local'
 limit 1;
 
 select is(
-  pg_temp.forwarded('/agent-client', 'aaaaaaaa-0000-4000-8000-00000000f26c'),
-  array['0f26f26f-0000-4000-8000-00000000a001'],
-  'local_message_to_agent forwards x-request-id'
+  (select forward_headers ->> 'x-request-id' from public.edge_calls
+   where record_id = 'aaaaaaaa-0000-4000-8000-00000000f26c' and function = 'agent-client'),
+  '0f26f26f-0000-4000-8000-00000000a001',
+  'local_message_to_agent queues x-request-id to forward'
 );
 
 -- dispatch_pending_messages: a candidate one minute old (trigger held so

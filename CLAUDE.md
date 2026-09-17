@@ -91,6 +91,52 @@ Available log tables: `function_logs` (stdout), `function_edge_logs`
 `realtime_logs`. Uses BigQuery SQL syntax. Max 1000 rows per query. Always
 filter by timestamp.
 
+### Edge call queue (agent-client, media-preprocessor)
+
+Since F12 the message triggers do not call these two functions with pg_net: they
+insert into `public.edge_calls`, and the `deliver-edge-calls` pg_cron job (every
+5 seconds) settles attempts from `net._http_response` and sends what is due —
+round-robin across organizations, retries with backoff (5 s, 30 s, 2 min, 10
+min), `failed` after 5 attempts or on a non-retryable 4xx. A pg_net timeout
+counts as done: the function keeps running after pg_net stops waiting.
+
+```sql
+-- Backlog per function and organization (alert: pending growing, or
+-- oldest_pending_at more than a minute old)
+select * from public.edge_calls_health order by pending desc;
+
+-- Why calls fail
+select function, last_status_code, last_error, count(*)
+from public.edge_calls
+where status = 'failed' and updated_at > now() - interval '1 day'
+group by 1, 2, 3 order by 4 desc;
+```
+
+Runbook for the production rollout of `…_f12_edge_calls.sql`:
+
+1. Before: note `select count(*) from net.http_request_queue` and the p95 of
+   agent-client replies.
+2. Apply the migration (CI). It creates the table, replaces the two triggers in
+   place and schedules `deliver-edge-calls`.
+3. Verify within a minute: `select * from public.edge_calls_health` shows
+   `pending` near 0 and `last_done_at` advancing;
+   `select * from cron.job_run_details where jobid = (select jobid from cron.job
+   where jobname = 'deliver-edge-calls') order by start_time desc limit 5`
+   succeeds.
+4. Latency: measured locally, insert → request p50 2.6–3.1 s / p95 4.9–6.6 s
+   with the 5-second job (pg_net direct: 0.5 s / 1.0 s). If that is too slow,
+   `select cron.alter_job((select jobid from cron.job where jobname =
+   'deliver-edge-calls'), schedule := '1 seconds')`
+   measured 0.7 s / 1.2 s (at the cost of ~86k `cron.job_run_details` rows a
+   day).
+5. Rollback: a migration that points `handle_incoming_message_to_agent` and
+   `handle_message_to_media_preprocessor` back at
+   `public.edge_function('/agent-client' | '/media-preprocessor', 'post')` and
+   restores `local_message_to_agent`'s `net.http_post` (see
+   `20260917163830_f26_forward_request_id.sql` for the previous bodies); keep
+   `deliver-edge-calls` scheduled until `edge_calls_health` shows nothing
+   pending, then unschedule it.
+
 ### Querying HTTP-level logs (status codes, execution time)
 
 Use the Supabase MCP server `get_logs` tool with `service: "edge-function"`.

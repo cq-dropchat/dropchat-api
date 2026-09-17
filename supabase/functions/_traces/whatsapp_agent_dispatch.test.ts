@@ -14,14 +14,22 @@
 // takes it. Only the outside world is stubbed: the LLM provider and the Graph
 // API.
 //
+// F12: agent-client is reached through the edge call queue. The test runs
+// the queue's worker (dispatch_edge_calls) in a transaction it rolls back,
+// takes the pg_net request the worker enqueued — URL, headers, body — and
+// delivers exactly that to the handler.
+//
 // F26: the handlers run wrapped as their entrypoints serve them
-// (withRequestLogging), and the test's pg_net stand-in forwards the
-// `x-request-id` the writing request sent to PostgREST — what the trigger
-// reads from `request.headers` and enqueues (pgTAP 21_request_id). The
-// webhook, agent-client and the dispatcher must log one request id.
+// (withRequestLogging). The webhook's request id reaches agent-client through
+// PostgREST's request.headers, the queued call and the worker's request; for
+// the dispatcher hop (still a direct pg_net call from its trigger) the
+// stand-in forwards the `x-request-id` the writing request sent to PostgREST
+// (pgTAP 21_request_id asserts the trigger does the same). The webhook,
+// agent-client and the dispatcher must log one request id.
 import "../_shared/testing/env.ts"; // before the handlers: keys are read at import
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { createClient } from "@supabase/supabase-js";
+import postgres from "postgres";
 import type { Database, MessageRow } from "../_shared/types/database_types.ts";
 import { env, fixture, supabaseIsUp } from "../_shared/testing/env.ts";
 import { metaRequest } from "../_shared/testing/sign.ts";
@@ -130,6 +138,49 @@ function triggerRequest(
 }
 
 /**
+ * The edge call worker, for one queued call: sends it in a transaction that
+ * is rolled back, and returns the request pg_net would have made. (The
+ * pg_cron worker may already have sent the call to the local runtime, which
+ * cannot serve it: resetting it to pending inside the transaction makes the
+ * run deterministic.)
+ */
+async function workerRequest(recordId: string, fn: string): Promise<Request> {
+  const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, {
+    max: 1,
+    onnotice: () => {},
+  });
+  let captured:
+    | { url: string; headers: Record<string, string>; body: string }
+    | undefined;
+  try {
+    await sql.begin(async (transaction) => {
+      // postgres.js types TransactionSql without its call signature.
+      const tx = transaction as unknown as typeof sql;
+      await tx`update public.edge_calls set status = 'pending', next_attempt_at = now()
+               where record_id = ${recordId} and function = ${fn}`;
+      await tx`select public.dispatch_edge_calls(1000, 1000)`;
+      const [row] = await tx`
+        select q.url, q.headers, convert_from(q.body, 'utf8') as body
+        from public.edge_calls c
+        join net.http_request_queue q on q.id = c.request_id
+        where c.record_id = ${recordId} and c.function = ${fn}`;
+      captured = row as typeof captured;
+      throw new Error("rollback");
+    }).catch((error) => {
+      if (error.message !== "rollback") throw error;
+    });
+  } finally {
+    await sql.end();
+  }
+  assert(captured, `no queued ${fn} call for ${recordId}`);
+  return new Request(`http://localhost/${fn}`, {
+    method: "POST",
+    headers: captured.headers,
+    body: captured.body,
+  });
+}
+
+/**
  * What PostgREST puts in `request.headers` for the trigger: the x-request-id
  * of the last write to `messages` since `take()`.
  */
@@ -229,14 +280,12 @@ Deno.test({
           "inbound row armed",
         );
 
-        // 2. agent-client answers (the database clock can run ahead: settle).
+        // 2. The edge call worker sends agent-client, which answers (the
+        //    database clock can run ahead: settle).
         await wait(500);
+        writes.take();
         const response = await agentClient(
-          triggerRequest(
-            "http://localhost/agent-client",
-            inbound as MessageRow,
-            writes.take(),
-          ),
+          await workerRequest(inbound.id, "agent-client"),
         );
         assertEquals(response.status, 200);
         assertEquals(llm.calls(), 1);
@@ -327,6 +376,11 @@ Deno.test({
         "conversation_id",
         "aaaaaaaa-0000-4000-8000-0000000000c2",
       );
+      await client
+        .from("edge_calls")
+        .delete()
+        .eq("organization_id", fixture.orgA)
+        .gte("created_at", since);
       await client
         .from("messages")
         .delete()

@@ -121,6 +121,10 @@ const INLINE_DATA_SIZE_LIMIT = 19 * 1000 * 1000; // 19MB
 
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// F12: a claim older than this belongs to an invocation that died; the same
+// window the `preprocess-pending-messages` sweep uses.
+const PREPROCESSING_LEASE_MS = 10 * 60 * 1000;
+
 export async function handler(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
@@ -132,6 +136,40 @@ export async function handler(req: Request): Promise<Response> {
   const client = createUnsecureClient();
 
   const incoming = ((await req.json()) as WebhookPayload<MessageRow>).record!;
+
+  // F12: one preprocessing per message. The edge call queue retries an
+  // attempt whose response was lost and the `preprocess-pending-messages`
+  // sweep re-fires pending files, so the same message can arrive twice, even
+  // at once. The first invocation claims it (status.preprocessing); another
+  // one while the claim is fresh, or once it is preprocessed, does nothing.
+  // The UPDATE's WHERE is re-checked under the row lock, so exactly one of
+  // two concurrent claims wins.
+  const staleClaim = new Date(Date.now() - PREPROCESSING_LEASE_MS)
+    .toISOString();
+  const { data: claimed } = await client
+    .from("messages")
+    .update({ status: { preprocessing: new Date().toISOString() } })
+    .eq("id", incoming.id)
+    .is("status->>preprocessed", null)
+    .or(
+      `status->>preprocessing.is.null,status->>preprocessing.lt.${staleClaim}`,
+    )
+    .select("id")
+    .throwOnError();
+
+  if (!claimed?.length) {
+    log.info("Preprocessing skipped: already done or in progress", {
+      message_id: incoming.id,
+    });
+    return new Response();
+  }
+
+  /** Lets a retry of this call run (a transient failure). */
+  const releaseClaim = () =>
+    client
+      .from("messages")
+      .update({ status: { preprocessing: null } })
+      .eq("id", incoming.id);
 
   const log_update_and_respond = async (
     logLevel: "error" | "warn" | "info",
@@ -327,12 +365,6 @@ export async function handler(req: Request): Promise<Response> {
     }
   }
 
-  await client
-    .from("messages")
-    .update({ status: { preprocessing: new Date().toISOString() } })
-    .eq("id", incoming.id)
-    .throwOnError();
-
   const file = await downloadFromStorage(client, content.file.uri);
   const base64File = encodeBase64(await file.arrayBuffer());
 
@@ -448,6 +480,7 @@ export async function handler(req: Request): Promise<Response> {
     // 500, 503: transient server errors worth retrying
     if ([429, 500, 503].includes(status)) {
       log.error("Retryable Gemini API error in preprocessing", error);
+      await releaseClaim();
       throw error;
     }
 
