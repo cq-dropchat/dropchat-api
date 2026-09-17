@@ -17,9 +17,16 @@
 //   --min-handlers N   lines % over every other file
 //   --min-lines N      lines % over all files
 
-// Ratchet (end of the P1/P2 batch): reached − 2, rounded down. Reached:
-// _shared 76.23 %, handlers 58.07 %, all 60.78 % — so only the handlers gate
-// moves; the other two round back to where they were. Never lowered.
+// Ratchet (end of the P1–P8 batch): reached − 2, rounded down, never lowered.
+// Final reading on the merge: _shared 74.33 %, handlers 57.97 %, all 60.19 %,
+// so nothing moves past the 56 that P1/P2 earned for the handlers (they had
+// reached 58.07 %).
+//
+// `_shared` fell from 76.23 % to 74.33 % without a test being deleted: P3
+// removed messages_v0.ts, 163 pure lines with a full test, and the percentage
+// is over what remains. It now clears its gate by 0.33 points — the next
+// module added there without tests turns CI red, which is the gate working,
+// but it is worth knowing before it happens.
 // (Phase 5: 74 / 55 / 58. Phase 4: 72 / 52 / 55. Phase 3: 66 / 29 / 35.)
 const DEFAULT_MIN_SHARED = 74;
 const DEFAULT_MIN_HANDLERS = 56;
