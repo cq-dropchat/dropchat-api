@@ -21,13 +21,14 @@ when (
 )
 execute function billing.check_message_limit();
 
--- Update message usage after insert (only recent, excludes history sync)
+-- Update message usage after insert (only recent, excludes history sync).
+-- Which counter a row feeds is billing.update_message_usage's call (F17).
 create trigger update_billing_message_usage
 after insert
 on public.messages
 for each row
 when (new.timestamp >= now() - interval '10 seconds')
-execute function billing.update_product_usage();
+execute function billing.update_message_usage();
 
 -- Update message usage after delete (always, to keep counters accurate)
 create trigger update_billing_message_usage_on_delete

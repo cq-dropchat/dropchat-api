@@ -172,6 +172,7 @@ export type Database = {
           agent_id: string | null
           billable: boolean | null
           created_at: string
+          external_id: string | null
           id: string
           message_id: string | null
           metadata: Json | null
@@ -187,6 +188,7 @@ export type Database = {
           agent_id?: string | null
           billable?: boolean | null
           created_at?: string
+          external_id?: string | null
           id?: string
           message_id?: string | null
           metadata?: Json | null
@@ -202,6 +204,7 @@ export type Database = {
           agent_id?: string | null
           billable?: boolean | null
           created_at?: string
+          external_id?: string | null
           id?: string
           message_id?: string | null
           metadata?: Json | null
@@ -556,6 +559,15 @@ export type Database = {
           _product_id: string
         }
         Returns: boolean
+      }
+      estimate_ai_cost: {
+        Args: {
+          _input_tokens: number
+          _max_output_tokens: number
+          _pricing: Json
+          _quantity: number
+        }
+        Returns: number
       }
       update_usage: {
         Args: {

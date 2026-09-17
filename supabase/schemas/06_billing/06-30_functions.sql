@@ -182,6 +182,61 @@ begin
 end;
 $$;
 
+-- F17. Upper bound of one LLM call's cost, for the reservation made before
+-- the call: every input token at the input price plus the output budget at
+-- the output price (input price when the provider publishes one rate).
+-- `pricing` and `quantity` are a billing.costs row.
+create function billing.estimate_ai_cost(
+  _pricing jsonb,
+  _quantity numeric,
+  _input_tokens numeric,
+  _max_output_tokens numeric
+) returns numeric
+language sql
+immutable
+set search_path to ''
+as $$
+  select round(
+    (
+      coalesce(_input_tokens, 0) * coalesce((_pricing ->> 'input')::numeric, 0)
+      + coalesce(_max_output_tokens, 0) * coalesce(
+          (_pricing ->> 'output')::numeric,
+          (_pricing ->> 'input')::numeric,
+          0
+        )
+    ) / nullif(_quantity, 0),
+    8
+  );
+$$;
+
+-- F17. Message usage, split by what the plan's quota is about. `messages`
+-- counts exactly what check_message_limit caps — rows the account sends,
+-- and every row an API role inserts — so the quota is spent by the
+-- organization, not by its contacts. What contacts write is metered as
+-- `messages_inbound` (no tier caps it; stats only). Record-only rows (tool
+-- traces, notes) count as neither.
+create function billing.update_message_usage() returns trigger
+language plpgsql
+security definer
+set search_path to ''
+as $$
+begin
+  if new.content ->> 'internal' is not null then
+    return new;
+  end if;
+
+  if new.sender_address is null
+    or coalesce(auth.role(), '') in ('anon', 'authenticated')
+  then
+    perform billing.update_usage(new.organization_id, 'messages');
+  else
+    perform billing.update_usage(new.organization_id, 'messages_inbound');
+  end if;
+
+  return new;
+end;
+$$;
+
 -- Generic trigger: update usage after insert or delete.
 -- Product id is derived from the table name.
 -- Counter products ignore delete; gauge products decrement on delete.

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **AI credits are reserved and the ledger is idempotent** (F17). Before an LLM
+  call, `check_limit(ai_credits, …)` is asked for the call's upper-bound cost
+  (`billing.estimate_ai_cost`: input tokens at the input price plus the output
+  budget at the output price) instead of zero, so the last call can no longer
+  drive a balance negative. `billing.ledger` has `external_id` (the provider's
+  response id), unique with `provider`: a retried write charges once. **The
+  `messages` quota now counts what the cap caps**: messages the account sends
+  and every insert by an API key or member; what contacts send is metered as the
+  new product `messages_inbound`, which no tier caps. Usage history before this
+  release mixes both.
+
 - **Agent tools only reach public destinations** (F08). SQL hosts, HTTP tool
   URLs, libsql URLs and MCP server URLs are refused when they are IP literals in
   private/loopback/link-local/metadata ranges, internal names (`localhost`,

@@ -9,6 +9,10 @@ create table billing.ledger (
   message_id uuid,
   provider text,
   model text,
+  -- The provider's id for the call this entry charges (an OpenAI
+  -- `chatcmpl-…`, a Gemini `responseId`). With provider, the idempotency key
+  -- (F17): a retried insert of the same response charges once.
+  external_id text,
   metadata jsonb,
   billable boolean,
   created_at timestamp with time zone default now() not null,
@@ -41,6 +45,15 @@ add constraint ledger_message_id_fkey
 foreign key (message_id)
 references public.messages(id)
 on delete set null;
+
+-- Nulls are distinct: grants and top-ups (no external_id) are unaffected.
+alter table only billing.ledger
+add constraint ledger_provider_external_id_key
+unique (provider, external_id);
+
+create index ledger_message_id_idx
+on billing.ledger
+using btree (message_id);
 
 alter table only billing.ledger
 add constraint ledger_type_check

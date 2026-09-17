@@ -1,3 +1,9 @@
+import type { Json } from "../../_shared/db_types.ts";
+import {
+  estimateInputTokens,
+  recordAiConsumption,
+  reserveAiCredits,
+} from "../../_shared/billing.ts";
 import OpenAI from "openai";
 import type {
   ChatCompletion,
@@ -526,14 +532,14 @@ export class ChatCompletionsHandler
       }
 
       // Check AI credits balance
-      await this.client
-        .schema("billing")
-        .rpc("check_limit", {
-          _organization_id: organization.id,
-          _product_id: "ai_credits",
-          _amount: 0,
-        })
-        .throwOnError();
+      // F17: reserve the call's upper-bound cost, not zero.
+      await reserveAiCredits(
+        this.client,
+        organization.id,
+        costs,
+        estimateInputTokens(request.messages),
+        agent.extra.max_tokens,
+      );
     }
 
     const openai = new OpenAI({
@@ -605,21 +611,18 @@ export class ChatCompletionsHandler
         )
         : 0;
 
-      await this.client
-        .schema("billing")
-        .from("ledger")
-        .insert({
-          organization_id: organization.id,
-          product_id: "ai_credits",
-          type: "consumption",
-          quantity: -cost,
-          agent_id: agent.id,
-          provider,
-          model,
-          billable,
-          metadata: response.usage,
-        })
-        .throwOnError();
+      // F17: once per provider response (idempotent on provider + id).
+      await recordAiConsumption(this.client, {
+        organization_id: organization.id,
+        agent_id: agent.id,
+        message_id: this.context.messages.at(-1)?.id ?? null,
+        provider,
+        model,
+        external_id: response.id,
+        cost,
+        billable,
+        metadata: response.usage as unknown as Json,
+      });
     }
 
     return {

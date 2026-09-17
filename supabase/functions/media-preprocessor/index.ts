@@ -1,3 +1,8 @@
+import {
+  DEFAULT_MAX_OUTPUT_TOKENS,
+  recordAiConsumption,
+  reserveAiCredits,
+} from "../_shared/billing.ts";
 import { revealOrganization } from "../_shared/secrets.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
@@ -297,18 +302,26 @@ export async function handler(req: Request): Promise<Response> {
       );
     }
 
-    const { error } = await client
-      .schema("billing")
-      .rpc("check_limit", {
-        _organization_id: org.id,
-        _product_id: "ai_credits",
-        _amount: 0,
-      });
-
-    if (error) {
+    // F17: reserve an upper bound, not zero. The input is the media itself,
+    // which is not in hand yet: a file of `size` bytes, priced as tokens at
+    // ~4 bytes each, is the generous bound.
+    try {
+      const file = incoming.content.type === "file"
+        ? incoming.content.file
+        : undefined;
+      await reserveAiCredits(
+        client,
+        org.id,
+        costs,
+        Math.ceil((file?.size ?? 0) / 4) + 1000,
+        DEFAULT_MAX_OUTPUT_TOKENS,
+      );
+    } catch (error) {
       return log_update_and_respond(
         "warn",
-        `AI credits check failed: ${error.message}`,
+        `AI credits check failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
     }
   }
@@ -455,20 +468,17 @@ export async function handler(req: Request): Promise<Response> {
       );
     }
 
-    await client
-      .schema("billing")
-      .from("ledger")
-      .insert({
-        organization_id: org.id,
-        product_id: "ai_credits",
-        type: "consumption",
-        quantity: -cost,
-        provider: "google",
-        model,
-        billable,
-        metadata: response.usageMetadata as Json,
-      })
-      .throwOnError();
+    // F17: once per provider response (idempotent on provider + id).
+    await recordAiConsumption(client, {
+      organization_id: org.id,
+      message_id: incoming.id,
+      provider: "google",
+      model,
+      external_id: response.responseId,
+      cost,
+      billable,
+      metadata: response.usageMetadata as Json,
+    });
   }
 
   if (!response?.text) {

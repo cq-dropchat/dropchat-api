@@ -21,6 +21,7 @@ select vault.create_secret(
 -- Products
 insert into billing.products (id, name, unit, kind) values
   ('messages',      'Messages',      'count', 'counter'),
+  ('messages_inbound', 'Inbound messages', 'count', 'counter'),
   ('conversations', 'Conversations', 'count', 'counter'),
   ('storage',       'Storage',       'gb',    'gauge'),
   ('ai_credits',    'AI Credits',    'usd',   'balance');
