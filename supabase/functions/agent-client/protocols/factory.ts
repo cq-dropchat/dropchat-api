@@ -2,7 +2,7 @@ import type { AgentProtocolHandler, RequestContext } from "./base.ts";
 import { ChatCompletionsHandler } from "./chat-completions.ts";
 import { ResponsesHandler } from "./responses.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { AgentTool } from "../index.ts";
+import type { AgentTool } from "../agent_tool.ts";
 
 export class ProtocolFactory {
   static getHandler(

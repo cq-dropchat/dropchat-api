@@ -23,7 +23,7 @@ import {
   type ResponseContext,
 } from "./base.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { AgentTool } from "../index.ts";
+import type { AgentTool } from "../agent_tool.ts";
 import * as log from "../../_shared/logger.ts";
 import { getFileMetadata } from "../../_shared/media.ts";
 import { serializePartAsXML } from "./serializer.ts";
