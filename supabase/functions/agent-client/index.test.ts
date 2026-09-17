@@ -6,7 +6,7 @@
 // Runs against a local Supabase with supabase/tests/fixtures loaded. The
 // LLM provider is stubbed and counted; everything else is real.
 import "../_shared/testing/env.ts"; // before index.ts: keys are read at import
-import { assertEquals } from "jsr:@std/assert@1";
+import { assert, assertEquals } from "jsr:@std/assert@1";
 import { createClient } from "@supabase/supabase-js";
 import type { Database, MessageRow } from "../_shared/types/database_types.ts";
 import { env, fixture, supabaseIsUp } from "../_shared/testing/env.ts";
@@ -168,6 +168,160 @@ Deno.test({
     } finally {
       llm.restore();
       await cleanup(client, since);
+    }
+  },
+});
+
+// ---------------------------------------------------------------------------
+// F23 — the context query read `organizations(*, agents(*))`: every agent of
+// the organization, members and retired AIs included, with their `extra`, and
+// then decrypted the secrets of all of them — on every invocation. Only the
+// live AI agents take part in selection; a local DM's author needs a name.
+// ---------------------------------------------------------------------------
+
+/** Records PostgREST calls (URL and JSON body) made through global fetch. */
+function recordRest() {
+  const realFetch = globalThis.fetch;
+  const calls: { url: string; body: unknown }[] = [];
+  globalThis.fetch = async (input, init) => {
+    const response = await realFetch(input, init);
+    const url = input instanceof Request ? input.url : String(input);
+    if (url.startsWith(`${env.url}/rest/v1/`)) {
+      const text = await response.clone().text();
+      let body: unknown = text;
+      try {
+        body = JSON.parse(text);
+      } catch { /* not JSON */ }
+      calls.push({ url: decodeURIComponent(url), body });
+    }
+    return response;
+  };
+  return { calls, restore: () => (globalThis.fetch = realFetch) };
+}
+
+Deno.test({
+  name:
+    "F23: the context carries only live AI agents, and only their secrets are read",
+  ignore: !up,
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    const client = service();
+    const since = new Date(Date.now() - 1000).toISOString();
+    await cleanup(client, since);
+    const llm = stubLlm(10);
+    const rest = recordRest();
+
+    try {
+      await withTestAgent(client, async (testAgentId) => {
+        const m = await inbound(client, "hola");
+        await settle();
+        await invoke(m);
+        assertEquals(llm.calls(), 1);
+
+        const context = rest.calls.find((c) =>
+          c.url.includes("/rest/v1/conversations?") &&
+          c.url.includes("organizations")
+        );
+        assert(context, "no context query recorded");
+        const agents = (context.body as {
+          organizations: {
+            agents: {
+              id: string;
+              user_id: string | null;
+              deleted_at: string | null;
+            }[];
+          };
+        }).organizations.agents;
+        assert(
+          agents.some((a) => a.id === testAgentId),
+          "the answering agent is missing",
+        );
+        for (const a of agents) {
+          assertEquals(a.user_id, null, `member row ${a.id} loaded`);
+          assertEquals(a.deleted_at, null, `retired agent ${a.id} loaded`);
+        }
+
+        const secrets = rest.calls.filter((c) =>
+          c.url.includes("/rest/v1/secrets?") &&
+          c.url.includes("scope=eq.agent")
+        );
+        for (const c of secrets) {
+          assert(
+            !c.url.includes(fixture.agentAlice),
+            `a member's secrets were read: ${c.url}`,
+          );
+        }
+      });
+    } finally {
+      rest.restore();
+      llm.restore();
+      await cleanup(client, since);
+    }
+  },
+});
+
+Deno.test({
+  name: "F23: a local DM with an AI still names its author to the model",
+  ignore: !up,
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    const client = service();
+    const llm = stubLlm(10);
+    let address = "";
+
+    try {
+      await withTestAgent(client, async (testAgentId) => {
+        address = [fixture.agentAlice, testAgentId].sort().join(":");
+        const { data: local } = await client
+          .from("organizations_addresses")
+          .select("address")
+          .eq("organization_id", fixture.orgA)
+          .eq("service", "local")
+          .limit(1)
+          .single()
+          .throwOnError();
+        const { data: m } = await client
+          .from("messages")
+          .insert({
+            organization_id: fixture.orgA,
+            service: "local",
+            organization_address: local.address,
+            conversation_address: address,
+            agent_id: fixture.agentAlice,
+            content: {
+              version: "1",
+              type: "text",
+              kind: "text",
+              text: "hola robot",
+            },
+            status: { delivered: new Date().toISOString() },
+          })
+          .select()
+          .single()
+          .throwOnError();
+        await settle();
+        await invoke(m as MessageRow);
+
+        assertEquals(llm.calls(), 1);
+        assert(llm.bodies[0].includes("name: 'Alice'"), llm.bodies[0]);
+      });
+    } finally {
+      llm.restore();
+      if (address) {
+        const { data: conv } = await client.from("conversations").select("id")
+          .eq("organization_id", fixture.orgA).eq("service", "local")
+          .eq("address", address).maybeSingle();
+        if (conv) {
+          await client.from("agent_turns").delete().eq(
+            "conversation_id",
+            conv.id,
+          );
+          await client.from("messages").delete().eq("conversation_id", conv.id);
+          await client.from("conversations").delete().eq("id", conv.id);
+        }
+      }
     }
   },
 });

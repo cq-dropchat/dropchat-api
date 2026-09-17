@@ -56,7 +56,7 @@ export function stubLlm(latencyMs = 200) {
  */
 export async function withTestAgent(
   client: Client,
-  fn: () => Promise<void>,
+  fn: (agentId: string) => Promise<void>,
 ) {
   const { data: robot } = await client
     .from("agents")
@@ -93,7 +93,7 @@ export async function withTestAgent(
     .throwOnError();
 
   try {
-    await fn();
+    await fn(agent.id);
   } finally {
     await client.from("agents").delete().eq("id", agent.id);
     await client

@@ -1,4 +1,4 @@
-import { revealAgents } from "../_shared/secrets.ts";
+import { revealAgent } from "../_shared/secrets.ts";
 import { describeRemoteTool } from "./tools/mcp.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import * as log from "../_shared/logger.ts";
@@ -155,7 +155,11 @@ export async function handler(req: Request): Promise<Response> {
 
   const incoming = ((await req.json()) as WebhookPayload<MessageRow>).record!;
 
-  // RETRIEVE CONVERSATION + ORGANIZATION + AGENTS (via organization, one-hop join)
+  // RETRIEVE CONVERSATION + ORGANIZATION + LIVE AI AGENTS (one-hop join)
+  //
+  // F23: only the agents that can answer — no user_id, not retired. The
+  // embed used to carry every member row and retired AI with its `extra`,
+  // and all of their secrets were decrypted, on every invocation.
 
   const { data: conv } = await client
     .from("conversations")
@@ -164,6 +168,8 @@ export async function handler(req: Request): Promise<Response> {
       organizations (*, agents (*))
     `)
     .eq("id", incoming.conversation_id)
+    .is("organizations.agents.user_id", null)
+    .is("organizations.agents.deleted_at", null)
     .single()
     .throwOnError();
 
@@ -188,9 +194,8 @@ export async function handler(req: Request): Promise<Response> {
   }
 
   // F02: agents.extra carries masks; the LLM key and tool credentials come
-  // from public.secrets.
-  const { agents: maskedAgents, ...organization } = org;
-  const agents = await revealAgents(client, maskedAgents);
+  // from public.secrets — revealed below for the selected agent only (F23).
+  const { agents, ...organization } = org;
 
   // AI DM DETECTION (local only)
   //
@@ -245,7 +250,17 @@ export async function handler(req: Request): Promise<Response> {
   let contact: ContactInfo | undefined;
 
   if (conv.service === "local") {
-    const author = agents.find((a) => a.id === incoming.agent_id);
+    // F23: the author is a member, not in the AI-only embed. A name is all
+    // the protocol handlers read.
+    const { data: author } = incoming.agent_id
+      ? await client
+        .from("agents")
+        .select("name")
+        .eq("id", incoming.agent_id)
+        .eq("organization_id", conv.organization_id)
+        .maybeSingle()
+        .throwOnError()
+      : { data: null };
 
     if (author) {
       contact = { name: author.name };
@@ -253,7 +268,7 @@ export async function handler(req: Request): Promise<Response> {
   } else {
     const { data: contact_address } = await client
       .from("contacts_addresses")
-      .select("*")
+      .select("extra")
       .eq("organization_id", conv.organization_id)
       .eq("organization_address", conv.organization_address)
       .eq("service", conv.service)
@@ -277,7 +292,7 @@ export async function handler(req: Request): Promise<Response> {
   //
   // Selected before the delay because the delay is the agent's own.
 
-  const agent = conv.service === "local"
+  const selected = conv.service === "local"
     ? (dmAI?.extra?.mode !== "inactive" ? dmAI : undefined)
     : agents
       .filter((a) =>
@@ -286,6 +301,8 @@ export async function handler(req: Request): Promise<Response> {
       )
       .sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))
       .at(0) as AgentRowWithExtra | undefined;
+
+  const agent = selected && await revealAgent(client, selected);
 
   // Authorship is space-relative: outside, the peer is whoever carries a
   // sender_address; in a local DM the peer is any member row that is not the
