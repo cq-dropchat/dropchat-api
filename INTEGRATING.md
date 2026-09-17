@@ -294,6 +294,15 @@ The file is removed 7 days after it is ready (the row then reads `expired`), and
 at once if the organization or one of its accounts is deleted. A member or admin
 (or their keys) gets `42501`.
 
+**Size.** The worker builds the whole ZIP in memory and uploads it in one
+request, so a large organization's export ends `failed` with the reason rather
+than producing a file: the ceilings are the function's memory and Storage's
+upload limit for a single request. As a rule of thumb the compressed NDJSON runs
+at a few kilobytes per hundred messages, so an organization in the hundreds of
+thousands of messages is where this starts to matter. If you hit it, ask for the
+data in ranges through the REST API (`messages` filtered by `created_at`) until
+the export is split into parts.
+
 ---
 
 ## Recap

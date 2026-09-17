@@ -74,6 +74,26 @@ Monetization
       the row lands with no participants and no one can ever see it. Either drop
       `anon` from the policy or give the keyless path a `channel`.
 
+- [ ] Organization export in parts (P4) — the `org-export` worker builds the
+      whole ZIP in memory and uploads it in one request, so an organization
+      large enough to exceed the function's memory or Storage's single-request
+      upload limit ends `failed` with the reason (INTEGRATING.md §9 says so).
+      Deferred on purpose: there is no deployment to measure, and every fix
+      changes the contract. Measure first — rows and bytes of the largest
+      organization —
+
+      ```sql
+      select count(*) as messages,
+             pg_size_pretty(sum(pg_column_size(m.*))) as raw
+      from public.messages m
+      where m.organization_id = '<org>';
+      ```
+
+      — then pick: parts bounded by bytes with the manifest naming them
+      (`object_name` becomes several objects: migration, RPC, INTEGRATING §9
+      and the owner's screen), or a resumable upload of one streamed ZIP.
+      Whichever, the export stops being one object per row.
+
 - [ ] Uniform connection ownership — whatsapp/instagram already resolve the
       newest connected row, so reconnecting from another org steals the
       connection (fine: whoever owns the account may move it). Do the same for
