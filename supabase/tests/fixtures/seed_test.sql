@@ -104,10 +104,13 @@ language plpgsql
 as $$
 begin
   execute 'reset role';
-  perform set_config('request.jwt.claims', '', true);
+  -- Empty JSON, not '': get_authorized_orgs casts request.headers to json
+  -- (PostgREST always sends JSON), so a blank value broke any statement run
+  -- after a clear that reaches it, such as a message insert.
+  perform set_config('request.jwt.claims', '{}', true);
   perform set_config('request.jwt.claim.sub', '', true);
   perform set_config('request.jwt.claim.role', '', true);
-  perform set_config('request.headers', '', true);
+  perform set_config('request.headers', '{}', true);
 end;
 $$;
 

@@ -54,9 +54,11 @@ Monetization
 - [x] Batched/async mass deletions — mark + sweep in pg_cron (F18):
       `deletion_requests`, `sweep_deletions` every minute (5,000 rows/run). The
       Meta callbacks verify `signed_request` and act on the owning organization
-      only. Still open: organization deletion leaves the media files in Storage
-      (needs the Storage API, not SQL), and there is no per-organization export
-      yet.
+      only. An organization's media files go with the hourly `storage-gc` once
+      the sweep has deleted the organization row. Still open: an account-scoped
+      deletion (Meta data deletion) leaves that account's media files in Storage
+      (its organization still exists, so `storage-gc` keeps them), and there is
+      no per-organization export yet.
 
 - [ ] Move the RLS helpers out of `public`.
 
