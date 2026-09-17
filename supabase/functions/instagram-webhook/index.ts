@@ -642,10 +642,12 @@ export async function processPayload(
     }
   }
   for (const contact of deadTokenAddresses.values()) {
+    // F28: only if the token that failed is still the stored one.
     await flagNeedsReauth(
       client,
       contact.organization_id,
       contact.orgAddress.address,
+      contact.orgAddress.extra?.access_token ?? "",
     );
   }
 

@@ -245,6 +245,23 @@ async function refreshLongLivedToken(
   return await response.json();
 }
 
+/** Graph's transient codes (same set as the dispatcher's). */
+const TRANSIENT_GRAPH_CODES = new Set([1, 2, 4, 613, 80007]);
+
+/**
+ * Whether a refresh failed for a reason that says nothing about the token:
+ * no HTTP answer at all, a 5xx, or a Graph error marked transient.
+ */
+function isTransientRefreshFailure(error: unknown): boolean {
+  if (!(error instanceof HTTPException)) return true;
+  if (error.status >= 500) return true;
+  const graph = (error.cause as
+    | { error?: { code?: number; is_transient?: boolean } }
+    | undefined)?.error;
+  return graph?.is_transient === true ||
+    (graph?.code != null && TRANSIENT_GRAPH_CODES.has(graph.code));
+}
+
 function normalizePermissions(
   permissions: ShortLivedToken["permissions"],
 ): string[] {
@@ -368,7 +385,9 @@ export async function performInstagramLogin(
       organization_id: payload.organization_id,
       agent_id: payload.agent_id ?? null,
       status: "connected",
-      extra,
+      // F28: a re-login is the fix a `needs_reauth` flag asks for. The upsert
+      // merges into the old extra (merge_update), so the flag goes explicitly.
+      extra: { ...extra, needs_reauth: null },
     })
     .select()
     .single();
@@ -467,11 +486,16 @@ export async function refreshTokens(client: Client) {
       });
 
       // Flag the account so the UI can prompt a re-login; merge keeps the rest.
-      await client
-        .from("organizations_addresses")
-        .update({ extra: { needs_reauth: new Date(now).toISOString() } })
-        .eq("organization_id", row.organization_id)
-        .eq("address", row.address);
+      // F28: the flag also stops sends, so an outage (network, 5xx, a
+      // transient Graph code) does not set it: the token may be fine and the
+      // next daily run retries.
+      if (!isTransientRefreshFailure(error)) {
+        await client
+          .from("organizations_addresses")
+          .update({ extra: { needs_reauth: new Date(now).toISOString() } })
+          .eq("organization_id", row.organization_id)
+          .eq("address", row.address);
+      }
 
       await client
         .from("logs")

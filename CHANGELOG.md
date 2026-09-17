@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Instagram: a rejected token stops outgoing sends too** (F28). While an
+  Instagram account carries `extra.needs_reauth`, outgoing messages fail at once
+  with a `190` error, without calling Graph, and read receipts and typing
+  indicators are skipped. The first `190` writes an `error` line to
+  `public.logs` (category `dispatch`). Re-logging in now clears the flag
+  (before, the upsert kept it), and so does a successful daily token refresh. A
+  refresh that fails for a transient reason (no answer, `5xx`, a transient Graph
+  code) no longer sets it. A token renewed while a send was in flight is not
+  flagged.
+
 - **One request id per message chain** (F26). The Edge Functions send the
   `x-request-id` of the request they serve to PostgREST, and the database
   triggers that call the next function (agent-client, the dispatchers, the

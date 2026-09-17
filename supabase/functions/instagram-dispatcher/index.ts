@@ -22,7 +22,8 @@ import {
   commitDispatchedMessage,
   releaseDispatch,
 } from "../_shared/dispatch.ts";
-import { flagNeedsReauth } from "../_shared/instagram.ts";
+import { flagNeedsReauth, readNeedsReauth } from "../_shared/instagram.ts";
+import { insertLog } from "../_shared/logs.ts";
 import { Json } from "../_shared/db_types.ts";
 
 const API_VERSION = "v25.0";
@@ -262,6 +263,15 @@ export async function handler(req: Request): Promise<Response> {
     );
   }
 
+  // F28: Graph rejected this account's token before (190, or a failed
+  // refresh). Until a re-login or a successful refresh lifts the flag,
+  // nothing is sent with it: every call would fail the same way.
+  const needsReauth = await readNeedsReauth(
+    client,
+    message.organization_id,
+    message.organization_address,
+  );
+
   // Authorship decides the job: a row the account itself wrote (sender null)
   // is a send; a contact's row only ever comes here for read receipts and
   // typing indicators.
@@ -276,6 +286,18 @@ export async function handler(req: Request): Promise<Response> {
     }
 
     try {
+      if (needsReauth) {
+        throw new InstagramError("Account token was rejected by Instagram", {
+          cause: {
+            error: {
+              code: 190,
+              message:
+                `The account's access token was rejected by Instagram (${needsReauth}). Reconnect the account to send again.`,
+            },
+          } as IgErrorResponse,
+        });
+      }
+
       const content = message.content as OutgoingMessage;
 
       const payloads = await outgoingMessageToPayloads({
@@ -350,12 +372,28 @@ export async function handler(req: Request): Promise<Response> {
       // 190 = token expired/invalidated (password change, revocation). Flag
       // the connection so the UI prompts a re-login — the refresh sweep only
       // looks near expiry and would miss a mid-life revocation for weeks.
-      if (metaCode === 190) {
-        await flagNeedsReauth(
+      if (metaCode === 190 && !needsReauth) {
+        const flagged = await flagNeedsReauth(
           client,
           message.organization_id,
           message.organization_address,
+          access_token,
         );
+        if (flagged) {
+          await insertLog(client, {
+            organization_id: message.organization_id,
+            organization_address: message.organization_address,
+            service: "instagram",
+            category: "dispatch",
+            level: "error",
+            message:
+              "Instagram rejected the account's access token; outgoing messages fail until the account is reconnected",
+            metadata: {
+              code: metaCode,
+              meta_message: igError?.message ?? null,
+            },
+          });
+        }
       }
 
       await client
@@ -404,6 +442,13 @@ export async function handler(req: Request): Promise<Response> {
       return new Response();
     }
 
+    if (needsReauth) {
+      log.info("Read receipt skipped: the account's token was rejected", {
+        message_id: message.id,
+      });
+      return new Response();
+    }
+
     // Instagram sender actions must be sent one at a time, each carrying only
     // the recipient and the action (no message_id, unlike WhatsApp's read mark).
     const recipient = { id: message.conversation_address };
@@ -442,6 +487,7 @@ export async function handler(req: Request): Promise<Response> {
           client,
           message.organization_id,
           message.organization_address,
+          access_token,
         );
       }
 
