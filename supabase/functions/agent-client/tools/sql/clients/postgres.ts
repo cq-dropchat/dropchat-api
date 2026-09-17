@@ -49,6 +49,11 @@ export class PostgresClient extends BaseClient {
     );
   }
 
+  /** Postgres numbers its parameters: $1, $2, … */
+  override placeholder(index: number): string {
+    return `$${index + 1}`;
+  }
+
   override async close() {
     return await this.conn.end();
   }

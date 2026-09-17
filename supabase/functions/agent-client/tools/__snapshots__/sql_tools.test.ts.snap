@@ -467,7 +467,130 @@ snapshot[`F29: SQL tools with the postgres driver (characterization) > definitio
 
 snapshot[`F29: SQL tools with the postgres driver (characterization) > getDbSchema 1`] = `
 {
-  error: 'syntax error at or near "\`"',
+  result: {
+    enums: Result(1) [
+      {
+        name: "plan",
+        schema: "f29_sql",
+        values: [
+          "free",
+          "pro",
+        ],
+      },
+    ],
+    sql_dialect: "postgres",
+    tables: [
+      {
+        columns: [
+          {
+            name: "id",
+            nullable: false,
+            type: "int4",
+          },
+          {
+            comment: "Login email",
+            name: "email",
+            nullable: false,
+            type: "text",
+          },
+          {
+            default: "'free'::f29_sql.plan",
+            name: "plan",
+            nullable: false,
+            type: "plan",
+          },
+          {
+            name: "note",
+            nullable: true,
+            type: "text",
+          },
+        ],
+        comment: "People who pay",
+        constraints: [
+          {
+            columns: [
+              "email",
+            ],
+            name: "customers_email_key",
+            schema: "f29_sql",
+            type: "UNIQUE",
+          },
+          {
+            columns: [
+              "id",
+            ],
+            name: "customers_pkey",
+            schema: "f29_sql",
+            type: "PRIMARY KEY",
+          },
+        ],
+        name: "customers",
+        schema: "f29_sql",
+        type: "BASE TABLE",
+      },
+      {
+        columns: [
+          {
+            name: "id",
+            nullable: false,
+            type: "int4",
+          },
+          {
+            name: "customer_id",
+            nullable: false,
+            type: "int4",
+          },
+          {
+            name: "total",
+            nullable: false,
+            type: "numeric",
+          },
+        ],
+        comment: undefined,
+        constraints: [
+          {
+            columns: [
+              "customer_id",
+            ],
+            name: "orders_customer_id_fkey",
+            referenced_constraint: {
+              name: "customers_pkey",
+              schema: "f29_sql",
+            },
+            referenced_table: {
+              columns: [
+                "id",
+              ],
+              name: "customers",
+              schema: "f29_sql",
+            },
+            schema: "f29_sql",
+            type: "FOREIGN KEY",
+          },
+          {
+            columns: [
+              "customer_id",
+              "id",
+            ],
+            name: "orders_customer_id_id_key",
+            schema: "f29_sql",
+            type: "UNIQUE",
+          },
+          {
+            columns: [
+              "id",
+            ],
+            name: "orders_pkey",
+            schema: "f29_sql",
+            type: "PRIMARY KEY",
+          },
+        ],
+        name: "orders",
+        schema: "f29_sql",
+        type: "BASE TABLE",
+      },
+    ],
+  },
 }
 `;
 
@@ -547,10 +670,25 @@ snapshot[`F29: SQL tools with the postgres driver (characterization) > selectAsC
 snapshot[`F29: SQL tools with the postgres driver (characterization) > bulkInsert 1`] = `
 {
   insert: {
-    error: 'syntax error at or near ","',
+    result: {
+      columns: [
+        "email",
+        "amount",
+      ],
+      rows_inserted: 2,
+    },
   },
   rows: {
-    result: Result(0) [],
+    result: Result(2) [
+      {
+        amount: "10.5",
+        email: "ana@example.test",
+      },
+      {
+        amount: null,
+        email: "beto@example.test",
+      },
+    ],
   },
 }
 `;

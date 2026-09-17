@@ -7,9 +7,9 @@
 // returns, plus the tool definitions the model sees. The mysql and libsql
 // drivers have no local server here: the split moves them verbatim.
 //
-// Two of the tools fail with postgres as the code stands (recorded as-is,
-// fixed after the split): getDbSchema quotes a column MySQL-style
-// (`default`), and bulkInsert uses `?` placeholders.
+// Recorded first with two of the tools failing on postgres; the snapshot
+// changed once, with the fix that made getDbSchema and bulkInsert work
+// there (see sql.test.ts).
 //
 // Regenerate only for an intended change:
 //   deno test -A agent-client/tools/sql_tools.test.ts -- --update

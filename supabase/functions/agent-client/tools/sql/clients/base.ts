@@ -80,6 +80,11 @@ export class BaseClient {
     return Promise.reject(new Error("Not implemented"));
   }
 
+  /** The bind parameter at 0-based `index`: `?` unless the driver differs. */
+  placeholder(_index: number): string {
+    return "?";
+  }
+
   quoteIdentifier(identifier: string): string {
     return '"' + identifier + '"';
   }

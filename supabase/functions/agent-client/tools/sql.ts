@@ -234,7 +234,12 @@ export async function bulkInsertImplementation(
     VALUES
       ${
     csv
-      .map((_row) => "(" + source.map((_col) => "?").join(", ") + ")")
+      .map((_row, r) =>
+        "(" +
+        source.map((_col, c) => client.placeholder(r * source.length + c))
+          .join(", ") +
+        ")"
+      )
       .join(",\n      ")
   }
     ;

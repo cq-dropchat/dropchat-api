@@ -31,11 +31,16 @@ export type ColumnRow = {
 
 export function getColumnsQuery(quotedSchemas: string, driver: Driver) {
   let typeColumn = "";
+  // `default` is a reserved word; each driver quotes the alias its own way
+  // (backticks were a syntax error in Postgres).
+  let defaultAlias = "";
 
   if (driver === "postgres") {
     typeColumn = "udt_name";
+    defaultAlias = '"default"';
   } else if (driver === "mysql") {
     typeColumn = "column_type";
+    defaultAlias = "`default`";
   }
 
   return `
@@ -45,7 +50,7 @@ export function getColumnsQuery(quotedSchemas: string, driver: Driver) {
       c.column_name AS name,
       c.${typeColumn} AS type,
       c.is_nullable = 'YES' AS nullable,
-      c.column_default AS \`default\`
+      c.column_default AS ${defaultAlias}
     FROM information_schema.columns c
     WHERE c.table_schema IN (${quotedSchemas})
     ORDER BY c.table_schema, c.table_name, c.ordinal_position;
@@ -89,9 +94,9 @@ export function getPostgresConstraintsQuery(quotedSchemas: string) {
       kcu.ordinal_position AS column_ordinal_position,
       rc.unique_constraint_schema AS referenced_constraint_schema,
       rc.unique_constraint_name   AS referenced_constraint_name,
-      ccu.table_schema AS referenced_table_schema,
-      ccu.table_name   AS referenced_table_name,
-      ccu.column_name  AS referenced_column_name
+      rkcu.table_schema AS referenced_table_schema,
+      rkcu.table_name   AS referenced_table_name,
+      rkcu.column_name  AS referenced_column_name
     FROM information_schema.table_constraints tc
     JOIN information_schema.key_column_usage kcu
       ON tc.constraint_schema = kcu.constraint_schema
@@ -99,9 +104,14 @@ export function getPostgresConstraintsQuery(quotedSchemas: string) {
     LEFT JOIN information_schema.referential_constraints rc
       ON tc.constraint_schema = rc.constraint_schema
      AND tc.constraint_name   = rc.constraint_name
-    LEFT JOIN information_schema.constraint_column_usage ccu
-      ON tc.constraint_schema = ccu.constraint_schema
-     AND tc.constraint_name   = ccu.constraint_name
+    -- The referenced column of each key column, by its position in the
+    -- referenced key. (constraint_column_usage has one row per column of
+    -- the constraint, unpaired: joining it repeated every column of a
+    -- multi-column key once per column.)
+    LEFT JOIN information_schema.key_column_usage rkcu
+      ON rkcu.constraint_schema = rc.unique_constraint_schema
+     AND rkcu.constraint_name   = rc.unique_constraint_name
+     AND rkcu.ordinal_position  = kcu.position_in_unique_constraint
     WHERE tc.table_schema IN (${quotedSchemas})
       AND tc.constraint_type IN ('PRIMARY KEY', 'UNIQUE', 'FOREIGN KEY')
     ORDER BY
@@ -163,6 +173,7 @@ export function getPostgresTableCommentsQuery(quotedSchemas: string) {
       LEFT JOIN pg_description d
         ON d.objoid = c.oid
        AND d.classoid = 'pg_class'::regclass
+       AND d.objsubid = 0 -- the table itself; its columns have objsubid > 0
       WHERE c.relkind = 'r' AND n.nspname IN (${quotedSchemas})
         AND d.description IS NOT NULL
       ORDER BY n.nspname, c.relname;
