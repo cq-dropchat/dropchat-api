@@ -38,6 +38,7 @@
  * }
  */
 
+import { assertPublicHost, assertPublicUrl } from "../../_shared/net_guard.ts";
 import * as z from "zod";
 import postgres from "postgres";
 import mysql from "mysql2";
@@ -528,6 +529,11 @@ class PostgresClient extends BaseClient {
       user: config.user,
       password: config.password,
       database: config.database,
+      connect_timeout: CONNECT_TIMEOUT_SECONDS,
+      // Sent as a startup parameter: every statement on the session is cut
+      // at the limit, whatever the query says.
+      connection: { statement_timeout: STATEMENT_TIMEOUT_MS },
+      max: 1,
     };
     this.conn = postgres(connectionConfig);
   }
@@ -585,6 +591,7 @@ class MySQLClient extends BaseClient {
       user: config.user,
       database: config.database,
       password: config.password,
+      connectTimeout: CONNECT_TIMEOUT_SECONDS * 1000,
     });
   }
 
@@ -593,7 +600,10 @@ class MySQLClient extends BaseClient {
     args?: unknown[],
   ): Promise<T[]> {
     // @ts-ignore Connection does have a query method
-    const [results, _fields] = await (await this.conn).query(query, args);
+    const [results, _fields] = await (await this.conn).query(
+      { sql: query, timeout: STATEMENT_TIMEOUT_MS },
+      args,
+    );
     return results as T[];
   }
 
@@ -740,7 +750,20 @@ class LibSQLClient extends BaseClient {
 
 // Factory function to create the appropriate client
 
-function createDBClient(config: SQLToolConfig): BaseClient {
+// F08: connection and statement limits for every driver.
+const CONNECT_TIMEOUT_SECONDS = 3;
+const STATEMENT_TIMEOUT_MS = 5_000;
+
+async function createDBClient(config: SQLToolConfig): Promise<BaseClient> {
+  // F08: the destination is an admin's string; it must be a public host.
+  if (config.driver === "libsql") {
+    await assertPublicUrl(config.url, {
+      protocols: ["libsql:", "https:", "http:", "wss:", "ws:"],
+    });
+  } else {
+    await assertPublicHost(config.host);
+  }
+
   switch (config.driver) {
     case "postgres":
       return new PostgresClient(config);
@@ -922,7 +945,7 @@ export async function getDbSchemaImplementation(
   config: SQLToolConfig,
   _context: RequestContext,
 ): Promise<z.infer<typeof GetDbSchemaOutputSchema>> {
-  const client = createDBClient(config);
+  const client = await createDBClient(config);
 
   client.setSchemas(input.schemas);
 
@@ -948,7 +971,7 @@ export async function executeSqlImplementation(
   config: SQLToolConfig,
   _context: RequestContext,
 ): Promise<z.infer<typeof ExecuteSqlOutputSchema>> {
-  const client = createDBClient(config);
+  const client = await createDBClient(config);
 
   try {
     return await client.execute(input.query);
@@ -1002,7 +1025,7 @@ export async function bulkInsertImplementation(
   _context: RequestContext,
   supabaseClient: SupabaseClient,
 ): Promise<z.infer<typeof BulkInsertOutputSchema>> {
-  const client = createDBClient(config);
+  const client = await createDBClient(config);
 
   const file = await downloadFromStorage(supabaseClient, input.file_uri);
 
@@ -1127,7 +1150,7 @@ export async function selectAsCsvImplementation(
   context: RequestContext,
   supabaseClient: SupabaseClient,
 ): Promise<z.infer<typeof SelectAsCsvOutputSchema>> {
-  const client = createDBClient(config);
+  const client = await createDBClient(config);
 
   try {
     const result = await client.execute(input.query);
@@ -1257,7 +1280,7 @@ export async function sampleTableRowsImplementation(
   config: SQLToolConfig,
   _context: RequestContext,
 ): Promise<z.infer<typeof SampleTableRowsOutputSchema>> {
-  const client = createDBClient(config);
+  const client = await createDBClient(config);
 
   client.setSchemas(input.schemas);
 

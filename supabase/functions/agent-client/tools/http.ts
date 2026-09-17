@@ -40,7 +40,11 @@
  */
 
 import * as z from "zod";
-import ky from "ky";
+import {
+  assertPublicUrl,
+  DestinationError,
+  type GuardOptions,
+} from "../../_shared/net_guard.ts";
 import { contextHeaders, type RequestContext } from "../protocols/base.ts";
 import type { LocalHTTPToolConfig } from "../../_shared/supabase.ts";
 import type { ToolDefinition } from "./base.ts";
@@ -68,10 +72,18 @@ export const RequestToolOutputSchema = z.union([
   }),
 ]);
 
+/** Model-chosen request headers that may pass through (F08). */
+const FORWARDABLE_INPUT_HEADERS = new Set(["content-type", "accept"]);
+
+const HTTP_TOOL_TIMEOUT_MS = 10_000;
+
 export async function requestToolImplementation(
   input: z.infer<typeof RequestToolInputSchema>,
   config: LocalHTTPToolConfig["config"],
   context: RequestContext,
+  _client?: unknown,
+  // Test seams: the DNS resolver and the timeout.
+  options: GuardOptions & { timeoutMs?: number } = {},
 ): Promise<z.infer<typeof RequestToolOutputSchema>> {
   // TODO: $context.conversation.contact_address value-like replacement
 
@@ -110,15 +122,61 @@ export async function requestToolImplementation(
     }
   }
 
-  const response = await ky(input.url, {
-    method: input.method,
-    headers: {
-      ...contextHeaders(context),
-      ...input.headers,
-      ...config.headers,
-    },
-    json: input.body,
-  });
+  // F08: the destination must be public — config.url is optional, and even
+  // when set it is an admin's string, not a proof.
+  try {
+    await assertPublicUrl(input.url, options);
+  } catch (error) {
+    if (!(error instanceof DestinationError)) throw error;
+    return { status: 403, isError: true, message: error.message };
+  }
+
+  // F08: the model does not choose credentials. Only content negotiation
+  // headers pass from the input; everything else comes from the config.
+  // Headers normalises case, so a later source replaces an earlier one
+  // instead of being appended next to it.
+  const headers = new Headers(contextHeaders(context));
+  for (const [name, value] of Object.entries(input.headers ?? {})) {
+    if (FORWARDABLE_INPUT_HEADERS.has(name.toLowerCase())) {
+      headers.set(name, value);
+    }
+  }
+  if (input.body !== undefined && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+  for (const [name, value] of Object.entries(config.headers ?? {})) {
+    headers.set(name, value);
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(input.url, {
+      method: input.method,
+      headers,
+      body: input.body !== undefined ? JSON.stringify(input.body) : undefined,
+      // F08: a redirect is an answer, not an instruction — following it would
+      // let a public URL bounce the request to a private address.
+      redirect: "manual",
+      signal: AbortSignal.timeout(options.timeoutMs ?? HTTP_TOOL_TIMEOUT_MS),
+    });
+  } catch (error) {
+    return {
+      status: 504,
+      isError: true,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  if (response.status >= 300 && response.status < 400) {
+    return {
+      status: response.status,
+      isError: true,
+      message: `Redirect to ${
+        response.headers.get("location") ?? "(none)"
+      } not followed`,
+    };
+  }
 
   if (!response.ok) {
     return {

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Agent tools only reach public destinations** (F08). SQL hosts, HTTP tool
+  URLs, libsql URLs and MCP server URLs are refused when they are IP literals in
+  private/loopback/link-local/metadata ranges, internal names (`localhost`,
+  single-label names, `*.internal`, `*.local`) or names that resolve to such
+  addresses. SQL connections time out after 3 s and statements after 5 s; HTTP
+  tool requests after 10 s, and redirects are returned, not followed. The HTTP
+  tool no longer forwards headers chosen by the model except `content-type` and
+  `accept`; put credentials in the tool's config. Remote MCP tool descriptions
+  reach the model bounded to 1,024 characters and marked as untrusted. Local
+  development: `AGENT_TOOL_ALLOWED_HOSTS` (comma-separated hostnames).
+
 - **Outgoing dispatch has a lease and backoff** (F11). Dispatchers take
   `status.dispatching` before calling the service, so the insert trigger and the
   retry sweep never send one message twice. A transient failure records

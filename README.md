@@ -1105,6 +1105,14 @@ npx supabase gen types typescript --local > supabase/functions/_shared/db_types.
 npx supabase functions serve
 ```
 
+Agent tools (SQL, HTTP, MCP) refuse private and internal destinations. To let an
+agent reach the repo's own MCP server locally, allow its internal name in
+`supabase/functions/.env` (never in production):
+
+```
+AGENT_TOOL_ALLOWED_HOSTS=api.supabase.internal
+```
+
 ### REST API docs
 
 Fetch the OpenAPI spec from PostgREST (requires the service role key):

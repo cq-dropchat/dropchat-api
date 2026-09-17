@@ -1,4 +1,5 @@
 import { revealAgents } from "../_shared/secrets.ts";
+import { describeRemoteTool } from "./tools/mcp.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import * as log from "../_shared/logger.ts";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -655,7 +656,11 @@ export async function handler(req: Request): Promise<Response> {
                 type: toolConfig.type,
                 label: toolConfig.label,
                 name: unlabeledTool.name,
-                description: unlabeledTool.description,
+                // F08: remote text, bounded and attributed.
+                description: describeRemoteTool(
+                  toolConfig.label,
+                  unlabeledTool.description,
+                ),
                 inputSchema: unlabeledTool
                   .inputSchema as z.core.JSONSchema.JSONSchema,
                 outputSchema: unlabeledTool.outputSchema as
