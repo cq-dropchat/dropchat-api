@@ -12,6 +12,7 @@
 // Tenant resolution: team_id → the workspace anchor row (service 'slack',
 // address = T…) → organization_id. One workspace = one org (enforced at
 // connect time).
+import { waitUntil } from "../_shared/edge_runtime.ts";
 import * as log from "../_shared/logger.ts";
 import { createUnsecureClient } from "../_shared/supabase.ts";
 import { handleEvent, type SlackEnvelope } from "./events.ts";
@@ -123,17 +124,8 @@ export async function handler(req: Request): Promise<Response> {
       },
     );
 
-  // Ack now, work after the response. waitUntil exists on the deployed edge
-  // runtime; fall back to inline awaiting when it doesn't (local tooling).
-  const runtime = globalThis as unknown as {
-    EdgeRuntime?: { waitUntil(p: Promise<unknown>): void };
-  };
-
-  if (runtime.EdgeRuntime?.waitUntil) {
-    runtime.EdgeRuntime.waitUntil(work);
-  } else {
-    await work;
-  }
+  // Ack now, work after the response (see _shared/edge_runtime.ts).
+  await waitUntil(work);
 
   return new Response();
 }

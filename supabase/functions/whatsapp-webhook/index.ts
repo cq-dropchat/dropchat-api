@@ -1,3 +1,5 @@
+import { insertLog } from "../_shared/logs.ts";
+import { waitUntil } from "../_shared/edge_runtime.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
 import {
@@ -526,14 +528,35 @@ async function processMessage(request: Request): Promise<Response> {
     return new Response();
   }
 
-  const client = createUnsecureClient();
-
   const payload = JSON.parse(body) as MetaWebhookPayload;
 
   if (payload.object !== "whatsapp_business_account") {
     return new Response("Unexpected object", { status: 400 });
   }
 
+  // F05: ack first. Meta retries (and eventually disables) a webhook that
+  // takes too long, and a batch with twenty media downloads did. Processing
+  // is idempotent (upserts on organization_id, external_id), so a retry that
+  // still lands is harmless. On the deployed runtime waitUntil keeps the
+  // worker alive; without it the work is awaited inline.
+  const work = processPayload(createUnsecureClient(), payload).catch(
+    (error) => {
+      log.error("WhatsApp webhook processing failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    },
+  );
+
+  await waitUntil(work);
+
+  return new Response();
+}
+
+/** Everything after the ack: resolve tenants, download media, persist. */
+export async function processPayload(
+  client: SupabaseClient<Database>,
+  payload: MetaWebhookPayload,
+): Promise<void> {
   // Collect all unique organization addresses and build lookup map
   const uniqueOrgAddresses = collectOrgAddresses(payload);
   const orgAddressMap = await buildOrgAddressMap(client, uniqueOrgAddresses);
@@ -588,17 +611,14 @@ async function processMessage(request: Request): Promise<Response> {
           waba_id,
         });
 
-        await client
-          .from("logs")
-          .insert({
-            organization_id: address.organization_id,
-            category: "account_update",
-            service: "whatsapp",
-            level: "info",
-            message: value.event.toLocaleLowerCase(),
-            metadata: { waba_id, value },
-          })
-          .throwOnError();
+        await insertLog(client, {
+          organization_id: address.organization_id,
+          category: "account_update",
+          service: "whatsapp",
+          level: "info",
+          message: value.event.toLocaleLowerCase(),
+          metadata: { waba_id, value },
+        });
 
         // Coexistence lifecycle: PARTNER_REMOVED and ACCOUNT_OFFBOARDED
         // disconnect the address; ACCOUNT_RECONNECTED re-enables it after the
@@ -808,18 +828,15 @@ async function processMessage(request: Request): Promise<Response> {
             error_title: error.title,
           });
 
-          await client
-            .from("logs")
-            .insert({
-              organization_id,
-              organization_address,
-              category: "messages",
-              service: "whatsapp",
-              level: "error",
-              message: error.message,
-              metadata: error,
-            })
-            .throwOnError();
+          await insertLog(client, {
+            organization_id,
+            organization_address,
+            category: "messages",
+            service: "whatsapp",
+            level: "error",
+            message: error.message,
+            metadata: error,
+          });
         }
       }
 
@@ -916,19 +933,16 @@ async function processMessage(request: Request): Promise<Response> {
               messages: msgCount,
             });
 
-            await client
-              .from("logs")
-              .insert({
-                organization_id,
-                organization_address,
-                category: "history",
-                service: "whatsapp",
-                level: "info",
-                message:
-                  `Syncing ${convCount} conversations and ${msgCount} messages`,
-                metadata: history.metadata,
-              })
-              .throwOnError();
+            await insertLog(client, {
+              organization_id,
+              organization_address,
+              category: "history",
+              service: "whatsapp",
+              level: "info",
+              message:
+                `Syncing ${convCount} conversations and ${msgCount} messages`,
+              metadata: history.metadata,
+            });
 
             for (const thread of history.threads) {
               // The thread's context identifies the contact for the whole
@@ -1078,18 +1092,15 @@ async function processMessage(request: Request): Promise<Response> {
                 error_message: error.message,
               });
 
-              await client
-                .from("logs")
-                .insert({
-                  organization_id,
-                  organization_address,
-                  category: "history",
-                  service: "whatsapp",
-                  level: "error",
-                  message: error.message,
-                  metadata: error,
-                })
-                .throwOnError();
+              await insertLog(client, {
+                organization_id,
+                organization_address,
+                category: "history",
+                service: "whatsapp",
+                level: "error",
+                message: error.message,
+                metadata: error,
+              });
             }
           }
         }
@@ -1146,19 +1157,15 @@ async function processMessage(request: Request): Promise<Response> {
             error_message: error.message,
           });
 
-          await client
-            .from("logs")
-            .insert({
-              organization_id,
-              organization_address,
-              category: field,
-              service: "whatsapp",
-              level: "error",
-              message:
-                `Received ${count} error messages with code ${error.code}`,
-              metadata: error,
-            })
-            .throwOnError();
+          await insertLog(client, {
+            organization_id,
+            organization_address,
+            category: field,
+            service: "whatsapp",
+            level: "error",
+            message: `Received ${count} error messages with code ${error.code}`,
+            metadata: error,
+          });
         }
       }
     }
@@ -1308,6 +1315,4 @@ async function processMessage(request: Request): Promise<Response> {
       .eq("external_id", original_message_id)
       .throwOnError();
   }
-
-  return new Response();
 }

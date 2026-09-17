@@ -3,14 +3,34 @@
 //
 //   deno run --allow-read _shared/testing/coverage_gate.ts coverage/lcov.info [--min-lines N]
 //
-// The threshold is ratcheted at the end of each phase to (reached − 2) and
-// never lowered. See IMPLEMENTATION_STATUS.md.
+// Thresholds are ratcheted at the end of each phase and never lowered. See
+// IMPLEMENTATION_STATUS.md.
+//
+// Three gates, because one number over "everything the tests loaded" is not
+// stable: `deno coverage` only counts modules a test imported, so the first
+// test of a 1,000-line handler moves the global figure by tens of points.
+// The layers of the audit prompt are gated separately — `_shared/*` (pure
+// modules, mappers, helpers) and the handlers (every other file) — plus the
+// global figure, which is what CI reports.
+//
+//   --min-shared N     lines % over files under _shared/   (default below)
+//   --min-handlers N   lines % over every other file
+//   --min-lines N      lines % over all files
 
-const DEFAULT_MIN_LINES = 20;
+const DEFAULT_MIN_SHARED = 63;
+const DEFAULT_MIN_HANDLERS = 23;
+const DEFAULT_MIN_LINES = 34;
+
+type Totals = { found: number; hit: number };
+
+function pct(t: Totals) {
+  return t.found === 0 ? 0 : (t.hit / t.found) * 100;
+}
 
 function parseLcov(text: string) {
-  let found = 0;
-  let hit = 0;
+  const all: Totals = { found: 0, hit: 0 };
+  const shared: Totals = { found: 0, hit: 0 };
+  const handlers: Totals = { found: 0, hit: 0 };
   const perFile: { file: string; found: number; hit: number }[] = [];
   let current: { file: string; found: number; hit: number } | null = null;
 
@@ -22,37 +42,68 @@ function parseLcov(text: string) {
     } else if (line.startsWith("LH:") && current) {
       current.hit = Number(line.slice(3));
     } else if (line === "end_of_record" && current) {
-      found += current.found;
-      hit += current.hit;
+      const layer = current.file.includes("/_shared/") ? shared : handlers;
+      layer.found += current.found;
+      layer.hit += current.hit;
+      all.found += current.found;
+      all.hit += current.hit;
       perFile.push(current);
       current = null;
     }
   }
 
-  return { found, hit, perFile };
+  return { all, shared, handlers, perFile };
+}
+
+function arg(args: string[], name: string, fallback: number): number {
+  const i = args.indexOf(name);
+  return i >= 0 ? Number(args[i + 1]) : fallback;
 }
 
 if (import.meta.main) {
   const [path, ...rest] = Deno.args;
-  const minIndex = rest.indexOf("--min-lines");
-  const minLines = minIndex >= 0
-    ? Number(rest[minIndex + 1])
-    : DEFAULT_MIN_LINES;
 
   if (!path) {
-    console.error("usage: coverage_gate.ts <lcov.info> [--min-lines N]");
+    console.error(
+      "usage: coverage_gate.ts <lcov.info> [--min-lines N] [--min-shared N] [--min-handlers N]",
+    );
     Deno.exit(2);
   }
 
-  const { found, hit } = parseLcov(await Deno.readTextFile(path));
-  const pct = found === 0 ? 0 : (hit / found) * 100;
+  const { all, shared, handlers } = parseLcov(await Deno.readTextFile(path));
+  const gates = [
+    {
+      name: "_shared",
+      totals: shared,
+      min: arg(rest, "--min-shared", DEFAULT_MIN_SHARED),
+    },
+    {
+      name: "handlers",
+      totals: handlers,
+      min: arg(rest, "--min-handlers", DEFAULT_MIN_HANDLERS),
+    },
+    {
+      name: "all",
+      totals: all,
+      min: arg(rest, "--min-lines", DEFAULT_MIN_LINES),
+    },
+  ];
 
-  console.log(
-    `lines: ${hit}/${found} = ${pct.toFixed(2)}% (threshold ${minLines}%)`,
-  );
+  let failed = false;
 
-  if (pct < minLines) {
-    console.error(`coverage gate FAILED: ${pct.toFixed(2)}% < ${minLines}%`);
+  for (const gate of gates) {
+    const p = pct(gate.totals);
+    const ok = p >= gate.min;
+    console.log(
+      `${gate.name.padEnd(9)} lines ${gate.totals.hit}/${gate.totals.found} = ${
+        p.toFixed(2)
+      }% (threshold ${gate.min}%)${ok ? "" : "  ← FAILED"}`,
+    );
+    if (!ok) failed = true;
+  }
+
+  if (failed) {
+    console.error("coverage gate FAILED");
     Deno.exit(1);
   }
 }

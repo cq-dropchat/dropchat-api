@@ -2,20 +2,27 @@
 
 ## Unreleased
 
-- **API keys are stored hashed** (F14). `api_keys.key` is now a write-only
-  slot: a key inserted there is turned into `key_hash` (sha256) and
-  `key_prefix` (first 8 characters) before the row is stored, and reads
-  back as `null` for everyone. Mint keys with the RPC
+- **Meta webhooks acknowledge before processing** (F05). `whatsapp-webhook`
+  and `instagram-webhook` validate the signature and answer `200`
+  immediately; tenant resolution, media download/upload and the upserts run
+  after the response under `EdgeRuntime.waitUntil`, as the Slack webhook
+  always did. Writes to `public.logs` no longer abort a batch. Nothing
+  changes for integrators; a `logs` row may now be missing where a webhook
+  used to fail whole.
+
+- **API keys are stored hashed** (F14). `api_keys.key` is now a write-only slot:
+  a key inserted there is turned into `key_hash` (sha256) and `key_prefix`
+  (first 8 characters) before the row is stored, and reads back as `null` for
+  everyone. Mint keys with the RPC
   `create_api_key(p_organization_id, p_name, p_role, p_expires_at)` (owners
-  only), which returns the plain key exactly once. New columns
-  `expires_at` (a key past it authenticates nothing) and `last_used_at`
-  (stamped on use, at most once a minute, on read-write requests). Existing
-  keys were hashed in place and keep working as they are.
-  **Cutover 2026-11-01:** until then a row that still holds a plain key and
-  no hash (none should exist) also authenticates by plaintext comparison;
-  after it, only the hash counts, and the `key` column is removed in a
-  following release. Integrations are unaffected: the `api-key` header is
-  the same secret.
+  only), which returns the plain key exactly once. New columns `expires_at` (a
+  key past it authenticates nothing) and `last_used_at` (stamped on use, at most
+  once a minute, on read-write requests). Existing keys were hashed in place and
+  keep working as they are. **Cutover 2026-11-01:** until then a row that still
+  holds a plain key and no hash (none should exist) also authenticates by
+  plaintext comparison; after it, only the hash counts, and the `key` column is
+  removed in a following release. Integrations are unaffected: the `api-key`
+  header is the same secret.
 
 - **Message caps and a rate limit apply to API roles** (F09). An API key or a
   signed-in member is capped on every armed row it inserts into `messages`,

@@ -1,3 +1,4 @@
+import { waitUntil } from "../_shared/edge_runtime.ts";
 import { revealAddresses } from "../_shared/secrets.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
@@ -556,14 +557,35 @@ async function processMessage(request: Request): Promise<Response> {
     return new Response();
   }
 
-  const client = createUnsecureClient();
-
   const payload = JSON.parse(body) as InstagramWebhookPayload;
 
   if (payload.object !== "instagram") {
     return new Response("Unexpected object", { status: 400 });
   }
 
+  // F05: ack first. Meta retries (and eventually disables) a webhook that
+  // takes too long, and a batch with twenty media downloads did. Processing
+  // is idempotent (upserts on organization_id, external_id), so a retry that
+  // still lands is harmless. On the deployed runtime waitUntil keeps the
+  // worker alive; without it the work is awaited inline.
+  const work = processPayload(createUnsecureClient(), payload).catch(
+    (error) => {
+      log.error("Instagram webhook processing failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    },
+  );
+
+  await waitUntil(work);
+
+  return new Response();
+}
+
+/** Everything after the ack: resolve tenants, download media, persist. */
+export async function processPayload(
+  client: SupabaseClient<Database>,
+  payload: InstagramWebhookPayload,
+): Promise<void> {
   const orgAddressMap = await buildOrgAddressMap(
     client,
     collectOrgAddresses(payload),
@@ -999,6 +1021,4 @@ async function processMessage(request: Request): Promise<Response> {
   // onto; within a conflicting pair either order yields the same merged result.
   await upsertBatch("statuses", statuses);
   await upsertBatch("messages", patchedMessages);
-
-  return new Response();
 }
