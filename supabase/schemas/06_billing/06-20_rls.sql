@@ -58,7 +58,7 @@ for select
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
 );
 
@@ -70,7 +70,7 @@ for select
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
 );
 
@@ -82,7 +82,7 @@ for select
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
 );
 
@@ -99,7 +99,7 @@ using (
     select s.account_id
     from billing.subscriptions s
     where s.organization_id in (
-      select public.get_authorized_orgs('owner')
+      select rls.get_authorized_orgs('owner')
     )
     and s.account_id is not null
   )
@@ -113,7 +113,7 @@ for select
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('owner')
+    select rls.get_authorized_orgs('owner')
   )
 );
 
@@ -128,7 +128,7 @@ using (
     select i.id
     from billing.invoices i
     where i.organization_id in (
-      select public.get_authorized_orgs('owner')
+      select rls.get_authorized_orgs('owner')
     )
   )
 );
@@ -141,6 +141,6 @@ for select
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('owner')
+    select rls.get_authorized_orgs('owner')
   )
 );

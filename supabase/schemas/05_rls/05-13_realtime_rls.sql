@@ -9,7 +9,7 @@ using (
   realtime.messages.extension = 'broadcast'
   and (
     -- org:<id> — members and API keys of the organization.
-    public.realtime_topic_uuid('org') in (select public.get_authorized_orgs('member'))
+    public.realtime_topic_uuid('org') in (select rls.get_authorized_orgs('member'))
     -- agent:<id> — only the member that agent is.
     or public.realtime_topic_uuid('agent') in (
       select a.id from public.agents a

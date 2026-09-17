@@ -14,7 +14,7 @@ for select
 to authenticated, anon
 using (
   id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
 );
 
@@ -25,12 +25,12 @@ for update
 to authenticated, anon
 using (
   id in (
-    select public.get_authorized_orgs('admin')
+    select rls.get_authorized_orgs('admin')
   )
 )
 with check (
   id in (
-    select public.get_authorized_orgs('admin')
+    select rls.get_authorized_orgs('admin')
   )
 );
 
@@ -40,6 +40,6 @@ for delete
 to authenticated, anon
 using (
   id in (
-    select public.get_authorized_orgs('owner')
+    select rls.get_authorized_orgs('owner')
   )
 );

@@ -1,4 +1,4 @@
-create function public.get_authorized_orgs(role public.role default 'member') returns setof uuid
+create function rls.get_authorized_orgs(role public.role default 'member') returns setof uuid
 language plpgsql
 security definer
 set search_path to ''
@@ -116,7 +116,7 @@ $$;
 -- organization_id would be a tenant escape, and one that could change user_id
 -- would be an impersonation. (`user_id` doubles as the AI test, so pinning
 -- it also pins that.)
-create function public.agent_identity_unchanged(
+create function rls.agent_identity_unchanged(
   p_id uuid,
   p_user_id uuid,
   p_organization_id uuid
@@ -139,7 +139,7 @@ $$;
 -- promote anyone: a member editing themselves, and an admin editing a
 -- colleague. Granting a role is an owner's privilege, so owners get the
 -- function above instead.
-create function public.agent_identity_and_role_unchanged(
+create function rls.agent_identity_and_role_unchanged(
   p_id uuid,
   p_user_id uuid,
   p_organization_id uuid,
@@ -167,7 +167,7 @@ $$;
 --
 -- Empty for API keys — they authenticate without auth.uid() and are nobody in
 -- particular, so no policy branch that means "my own row" can ever match one.
-create function public.get_own_agents() returns setof uuid
+create function rls.get_own_agents() returns setof uuid
 language sql
 stable
 security definer
@@ -195,7 +195,7 @@ declare
   _key text;
   _id uuid;
 begin
-  if p_organization_id not in (select public.get_authorized_orgs('owner')) then
+  if p_organization_id not in (select rls.get_authorized_orgs('owner')) then
     raise exception using
       errcode = '42501',
       message = 'only owners can create api keys';

@@ -13,11 +13,11 @@ for select
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
   and (organization_id, service, organization_address) in (
     select v.organization_id, v.service, v.address
-    from public.get_visible_addresses() v
+    from rls.get_visible_addresses() v
   )
 );
 
@@ -28,11 +28,11 @@ for insert
 to authenticated, anon
 with check (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
   and (organization_id, service, organization_address) in (
     select v.organization_id, v.service, v.address
-    from public.get_visible_addresses() v
+    from rls.get_visible_addresses() v
   )
   and (extra->'synced'->>'action') is distinct from 'add'
 );
@@ -47,21 +47,21 @@ for update
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
   and (organization_id, service, organization_address) in (
     select v.organization_id, v.service, v.address
-    from public.get_visible_addresses() v
+    from rls.get_visible_addresses() v
   )
   and (extra->'synced'->>'action') is distinct from 'add'
 )
 with check (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
   and (organization_id, service, organization_address) in (
     select v.organization_id, v.service, v.address
-    from public.get_visible_addresses() v
+    from rls.get_visible_addresses() v
   )
   and (extra->'synced'->>'action') is distinct from 'add'
 );
@@ -73,11 +73,11 @@ for delete
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('member')
+    select rls.get_authorized_orgs('member')
   )
   and (organization_id, service, organization_address) in (
     select v.organization_id, v.service, v.address
-    from public.get_visible_addresses() v
+    from rls.get_visible_addresses() v
   )
   and (extra->'synced'->>'action') is distinct from 'add'
 );

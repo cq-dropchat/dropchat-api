@@ -8,7 +8,7 @@ for select
 to authenticated, anon
 using (
   organization_id in (
-    select public.get_authorized_orgs('owner')
+    select rls.get_authorized_orgs('owner')
   )
 );
 

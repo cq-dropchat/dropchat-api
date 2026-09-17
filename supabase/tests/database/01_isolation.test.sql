@@ -85,7 +85,7 @@ select is(
 
 -- The visibility RPC is public and SECURITY DEFINER: it must be scoped too.
 select results_eq(
-  $$ select organization_id from public.get_visible_addresses() $$,
+  $$ select organization_id from rls.get_visible_addresses() $$,
   $$ select tests.id('org_b') union all select tests.id('org_b') $$,
   'get_visible_addresses() as key B only lists B''s two accounts'
 );
@@ -127,7 +127,7 @@ select throws_ok(
 );
 
 select throws_ok(
-  $$ select * from public.get_visible_addresses() $$,
+  $$ select * from rls.get_visible_addresses() $$,
   '42501',
   'authentication required',
   'anon without api-key is refused on the visibility RPC'

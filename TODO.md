@@ -62,12 +62,20 @@ Monetization
       references (`media.id` without the `internal://media/` prefix), which the
       §5.2 backfill has not converted in production yet.
 
-- [ ] Move the RLS helpers out of `public`.
+- [x] Move the RLS helpers out of `public` (P8) — the ten SECURITY DEFINER
+      helpers the policies call (`get_authorized_orgs`, `get_own_agents`, the
+      six visibility helpers, the two agent-identity guards) live in the `rls`
+      schema, which PostgREST does not serve. `25_rls_helpers_schema` pins where
+      they are and that the five actors still see exactly what they saw.
 
-- [ ] Members' lists still show deleted agents — the SELECT policies keep them
-      readable on purpose (message authorship, roster names), so the filtering
-      belongs to the readers: UI member lists, and anything that ever counts
-      seats.
+- [x] Members' lists still show deleted agents (P8) — checked, and the readers
+      already filter: `useCurrentAgents`, `useCurrentAgent` and the initial
+      fetch all pass `deleted_at is null`, and so do the Edge Functions that
+      resolve a membership (`management_auth`, `mcp/organization`,
+      `slack-management`). The ones that do not are the authorship readers —
+      `useAgentProfile` and the Slack mention resolver — which is the case the
+      policy keeps the row readable for. Nothing counts seats. Pinned by two
+      cases in `useAgents.test.tsx`.
 
 - [ ] API-key-created `local` conversations are invisible orphans — the insert
       policy admits `anon`, but the participant trigger needs `auth.uid()`, so

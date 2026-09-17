@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **The RLS helpers moved to the `rls` schema** (P8). The SECURITY DEFINER
+  functions the policies call — `get_authorized_orgs`, `get_visible_addresses`,
+  `get_participant_conversations`, `get_restricted_conversations`,
+  `is_restricted_conversation`, `is_conversation_visible`, `is_media_visible`,
+  `get_own_agents` and the two agent-identity guards — were in `public`, which
+  PostgREST exposes, so each one was reachable at `/rest/v1/rpc/<name>` with the
+  anon key. They answer about their caller, so they leaked nothing about other
+  tenants, but they are internal machinery. They now live in a schema PostgREST
+  does not serve; the policies are unchanged apart from the qualification. If
+  you were calling one over REST — nothing here ever did — it is gone.
+
 - **`api_keys.key` is gone, and so is the plaintext fallback** (P8, closing
   F14). The write-only `key` column — where a client could still hand the
   database a plain key for it to hash — no longer exists, and
