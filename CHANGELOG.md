@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+- **Deleting an organization is asynchronous** (F18). `DELETE` on
+  `organizations` (owners, as before) no longer runs the cascade in the request:
+  it sets `organizations.deletion_requested_at`, files a row in
+  `public.deletion_requests`, moves the organization's accounts to status
+  `deleting` and affects zero rows. From that moment the organization is gone
+  for every member and API key (`get_authorized_orgs` skips it); the
+  `sweep-deletions` pg_cron job removes its data in batches of 5,000 rows a
+  minute and then the row itself, and the hourly `storage-gc` its media files.
+  Instagram's data-deletion and deauthorize callbacks now act only on the
+  organization that owns the account (its newest row) instead of every
+  organization holding it; data deletion is filed the same way, account-scoped,
+  and its confirmation code is the request id: the status URL answers `pending`
+  or `completed` (404 for an unknown code). Account-scoped deletion does not yet
+  remove the account's media files.
+
+- **One agent turn per conversation** (F16). `agent-client` registers each
+  inbound message in `public.agent_turns` and answers only while it holds that
+  conversation's lease: a newer message supersedes an older one, a duplicate
+  invocation of one message answers once, and a message arriving while the agent
+  is answering waits for it and is answered with that reply in the history (the
+  holder stops before its next LLM call). Service role only. A conversation
+  whose invocation crashed is free again after 90 seconds.
+
+- **Internal sweep functions are service-role only** (F11/F05 follow-up).
+  `pending_dispatch_candidates`, `claim_message_dispatch`,
+  `release_message_dispatch`, `dispatch_pending_messages`,
+  `record_webhook_result`, `settle_webhook_deliveries`,
+  `dispatch_webhook_deliveries` and `deliver_webhooks` were callable through
+  `/rest/v1/rpc/*` by the anon key and any member (execute had been revoked from
+  `public` only); they now answer 42501. `pending_dispatch_candidates` returned
+  every organization's pending outgoing messages. Nothing legitimate called them
+  over the API.
+
+- **Edge Function logs are JSON with a request id** (F26). Every line is one
+  JSON object (`ts`, `level`, `fn`, `request_id`, `msg`, and the details' fields
+  such as `organization_id`, `message_id`). Responses carry `x-request-id`; a
+  caller that sends one keeps it across functions. Log queries that matched the
+  old `%c`-coloured text need updating.
+
 - **AI credits are reserved and the ledger is idempotent** (F17). Before an LLM
   call, `check_limit(ai_credits, …)` is asked for the call's upper-bound cost
   (`billing.estimate_ai_cost`: input tokens at the input price plus the output
