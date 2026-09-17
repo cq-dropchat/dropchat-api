@@ -1,5 +1,26 @@
 import { createClient as createClientBase } from "@supabase/supabase-js";
 import type { Database } from "./types/database_types.ts";
+import { currentRequestId } from "./logger.ts";
+
+// F26: every request to Supabase made while handling an Edge Function request
+// carries its `x-request-id`. PostgREST exposes it to the triggers in
+// `request.headers`, and the triggers that call the next function forward it
+// (public.request_id_header), so one chain logs one id. Read at call time,
+// not at client creation, so a client kept across requests stays correct;
+// `globalThis.fetch` is looked up per call too (tests stub it).
+function fetchWithRequestId(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const requestId = currentRequestId();
+  if (!requestId) return globalThis.fetch(input, init);
+
+  const headers = new Headers(
+    init?.headers ?? (input instanceof Request ? input.headers : undefined),
+  );
+  headers.set("x-request-id", requestId);
+  return globalThis.fetch(input, { ...init, headers });
+}
 
 export function createClient(req: Request) {
   if (!Deno.env.get("SUPABASE_URL")) {
@@ -28,6 +49,7 @@ export function createClient(req: Request) {
     {
       auth: { persistSession: false },
       global: {
+        fetch: fetchWithRequestId,
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -63,6 +85,7 @@ export function createApiClient(req: Request) {
     {
       auth: { persistSession: false },
       global: {
+        fetch: fetchWithRequestId,
         headers: {
           "api-key": token,
         },
@@ -89,6 +112,7 @@ export function createApiClientFromKey(apiKey: string) {
     {
       auth: { persistSession: false },
       global: {
+        fetch: fetchWithRequestId,
         headers: {
           "api-key": apiKey,
         },
@@ -111,6 +135,7 @@ export function createUnsecureClient() {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     {
       auth: { persistSession: false },
+      global: { fetch: fetchWithRequestId },
     },
   );
 }

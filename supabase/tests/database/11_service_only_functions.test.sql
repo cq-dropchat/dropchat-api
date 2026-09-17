@@ -43,7 +43,8 @@ insert into service_only values
   ('public.request_address_deletion(uuid, public.service, text, text)'),
   ('public.sweep_deletions(integer)'),
   ('public.purge_expired_rows(integer)'),
-  ('public.backfill_message_contents(jsonb)');
+  ('public.backfill_message_contents(jsonb)'),
+  ('public.request_id_header()');
 
 select is(
   (select array_agg(fn order by fn) from service_only
@@ -59,7 +60,8 @@ select is(
 );
 select ok(
   (select bool_and(has_function_privilege('service_role', fn::regprocedure, 'execute')) from service_only
-   where fn not like '%agent_turn%' and fn not like '%sweep_deletions%' and fn not like '%purge_expired_rows%'),
+   where fn not like '%agent_turn%' and fn not like '%sweep_deletions%' and fn not like '%purge_expired_rows%'
+     and fn not like '%request_id_header%'),
   'service_role still executes them'
 );
 

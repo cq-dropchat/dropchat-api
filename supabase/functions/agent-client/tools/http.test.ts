@@ -3,6 +3,7 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { requestToolImplementation } from "./http.ts";
 import type { RequestContext } from "../protocols/base.ts";
+import { withRequestLogging } from "../../_shared/logger.ts";
 
 const context = {
   organization: { id: "aaaaaaaa-0000-4000-8000-000000000001" },
@@ -143,6 +144,39 @@ Deno.test("F08: a hanging endpoint times out", async () => {
     assert(performance.now() - t0 < 2000);
     assertEquals(result.isError, true);
   } finally {
+    net.restore();
+  }
+});
+
+Deno.test("F26: the request id stays inside the platform; the HTTP tool does not send it", async () => {
+  const net = stubFetch(() => Promise.resolve(Response.json({ ok: true })));
+  const quiet = console.log;
+  console.log = () => {};
+  try {
+    const handler = withRequestLogging("agent-client", async () => {
+      const result = await requestToolImplementation(
+        { url: "https://api.example.com/users", method: "GET" },
+        {},
+        context,
+        undefined,
+        { resolver: publicDns },
+      );
+      assertEquals(result.isError, false);
+      return new Response();
+    });
+    const response = await handler(
+      new Request("http://localhost/agent-client", {
+        headers: { "x-request-id": "0f26f26f-0000-4000-8000-00000000b001" },
+      }),
+    );
+    assertEquals(
+      response.headers.get("x-request-id"),
+      "0f26f26f-0000-4000-8000-00000000b001",
+    );
+    assertEquals(net.seen.length, 1);
+    assertEquals(net.seen[0].headers.get("x-request-id"), null);
+  } finally {
+    console.log = quiet;
     net.restore();
   }
 });

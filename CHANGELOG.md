@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **One request id per message chain** (F26). The Edge Functions send the
+  `x-request-id` of the request they serve to PostgREST, and the database
+  triggers that call the next function (agent-client, the dispatchers, the
+  dispatch sweep) forward it. A webhook, the agent reply it causes and the
+  dispatch of that reply now log the same `request_id`. A client that writes
+  through the REST API may send its own `x-request-id`: when it is a UUID it is
+  forwarded to our functions' logs; any other value is ignored. The id is never
+  sent to third parties (agent tools, Meta, Slack, Instagram).
+
 - **A versioned contract for message content** (F29).
   `contracts/message-content.v1.schema.json` is the JSON Schema of
   `messages.content` for version `"1"`: text, file, the data kinds (reaction,

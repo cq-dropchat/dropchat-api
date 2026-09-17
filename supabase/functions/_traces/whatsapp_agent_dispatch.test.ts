@@ -13,6 +13,12 @@
 // 14_retention.test.sql, where the queue row is visible before pg_net's worker
 // takes it. Only the outside world is stubbed: the LLM provider and the Graph
 // API.
+//
+// F26: the handlers run wrapped as their entrypoints serve them
+// (withRequestLogging), and the test's pg_net stand-in forwards the
+// `x-request-id` the writing request sent to PostgREST — what the trigger
+// reads from `request.headers` and enqueues (pgTAP 21_request_id). The
+// webhook, agent-client and the dispatcher must log one request id.
 import "../_shared/testing/env.ts"; // before the handlers: keys are read at import
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { createClient } from "@supabase/supabase-js";
@@ -20,9 +26,20 @@ import type { Database, MessageRow } from "../_shared/types/database_types.ts";
 import { env, fixture, supabaseIsUp } from "../_shared/testing/env.ts";
 import { metaRequest } from "../_shared/testing/sign.ts";
 import { stubLlm, withTestAgent } from "../_shared/testing/agents.ts";
-import { handler as whatsappWebhook } from "../whatsapp-webhook/index.ts";
-import { handler as agentClient } from "../agent-client/index.ts";
-import { handler as whatsappDispatcher } from "../whatsapp-dispatcher/index.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
+import { handler as whatsappWebhookHandler } from "../whatsapp-webhook/index.ts";
+import { handler as agentClientHandler } from "../agent-client/index.ts";
+import { handler as whatsappDispatcherHandler } from "../whatsapp-dispatcher/index.ts";
+
+const whatsappWebhook = withRequestLogging(
+  "whatsapp-webhook",
+  whatsappWebhookHandler,
+);
+const agentClient = withRequestLogging("agent-client", agentClientHandler);
+const whatsappDispatcher = withRequestLogging(
+  "whatsapp-dispatcher",
+  whatsappDispatcherHandler,
+);
 
 const up = await supabaseIsUp();
 
@@ -37,7 +54,7 @@ function service() {
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** The deployed runtime's waitUntil: the webhook acks, then does the work. */
-async function deliverWebhook(body: unknown) {
+async function deliverWebhook(body: unknown): Promise<string | null> {
   const pending: Promise<unknown>[] = [];
   const g = globalThis as unknown as { EdgeRuntime?: unknown };
   const previous = g.EdgeRuntime;
@@ -52,6 +69,7 @@ async function deliverWebhook(body: unknown) {
     );
     assertEquals(response.status, 200);
     await Promise.all(pending);
+    return response.headers.get("x-request-id");
   } finally {
     g.EdgeRuntime = previous;
   }
@@ -89,12 +107,17 @@ function statusChange(wamid: string, status: string, at: number) {
 }
 
 /** The payload a messages trigger posts: the inserted row. */
-function triggerRequest(url: string, record: MessageRow) {
+function triggerRequest(
+  url: string,
+  record: MessageRow,
+  requestId: string | null,
+) {
   return new Request(url, {
     method: "POST",
     headers: {
       authorization: `Bearer ${env.serviceRoleKey}`,
       "content-type": "application/json",
+      ...(requestId ? { "x-request-id": requestId } : {}),
     },
     body: JSON.stringify({
       type: "INSERT",
@@ -104,6 +127,59 @@ function triggerRequest(url: string, record: MessageRow) {
       old_record: null,
     }),
   });
+}
+
+/**
+ * What PostgREST puts in `request.headers` for the trigger: the x-request-id
+ * of the last write to `messages` since `take()`.
+ */
+function recordMessageWrites() {
+  const realFetch = globalThis.fetch;
+  let ids: (string | null)[] = [];
+  globalThis.fetch = (input, init) => {
+    const req = input instanceof Request ? input : new Request(input, init);
+    if (
+      req.method === "POST" && new URL(req.url).pathname === "/rest/v1/messages"
+    ) {
+      ids.push(req.headers.get("x-request-id"));
+    }
+    return realFetch(input, init);
+  };
+  return {
+    take() {
+      const last = ids.at(-1) ?? null;
+      ids = [];
+      return last;
+    },
+    restore: () => (globalThis.fetch = realFetch),
+  };
+}
+
+/** The JSON log lines, by function. */
+function captureLogs() {
+  const original = {
+    log: console.log,
+    warn: console.warn,
+    error: console.error,
+  };
+  const lines: { fn?: string; request_id?: string }[] = [];
+  for (const level of ["log", "warn", "error"] as const) {
+    console[level] = (...args: unknown[]) => {
+      try {
+        lines.push(JSON.parse(String(args[0])));
+      } catch {
+        original[level](...args);
+      }
+    };
+  }
+  return {
+    ids: (
+      fn: string,
+    ) => [
+      ...new Set(lines.filter((l) => l.fn === fn).map((l) => l.request_id)),
+    ],
+    restore: () => Object.assign(console, original),
+  };
 }
 
 Deno.test({
@@ -120,13 +196,16 @@ Deno.test({
     const since = new Date(Date.now() - 1000).toISOString();
 
     const llm = stubLlm(50);
-    // Captured after the LLM stub: the Graph stub below falls through to it.
+    const writes = recordMessageWrites();
+    const logs = captureLogs();
+    // Captured after the stubs: the Graph stub below falls through to them.
     const realFetch = globalThis.fetch;
 
     try {
       await withTestAgent(client, async () => {
         // 1. A signed inbound message.
-        await deliverWebhook(change({
+        writes.take();
+        const requestId = await deliverWebhook(change({
           contacts: [{ profile: { name: "Dario" }, wa_id: CONTACT }],
           messages: [{
             from: CONTACT,
@@ -156,6 +235,7 @@ Deno.test({
           triggerRequest(
             "http://localhost/agent-client",
             inbound as MessageRow,
+            writes.take(),
           ),
         );
         assertEquals(response.status, 200);
@@ -196,10 +276,12 @@ Deno.test({
           return realFetch(input, init);
         };
 
+        const replyWrite = writes.take();
         const dispatched = await whatsappDispatcher(
           triggerRequest(
             "http://localhost/whatsapp-dispatcher",
             reply as MessageRow,
+            replyWrite,
           ),
         );
         assertEquals(dispatched.status, 200);
@@ -230,9 +312,16 @@ Deno.test({
           "respuesta de prueba",
           "the reply's content was overwritten by the status row",
         );
+
+        // F26: one request id from the webhook to the dispatcher.
+        assert(requestId, "the webhook response carries x-request-id");
+        assertEquals(logs.ids("agent-client"), [requestId]);
+        assertEquals(logs.ids("whatsapp-dispatcher"), [requestId]);
       });
     } finally {
+      logs.restore();
       globalThis.fetch = realFetch;
+      writes.restore();
       llm.restore();
       await client.from("agent_turns").delete().eq(
         "conversation_id",

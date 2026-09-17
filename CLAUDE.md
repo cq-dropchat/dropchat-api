@@ -63,6 +63,29 @@ response carries `x-request-id`; filter one invocation with
 `regexp_contains(event_message, '"request_id":"<id>"')`, or one message with
 `'"message_id":"<uuid>"'`.
 
+A request id also follows a message across functions (F26): the Supabase clients
+send it to PostgREST as `x-request-id`, and the triggers that call the next
+function forward it (`public.request_id_header()`). One inbound WhatsApp
+message, the agent reply and its dispatch share the webhook's id, so the whole
+chain is one query:
+
+```sql
+select cast(timestamp as datetime) as ts,
+       json_value(event_message, '$.fn') as fn,
+       json_value(event_message, '$.msg') as msg,
+       event_message
+from function_logs
+where regexp_contains(event_message, '"request_id":"<id>"')
+order by timestamp asc
+limit 1000
+```
+
+Take `<id>` from the response's `x-request-id` or from any line of the chain
+(e.g. find the dispatcher's line by `message_id`, then query its `request_id`).
+Chains started by cron (the dispatch sweep, retries) have no incoming id: each
+sweep request mints its own. The id is internal: it is not sent to agent tools,
+Meta, Slack or Instagram.
+
 Available log tables: `function_logs` (stdout), `function_edge_logs`
 (HTTP-level), `edge_logs`, `postgres_logs`, `auth_logs`, `storage_logs`,
 `realtime_logs`. Uses BigQuery SQL syntax. Max 1000 rows per query. Always

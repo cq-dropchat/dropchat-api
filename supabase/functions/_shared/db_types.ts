@@ -1597,6 +1597,7 @@ export type Database = {
         }
         Returns: string
       }
+      request_id_header: { Args: never; Returns: Json }
       settle_webhook_deliveries: { Args: never; Returns: number }
       sweep_deletions: { Args: { _budget?: number }; Returns: Json }
       webhook_max_attempts: { Args: never; Returns: number }

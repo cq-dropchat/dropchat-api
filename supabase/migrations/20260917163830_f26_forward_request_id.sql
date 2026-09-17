@@ -1,47 +1,11 @@
--- F15: these triggers only enqueue their pg_net request. They used to also
--- insert a row per call in supabase_functions.hooks, which nothing read (~3 M
--- rows/day at 2 M messages/day); net._http_response keeps the outcome of each
--- request for pg_net's TTL. purge_expired_rows (04-08) empties the old rows.
+set check_function_bodies = off;
 
--- F24: the edge functions' base URL and service token, from Vault, in one
--- query. The triggers below and dispatch_pending_messages (04-05) each read
--- both with their own pair of queries. Only the owner (the SECURITY DEFINER
--- triggers) may call it: it returns the service token. Not cached in a GUC
--- per transaction: that would leave the token readable by current_setting().
--- plpgsql, not sql: a SECURITY DEFINER sql function is not inlined and runs
--- as a set-returning function, ~43 µs a call against ~16 µs here.
-create function public.edge_functions_config(out url text, out token text)
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-begin
-  select
-    max(s.decrypted_secret) filter (where s.name = 'edge_functions_url'),
-    max(s.decrypted_secret) filter (where s.name = 'edge_functions_token')
-  into url, token
-  from vault.decrypted_secrets s
-  where s.name in ('edge_functions_url', 'edge_functions_token');
-end;
-$$;
-
-revoke execute on function public.edge_functions_config() from public, anon, authenticated, service_role;
-
--- F26: the `x-request-id` of the request that fired the trigger, as a
--- header to merge into the call to the next function, so a chain (webhook →
--- insert → agent-client → insert → dispatcher) logs one request id.
--- PostgREST puts the caller's headers in `request.headers`; the Edge
--- Functions' Supabase clients send the id of the request they are serving.
--- The text is client-controlled: only a UUID is forwarded (normalized to
--- lower case). Without one — cron, psql, a direct client with no id or any
--- other value — it returns '{}' and the receiver mints its own. Never sent to
--- third parties: only these calls to our own functions use it.
-create function public.request_id_header() returns jsonb
-language plpgsql
-stable
-set search_path = ''
-as $$
+CREATE OR REPLACE FUNCTION public.request_id_header()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE
+ SET search_path TO ''
+AS $function$
 declare
   _headers text := current_setting('request.headers', true);
   _id text;
@@ -58,14 +22,53 @@ begin
 
   return '{}'::jsonb;
 end;
-$$;
+$function$
+;
 
-revoke execute on function public.request_id_header() from public, anon, authenticated, service_role;
+CREATE OR REPLACE FUNCTION public.dispatch_pending_messages()
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  _base_url text;
+  _token text;
+  _count integer := 0;
+  _row public.messages;
+  _forward jsonb := public.request_id_header();
+begin
+  select * into _base_url, _token from public.edge_functions_config();
 
-create function public.dispatcher_edge_function() returns trigger
-language plpgsql
-security definer
-as $$
+  for _row in select * from public.pending_dispatch_candidates() loop
+    perform net.http_post(
+      url := _base_url || '/' || _row.service::text || '-dispatcher',
+      headers := jsonb_build_object(
+        'content-type', 'application/json',
+        'authorization', 'Bearer ' || _token
+      ) || _forward,
+      body := jsonb_build_object(
+        'old_record', null,
+        'record', to_jsonb(_row),
+        'type', 'INSERT',
+        'table', 'messages',
+        'schema', 'public'
+      ),
+      timeout_milliseconds := 10000
+    );
+    _count := _count + 1;
+  end loop;
+
+  return _count;
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.dispatcher_edge_function()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
 declare
   service text := new.service::text;
   path text := concat('/', service, '-dispatcher');
@@ -106,12 +109,14 @@ begin
 
   return new;
 end;
-$$;
+$function$
+;
 
-create function public.edge_function() returns trigger
-language plpgsql
-security definer
-as $$
+CREATE OR REPLACE FUNCTION public.edge_function()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
 declare
   payload jsonb;
   base_url text;
@@ -179,26 +184,15 @@ begin
 
   return new;
 end
-$$;
+$function$
+;
 
--- The internal mirror of edge_function('/agent-client', 'post'), for the
--- AI-DM flow (see handle_local_message_to_agent on messages). The trigger's
--- WHEN prefilters — local, a member author, armed — and the one fact a WHEN
--- cannot express lives here: is the other roster slot an AI agent?
---
--- A local direct's address IS its roster (agent ids, sorted, ':'-joined),
--- and RLS only allows roster edits on `group` — so "the AI answers where its
--- own id is in the address" is safe by construction: a member cannot pull
--- the AI into a real team conversation, and DMing the AI is not a mode, it
--- is just a conversation. Excluding the author (`a.id <> new.agent_id`) also
--- makes the AI's own replies a no-op here, with no special case. Everything
--- that enters and is not an AI DM — a group message, a human-human DM —
--- costs one indexed exists and exits.
-create function public.local_message_to_agent() returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
+CREATE OR REPLACE FUNCTION public.local_message_to_agent()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 declare
   segments text[] := string_to_array(new.conversation_address, ':');
   base_url text;
@@ -244,4 +238,11 @@ begin
 
   return new;
 end
-$$; 
+$function$
+;
+
+
+
+-- Hand-written (db diff does not model privileges): internal helper, only
+-- the SECURITY DEFINER writers above call it.
+revoke execute on function public.request_id_header() from public, anon, authenticated, service_role;

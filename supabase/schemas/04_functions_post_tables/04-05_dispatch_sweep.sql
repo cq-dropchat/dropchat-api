@@ -129,6 +129,7 @@ $$;
 
 -- The cron body: one dispatcher request per candidate. The dispatcher claims
 -- the lease itself, so a request that races the insert trigger's is a no-op.
+-- F26: run from cron it forwards no x-request-id; inside a request, its id.
 create function public.dispatch_pending_messages() returns integer
 language plpgsql
 security definer
@@ -139,6 +140,7 @@ declare
   _token text;
   _count integer := 0;
   _row public.messages;
+  _forward jsonb := public.request_id_header();
 begin
   select * into _base_url, _token from public.edge_functions_config();
 
@@ -148,7 +150,7 @@ begin
       headers := jsonb_build_object(
         'content-type', 'application/json',
         'authorization', 'Bearer ' || _token
-      ),
+      ) || _forward,
       body := jsonb_build_object(
         'old_record', null,
         'record', to_jsonb(_row),
