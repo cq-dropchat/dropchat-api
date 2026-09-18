@@ -4,8 +4,8 @@ alter table "billing"."ledger" add column "period_start" timestamp with time zon
 
 alter table "billing"."subscriptions" add column "canceled_at" timestamp with time zone;
 
--- CONCURRENTLY by hand: the ledger gets a row per AI call.
-CREATE UNIQUE INDEX CONCURRENTLY ledger_period_entry_key ON billing.ledger USING btree (organization_id, product_id, type, period_start);
+-- Not CONCURRENTLY: only the first statement of a migration may be (see CLAUDE.md).
+CREATE UNIQUE INDEX ledger_period_entry_key ON billing.ledger USING btree (organization_id, product_id, type, period_start);
 
 alter table "billing"."ledger" add constraint "ledger_type_check" CHECK ((type = ANY (ARRAY['grant'::text, 'consumption'::text, 'topup'::text, 'expiration'::text]))) not valid;
 

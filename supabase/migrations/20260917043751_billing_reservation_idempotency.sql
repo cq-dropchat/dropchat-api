@@ -1,7 +1,7 @@
 
 alter table "billing"."ledger" add column "external_id" text;
 
-CREATE INDEX CONCURRENTLY ledger_message_id_idx ON billing.ledger USING btree (message_id);
+CREATE INDEX ledger_message_id_idx ON billing.ledger USING btree (message_id);
 
 CREATE UNIQUE INDEX ledger_provider_external_id_key ON billing.ledger USING btree (provider, external_id);
 

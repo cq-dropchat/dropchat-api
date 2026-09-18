@@ -208,9 +208,13 @@ ORDER BY created_at DESC;
     pg_cron jobs (see `*_cron.sql` migrations).
   - **`CREATE INDEX CONCURRENTLY`** — on large tables (`messages`,
     `conversations`) edit the generated `CREATE INDEX` into
-    `CREATE INDEX CONCURRENTLY`. The CLI runs each migration statement outside a
-    transaction block (verified), so it applies; keep it before any statement
-    that depends on the index (e.g. dropping the constraint it replaces).
+    `CREATE INDEX CONCURRENTLY`. It must be the **first statement of the
+    migration file**: `supabase db push` (and the GitHub integration) send the
+    rest of the file as one pipeline, and a `CONCURRENTLY` there fails with
+    _"cannot be executed within a pipeline"_ (SQLSTATE 25001) and rolls the
+    whole migration back. If the index cannot go first, put it in its own
+    migration. Keep it before any statement that depends on the index (e.g.
+    dropping the constraint it replaces).
   - **Enum value additions** — for an enum used by a column that an RLS policy
     (or other dependent) references, `db diff`'s rename/recreate/recast fails to
     apply: _"cannot alter type of a column used in a policy definition"_. Still
