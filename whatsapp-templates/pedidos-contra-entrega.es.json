@@ -1,0 +1,162 @@
+[
+  {
+    "name": "confirmacion_pedido_contra_entrega",
+    "category": "UTILITY",
+    "language": "es",
+    "components": [
+      {
+        "type": "BODY",
+        "text": "Hola {{1}} 👋 Recibimos tu pedido #{{2}}: {{3}}.\n\n💵 Pago contra entrega: ${{4}}\n📍 Dirección: {{5}}\n\n¿Confirmamos el despacho?",
+        "example": {
+          "body_text": [
+            [
+              "Laura",
+              "4821",
+              "Freidora de aire 5L",
+              "49.990",
+              "Los Aromos 1234, Maipú"
+            ]
+          ]
+        }
+      },
+      {
+        "type": "FOOTER",
+        "text": "Si no hiciste este pedido, respóndenos aquí."
+      },
+      {
+        "type": "BUTTONS",
+        "buttons": [
+          { "type": "QUICK_REPLY", "text": "Confirmar pedido" },
+          { "type": "QUICK_REPLY", "text": "Cambiar dirección" },
+          { "type": "QUICK_REPLY", "text": "Cancelar" }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "recordatorio_confirmacion_pedido",
+    "category": "UTILITY",
+    "language": "es",
+    "components": [
+      {
+        "type": "BODY",
+        "text": "Hola {{1}}, seguimos esperando tu confirmación para despachar el pedido #{{2}}: {{3}}.\n\nSi no nos respondes hoy lo dejamos en pausa, para no enviarlo a una dirección equivocada.\n\n¿Lo despachamos?",
+        "example": {
+          "body_text": [["Laura", "4821", "Freidora de aire 5L"]]
+        }
+      },
+      {
+        "type": "BUTTONS",
+        "buttons": [
+          { "type": "QUICK_REPLY", "text": "Confirmar pedido" },
+          { "type": "QUICK_REPLY", "text": "Cambiar dirección" },
+          { "type": "QUICK_REPLY", "text": "Cancelar" }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "direccion_incompleta",
+    "category": "UTILITY",
+    "language": "es",
+    "components": [
+      {
+        "type": "BODY",
+        "text": "Hola {{1}}, antes de despachar tu pedido #{{2}} necesitamos completar la dirección.\n\nHoy tenemos anotado: {{3}}\n\nRespóndenos con calle y número, block o depto si corresponde, y la comuna. Con eso lo dejamos listo para salir.",
+        "example": {
+          "body_text": [["Laura", "4821", "Los Aromos, Maipú"]]
+        }
+      },
+      {
+        "type": "FOOTER",
+        "text": "Escríbela aquí mismo, te respondemos al toque."
+      }
+    ]
+  },
+  {
+    "name": "pedido_en_camino",
+    "category": "UTILITY",
+    "language": "es",
+    "components": [
+      {
+        "type": "BODY",
+        "text": "Buenas noticias, {{1}} 🚚 Tu pedido #{{2}} ya va en camino y llega {{3}}.\n\nTen listos ${{4}} para pagarle al repartidor. Si ese día no vas a estar, avísanos por aquí y lo reprogramamos.",
+        "example": {
+          "body_text": [["Laura", "4821", "mañana", "49.990"]]
+        }
+      },
+      {
+        "type": "BUTTONS",
+        "buttons": [
+          { "type": "QUICK_REPLY", "text": "Ahí estaré" },
+          { "type": "QUICK_REPLY", "text": "Cambiar la fecha" }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "pedido_en_reparto_hoy",
+    "category": "UTILITY",
+    "language": "es",
+    "components": [
+      {
+        "type": "BODY",
+        "text": "Hola {{1}}, hoy sale a reparto tu pedido #{{2}} a {{3}}.\n\nEl repartidor cobra ${{4}} al entregar. Deja el efectivo listo y mantén el teléfono a mano por si necesita ubicarte.",
+        "example": {
+          "body_text": [
+            ["Laura", "4821", "Los Aromos 1234, block B depto 302, Maipú", "49.990"]
+          ]
+        }
+      },
+      {
+        "type": "FOOTER",
+        "text": "¿Algo cambió? Respóndenos aquí."
+      }
+    ]
+  },
+  {
+    "name": "entrega_fallida_reintento",
+    "category": "UTILITY",
+    "language": "es",
+    "components": [
+      {
+        "type": "BODY",
+        "text": "Hola {{1}}, hoy el repartidor llegó con tu pedido #{{2}} a {{3}} y no encontró a nadie.\n\nPodemos intentarlo una vez más sin costo. ¿Cuándo te acomoda?",
+        "example": {
+          "body_text": [
+            ["Laura", "4821", "Los Aromos 1234, block B depto 302, Maipú"]
+          ]
+        }
+      },
+      {
+        "type": "BUTTONS",
+        "buttons": [
+          { "type": "QUICK_REPLY", "text": "Reintentar mañana" },
+          { "type": "QUICK_REPLY", "text": "Coordinar otro día" },
+          { "type": "QUICK_REPLY", "text": "Cancelar pedido" }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "pedido_entregado",
+    "category": "UTILITY",
+    "language": "es",
+    "components": [
+      {
+        "type": "BODY",
+        "text": "¡Listo, {{1}}! Tu pedido #{{2}} quedó entregado 📦\n\nSi algo no llegó como esperabas, respóndenos aquí y lo resolvemos.",
+        "example": {
+          "body_text": [["Laura", "4821"]]
+        }
+      },
+      {
+        "type": "BUTTONS",
+        "buttons": [
+          { "type": "QUICK_REPLY", "text": "Todo bien" },
+          { "type": "QUICK_REPLY", "text": "Tuve un problema" }
+        ]
+      }
+    ]
+  }
+]
