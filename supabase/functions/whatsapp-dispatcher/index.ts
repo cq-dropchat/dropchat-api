@@ -1,4 +1,8 @@
-import { isServiceToken } from "../_shared/service_auth.ts";
+import {
+  isServiceToken,
+  serviceKeys,
+  tokenShape,
+} from "../_shared/service_auth.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
 import { withRequestLogging } from "../_shared/logger.ts";
@@ -494,6 +498,11 @@ export async function handler(req: Request): Promise<Response> {
   const token = authHeader?.replace("Bearer ", "");
 
   if (!isServiceToken(token)) {
+    // Shapes only (kind, length, JWT role/ref/iat), never the values.
+    log.warn("Unauthorized internal call", {
+      received: tokenShape(token),
+      accepted: serviceKeys().map(tokenShape),
+    });
     return new Response("Unauthorized", { status: 401 });
   }
 

@@ -38,3 +38,39 @@ export function isServiceToken(
 ): boolean {
   return !!token && keys.includes(token);
 }
+
+/**
+ * A token's shape for logs, never its value: kind, length and, for a JWT, the
+ * non-secret claims that tell two service_role keys apart.
+ */
+export function tokenShape(token: string | null | undefined): {
+  kind: "none" | "jwt" | "sb_secret" | "other";
+  length: number;
+  role?: string;
+  ref?: string;
+  iat?: number;
+} {
+  if (!token) return { kind: "none", length: 0 };
+  if (token.startsWith("sb_secret_")) {
+    return { kind: "sb_secret", length: token.length };
+  }
+  const parts = token.split(".");
+  if (parts.length === 3) {
+    try {
+      const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const claims = JSON.parse(
+        atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4)),
+      );
+      return {
+        kind: "jwt",
+        length: token.length,
+        role: claims.role,
+        ref: claims.ref,
+        iat: claims.iat,
+      };
+    } catch {
+      // not a readable JWT
+    }
+  }
+  return { kind: "other", length: token.length };
+}
