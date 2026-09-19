@@ -1,6 +1,7 @@
 import { createClient as createClientBase } from "@supabase/supabase-js";
 import type { Database } from "./types/database_types.ts";
 import { currentRequestId } from "./logger.ts";
+import { serviceKeys } from "./service_auth.ts";
 
 // F26: every request to Supabase made while handling an Edge Function request
 // carries its `x-request-id`. PostgREST exposes it to the triggers in
@@ -126,13 +127,21 @@ export function createUnsecureClient() {
     throw new Error("Undefined SUPABASE_URL env var.");
   }
 
-  if (!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
-    throw new Error("Undefined SUPABASE_SERVICE_ROLE_KEY env var.");
+  // The runtime injects whichever key the project uses under
+  // SUPABASE_SERVICE_ROLE_KEY — the legacy JWT or, on projects migrated to
+  // API keys, an sb_secret_ one. serviceKeys falls back to the
+  // SUPABASE_SECRET_KEYS dictionary for the day it stops injecting it (legacy
+  // keys retire at the end of 2026).
+  const key = serviceKeys()[0];
+  if (!key) {
+    throw new Error(
+      "No service key: set SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEYS.",
+    );
   }
 
   return createClientBase<Database>(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    key,
     {
       auth: { persistSession: false },
       global: { fetch: fetchWithRequestId },

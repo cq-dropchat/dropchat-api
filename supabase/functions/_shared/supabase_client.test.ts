@@ -109,3 +109,27 @@ Deno.test("F26: outside a request no x-request-id is sent", leaky, async () => {
   }
   assertEquals(net.seen[0].get("x-request-id"), null);
 });
+
+// The legacy service_role key retires at the end of 2026; a project without
+// one still gets its secret keys in SUPABASE_SECRET_KEYS.
+Deno.test(
+  "createUnsecureClient authenticates with a secret key when no legacy key is set",
+  leaky,
+  async () => {
+    const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    Deno.env.delete("SUPABASE_SERVICE_ROLE_KEY");
+    Deno.env.set(
+      "SUPABASE_SECRET_KEYS",
+      JSON.stringify({ default: "sb_secret_from_the_dictionary" }),
+    );
+    const net = recordFetch();
+    try {
+      await createUnsecureClient().from("messages").select("id");
+    } finally {
+      net.restore();
+      Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", legacy);
+      Deno.env.delete("SUPABASE_SECRET_KEYS");
+    }
+    assertEquals(net.seen[0].get("apikey"), "sb_secret_from_the_dictionary");
+  },
+);

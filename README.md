@@ -427,7 +427,14 @@ Option A: deploy via Supabase GitHub Integration
 
 - **edge_functions_url**:
   `https://{SUPABASE_PROJECT_ID}.supabase.co/functions/v1`
-- **edge_functions_token**: the `SUPABASE_SERVICE_ROLE_KEY`
+- **edge_functions_token**: the project's secret key — the same value the
+  runtime injects into the functions as `SUPABASE_SERVICE_ROLE_KEY`. On a
+  project created with the new API keys that is the `sb_secret_…` **default**
+  key (Project Settings > API Keys > Secret keys), **not** the legacy
+  `service_role` JWT: the functions compare the bearer against the keys the
+  runtime gives them, so a legacy JWT there makes every trigger call fail with
+  `401 Unauthorized`. Older projects still get the legacy JWT injected, and it
+  works until the legacy keys retire at the end of 2026.
 
 ##### Release
 
