@@ -104,7 +104,12 @@
         "text": "Hola {{1}}, hoy sale a reparto tu pedido #{{2}} a {{3}}.\n\nEl repartidor cobra ${{4}} al entregar. Deja el efectivo listo y mantén el teléfono a mano por si necesita ubicarte.",
         "example": {
           "body_text": [
-            ["Laura", "4821", "Los Aromos 1234, block B depto 302, Maipú", "49.990"]
+            [
+              "Laura",
+              "4821",
+              "Los Aromos 1234, block B depto 302, Maipú",
+              "49.990"
+            ]
           ]
         }
       },

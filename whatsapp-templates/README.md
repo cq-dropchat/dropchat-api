@@ -11,15 +11,15 @@ la API de Meta (`POST /{waba_id}/message_templates`), que es lo mismo que envía
 
 ## Las siete plantillas
 
-| Nombre | Cuándo se envía | Botones |
-| --- | --- | --- |
-| `confirmacion_pedido_contra_entrega` | apenas entra el pedido en Dropi | Confirmar · Cambiar dirección · Cancelar |
-| `recordatorio_confirmacion_pedido` | si no contestó la primera | Confirmar · Cambiar dirección · Cancelar |
-| `direccion_incompleta` | dirección sin número, block o comuna | — (se espera texto libre) |
-| `pedido_en_camino` | el pedido sale de bodega | Ahí estaré · Cambiar la fecha |
-| `pedido_en_reparto_hoy` | sale a reparto ese día | — |
-| `entrega_fallida_reintento` | nadie abrió la puerta | Reintentar mañana · Coordinar otro día · Cancelar |
-| `pedido_entregado` | entrega confirmada | Todo bien · Tuve un problema |
+| Nombre                               | Cuándo se envía                      | Botones                                           |
+| ------------------------------------ | ------------------------------------ | ------------------------------------------------- |
+| `confirmacion_pedido_contra_entrega` | apenas entra el pedido en Dropi      | Confirmar · Cambiar dirección · Cancelar          |
+| `recordatorio_confirmacion_pedido`   | si no contestó la primera            | Confirmar · Cambiar dirección · Cancelar          |
+| `direccion_incompleta`               | dirección sin número, block o comuna | — (se espera texto libre)                         |
+| `pedido_en_camino`                   | el pedido sale de bodega             | Ahí estaré · Cambiar la fecha                     |
+| `pedido_en_reparto_hoy`              | sale a reparto ese día               | —                                                 |
+| `entrega_fallida_reintento`          | nadie abrió la puerta                | Reintentar mañana · Coordinar otro día · Cancelar |
+| `pedido_entregado`                   | entrega confirmada                   | Todo bien · Tuve un problema                      |
 
 Las siete son **UTILITY**: hablan de un pedido que el cliente ya hizo. Esa
 categoría se aprueba más rápido, no necesita opt-in de marketing y a Meta le
@@ -40,8 +40,8 @@ otras reglas; no hay ninguna en este archivo.
 
 ## Cómo enviarlas a aprobación
 
-Desde la app: Integraciones → WhatsApp → Plantillas → Nueva. La UI arma el
-mismo JSON.
+Desde la app: Integraciones → WhatsApp → Plantillas → Nueva. La UI arma el mismo
+JSON.
 
 O directo a Meta, una por una, con un token de usuario del sistema que tenga
 `whatsapp_business_management`:
