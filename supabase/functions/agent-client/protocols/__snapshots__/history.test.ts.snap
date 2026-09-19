@@ -1,0 +1,98 @@
+export const snapshot = {};
+
+snapshot[`H2 characterization: chat completions, external conversation 1`] = `
+{
+  messages: [
+    {
+      content: "Eres Sofía, la asistente de la tienda.
+
+{
+  now: '<now>',
+  user: {
+    name: 'Pedro',
+    phone: '+56912345678'
+  }
+}",
+      role: "system",
+    },
+    {
+      content: "hola, quiero cambiar mi pedido",
+      role: "user",
+    },
+    {
+      content: "¡Hola! ¿Qué pedido sería?",
+      role: "assistant",
+    },
+    {
+      content: "Soy Carla del equipo, ya te lo cambio: es el 4021",
+      role: "user",
+    },
+    {
+      content: "gracias Carla",
+      role: "user",
+    },
+  ],
+  tools: [],
+}
+`;
+
+snapshot[`H2 characterization: responses, external conversation 1`] = `
+{
+  input: [
+    {
+      content: "hola, quiero cambiar mi pedido",
+      role: "user",
+    },
+    {
+      content: "¡Hola! ¿Qué pedido sería?",
+      role: "assistant",
+    },
+    {
+      content: "Soy Carla del equipo, ya te lo cambio: es el 4021",
+      role: "user",
+    },
+    {
+      content: "gracias Carla",
+      role: "user",
+    },
+  ],
+  instructions: "Eres Sofía, la asistente de la tienda.
+
+{
+  now: '<now>',
+  user: {
+    name: 'Pedro',
+    phone: '+56912345678'
+  }
+}",
+  tools: [],
+}
+`;
+
+snapshot[`H2 characterization: chat completions, local DM 1`] = `
+{
+  messages: [
+    {
+      content: "Eres Sofía, la asistente de la tienda.
+
+{
+  now: '<now>',
+  user: {
+    name: 'Pedro',
+    phone: undefined
+  }
+}",
+      role: "system",
+    },
+    {
+      content: "probá contestar esto",
+      role: "user",
+    },
+    {
+      content: "listo",
+      role: "assistant",
+    },
+  ],
+  tools: [],
+}
+`;
