@@ -1,4 +1,8 @@
-import type { Database, TemplateData } from "../_shared/supabase.ts";
+import {
+  createUnsecureClient,
+  type Database,
+  type TemplateData,
+} from "../_shared/supabase.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
 import { getAddressSecrets } from "../_shared/secrets.ts";
@@ -6,6 +10,20 @@ import { HTTPException } from "jsr:@hono/hono/http-exception";
 import { ContentfulStatusCode } from "jsr:@hono/hono/utils/http-status";
 
 const API_VERSION = "v24.0";
+// Same fallback as the dispatcher and the webhook: an address registered
+// without its own token (the README's manual setup, Meta's test number) is
+// operated with the system user's.
+const DEFAULT_ACCESS_TOKEN = Deno.env.get("META_SYSTEM_USER_ACCESS_TOKEN") ||
+  "";
+
+/** The address's own token when it has one, else the system user's. */
+export function pickAccessToken(
+  secrets: { [key: string]: unknown } | null | undefined,
+  fallback: string,
+): string {
+  const own = secrets?.access_token;
+  return typeof own === "string" && own !== "" ? own : fallback;
+}
 
 async function getBusinessCredentials(
   client: SupabaseClient<Database>,
@@ -28,9 +46,12 @@ async function getBusinessCredentials(
     });
   }
 
-  // F02: the token lives in public.secrets, not in extra.
+  // F02: the token lives in public.secrets, which only the service role can
+  // read. `client` is the caller's (a member's session or an API key), so the
+  // row above, read through it, is the authorization check; the secret itself
+  // is read with the service role.
   const secrets = await getAddressSecrets(
-    client,
+    createUnsecureClient(),
     organization_id,
     "whatsapp",
     organization_address,
@@ -38,9 +59,7 @@ async function getBusinessCredentials(
 
   return {
     waba_id: data.waba_id,
-    access_token: typeof secrets?.access_token === "string"
-      ? secrets.access_token
-      : "",
+    access_token: pickAccessToken(secrets, DEFAULT_ACCESS_TOKEN),
   };
 }
 
