@@ -258,6 +258,53 @@ from OpenBSP via the `organizations_addresses` / `logs` channels. OpenBSP does
   on your side — or, if you self-host OpenBSP, read it with the service role
   from `public.secrets` (`functions/_shared/secrets.ts`).
 
+### Who answers a conversation (H1)
+
+A conversation is answered by one agent, recorded on the row itself:
+
+| Column                            | Meaning                                                                                                                              |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `conversations.assigned_agent_id` | Who holds this conversation: an AI agent, a member (a human took it), or `null` — nobody yet, so the next inbound message routes it. |
+| `conversations.assigned_at`       | When that assignment was made.                                                                                                       |
+| `organizations.entry_agent_id`    | The agent that takes a conversation nobody holds. Unset means "the oldest eligible AI agent".                                        |
+
+All three are **read-only over the API**: a direct `PATCH` fails with `42501`,
+because every change has to go through the function that also records it. An
+agent is eligible when it is not a membership (`user_id is null`), not retired
+(`deleted_at is null`) and its `extra.mode` is neither `inactive` nor `draft`.
+
+Each change inserts a **record-only message** in the conversation — internal,
+never dispatched, never billed:
+
+```json
+{
+  "version": "1",
+  "type": "data",
+  "kind": "assignment",
+  "internal": true,
+  "data": {
+    "from": null,
+    "to": "8f1c…",
+    "awaiting_human": false,
+    "by": null,
+    "cause": "entry"
+  }
+}
+```
+
+`cause` is one of `routing`, `entry`, `escalation`, `manual`, `takeover`,
+`expiry`; `category` and `reason` appear when the change carries them (an
+escalation to a human, from H3). Two consequences for an integrator:
+
+- If you count what the contact received, filter internal rows out
+  (`content->internal is null`) — the same filter tool traces already needed.
+- Assignments emit `update` events of `conversations` on your webhooks. If you
+  subscribe to that table, expect one event per conversation the first time it
+  is answered.
+
+On external services the AI answers `direct` conversations only. To let it
+answer in groups, set `organizations.extra.ai_in_groups = true`.
+
 ## 8. (Optional) Poll instead of webhooks
 
 If you'd rather pull than receive pushes:

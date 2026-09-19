@@ -7,7 +7,17 @@ create table public.organizations (
   -- F18: set when the owner deletes the organization. From then on
   -- get_authorized_orgs no longer returns it; sweep_deletions removes the
   -- data in batches and finally the row.
-  deletion_requested_at timestamp with time zone
+  deletion_requested_at timestamp with time zone,
+  -- H1: which AI agent takes a conversation that has no assignment yet — the
+  -- organization's front door. Null means "the oldest eligible one", which is
+  -- what every conversation got before assignments existed; the H1 migration
+  -- backfills it with exactly that agent so no organization's behaviour moves
+  -- on deploy day.
+  --
+  -- The reference is composite (see 03-21) so it cannot name another tenant's
+  -- agent. Set to null when that agent is deleted: the organization falls back
+  -- to the oldest eligible one rather than losing its front door silently.
+  entry_agent_id uuid
 );
 
 alter table only public.organizations

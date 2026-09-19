@@ -796,6 +796,8 @@ export type Database = {
       conversations: {
         Row: {
           address: string
+          assigned_agent_id: string | null
+          assigned_at: string | null
           created_at: string
           extra: Json | null
           id: string
@@ -808,6 +810,8 @@ export type Database = {
         }
         Insert: {
           address: string
+          assigned_agent_id?: string | null
+          assigned_at?: string | null
           created_at?: string
           extra?: Json | null
           id?: string
@@ -820,6 +824,8 @@ export type Database = {
         }
         Update: {
           address?: string
+          assigned_agent_id?: string | null
+          assigned_at?: string | null
           created_at?: string
           extra?: Json | null
           id?: string
@@ -831,6 +837,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "conversations_assigned_agent_id_fkey"
+            columns: ["organization_id", "assigned_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["organization_id", "id"]
+          },
           {
             foreignKeyName: "conversations_organization_address_fkey"
             columns: ["organization_id", "service", "organization_address"]
@@ -1302,6 +1315,7 @@ export type Database = {
         Row: {
           created_at: string
           deletion_requested_at: string | null
+          entry_agent_id: string | null
           extra: Json | null
           id: string
           name: string
@@ -1310,6 +1324,7 @@ export type Database = {
         Insert: {
           created_at?: string
           deletion_requested_at?: string | null
+          entry_agent_id?: string | null
           extra?: Json | null
           id?: string
           name: string
@@ -1318,12 +1333,21 @@ export type Database = {
         Update: {
           created_at?: string
           deletion_requested_at?: string | null
+          entry_agent_id?: string | null
           extra?: Json | null
           id?: string
           name?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "organizations_entry_agent_id_fkey"
+            columns: ["id", "entry_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["organization_id", "id"]
+          },
+        ]
       }
       organizations_addresses: {
         Row: {
@@ -1796,6 +1820,35 @@ export type Database = {
       request_organization_export: {
         Args: { _organization_id: string }
         Returns: string
+      }
+      set_conversation_assignment: {
+        Args: {
+          p_actor_agent_id?: string
+          p_agent_id: string
+          p_awaiting_human?: boolean
+          p_conversation_id: string
+          p_reason?: Json
+        }
+        Returns: {
+          address: string
+          assigned_agent_id: string | null
+          assigned_at: string | null
+          created_at: string
+          extra: Json | null
+          id: string
+          name: string | null
+          organization_address: string
+          organization_id: string
+          service: Database["public"]["Enums"]["service"]
+          type: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       settle_edge_calls: { Args: never; Returns: number }
       settle_webhook_deliveries: { Args: never; Returns: number }

@@ -295,6 +295,10 @@ Deno.test({
           .select()
           .eq("conversation_id", inbound.conversation_id)
           .is("sender_address", null)
+          // H1: the assignment note is an outgoing row too (no
+          // sender_address), and record-only. What the dispatcher sends is
+          // the reply, so the note stays out of this trace.
+          .is("content->internal", null)
           .gte("created_at", since)
           .single()
           .throwOnError();

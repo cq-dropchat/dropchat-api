@@ -89,6 +89,24 @@ snapshot[`F29: agent-client tool round, then the answer (characterization) 1`] =
       agent_id: "<agent>",
       content: {
         data: {
+          awaiting_human: false,
+          by: "<agent>",
+          cause: "entry",
+          from: null,
+          to: "<agent>",
+        },
+        internal: true,
+        kind: "assignment",
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
           expression: "2+2",
         },
         internal: true,
@@ -246,6 +264,24 @@ snapshot[`F29: agent-client stops after ten iterations (characterization) 1`] = 
 {
   llmCalls: 10,
   rows: [
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          awaiting_human: false,
+          by: "<agent>",
+          cause: "entry",
+          from: null,
+          to: "<agent>",
+        },
+        internal: true,
+        kind: "assignment",
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
     {
       agent_id: "<agent>",
       content: {
@@ -746,6 +782,24 @@ snapshot[`F29: agent-client greets a new conversation (characterization) 1`] = `
 {
   llmCalls: 0,
   rows: [
+    {
+      agent_id: "<agent>",
+      content: {
+        data: {
+          awaiting_human: false,
+          by: "<agent>",
+          cause: "entry",
+          from: null,
+          to: "<agent>",
+        },
+        internal: true,
+        kind: "assignment",
+        type: "data",
+        version: "1",
+      },
+      sender_address: null,
+      status: {},
+    },
     {
       agent_id: "<agent>",
       content: {

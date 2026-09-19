@@ -967,3 +967,32 @@ begin
   return null;
 end;
 $$;
+
+-- H1. The assignment columns on public.conversations have one writer:
+-- public.set_conversation_assignment (04-13), which changes them AND records
+-- the audit note in the same transaction. This refuses every other path.
+--
+-- It cannot be an RLS policy: policies cannot restrict columns, and members
+-- legitimately hold UPDATE on `local` conversations (05-03) for renaming and
+-- retyping. A BEFORE trigger can, because it sees old and new side by side.
+--
+-- The flag is transaction-local (`set_config(..., true)`) and set only inside
+-- the assignment function, so it cannot leak into a later statement of the
+-- same session. PostgREST exposes no way to set it: `set_config` is not a
+-- callable RPC here, and a GUC set through a different connection does not
+-- reach this transaction.
+create function public.guard_conversation_assignment() returns trigger
+language plpgsql
+security definer
+set search_path to ''
+as $$
+begin
+  if current_setting('app.assignment_writer', true) = 'on' then
+    return new;
+  end if;
+
+  raise exception
+    'conversation assignment is written by set_conversation_assignment only'
+    using errcode = '42501';
+end;
+$$;

@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+- **A conversation now has an assigned agent** (H1). `conversations` carries
+  `assigned_agent_id` and `assigned_at`, and `organizations` carries
+  `entry_agent_id` — the agent that takes a conversation nobody has taken yet.
+  Before this, who answered was decided fresh on every inbound message ("the
+  oldest AI agent of the organization"), so creating an agent could silently
+  move conversations already underway onto it. The first inbound message of a
+  conversation now assigns it, and every later message goes to the same agent.
+
+  For integrators:
+  - The three columns are readable over REST and **not writable**: no API role
+    can UPDATE them (a direct write fails with `42501`). The member-facing way
+    to change an assignment arrives with H3 (`assign_conversation`).
+  - Assigning emits an `update` event of `conversations` on your webhooks — a
+    new source of events on a table you may already subscribe to. Expect one per
+    conversation the first time it is answered.
+  - Each change also inserts a **record-only message** in the conversation:
+    `content.internal = true`, `content.kind = "assignment"`, `status = {}`
+    (never dispatched, never billed), with
+    `data: { from, to, awaiting_human, by, cause }` plus `category`/`reason`
+    when the change carries them. `cause` is one of `routing`, `entry`,
+    `escalation`, `manual`, `takeover`, `expiry`. If you count outgoing messages
+    by `sender_address is null`, filter `content->internal` out, as tool traces
+    and agent errors already required.
+
+- **A `draft` agent no longer answers contacts** (H1). Selection excluded
+  `inactive` only, so the mode the dashboard offers for "not ready yet" answered
+  real conversations — and, being usually the oldest row, won over every live
+  agent. `draft` is now excluded everywhere, including in a `local` DM addressed
+  to it.
+
+- **The AI no longer answers in groups by default** (H1). Nothing consulted
+  `conversations.type`, so in a WhatsApp group the agent replied to whoever
+  wrote last. On external services the AI now answers only in `direct`
+  conversations (or ones not classified yet); an organization that wants the old
+  behaviour sets `extra.ai_in_groups = true`.
+
 - **An agent no longer goes silent when the database clock runs ahead** (P1).
   agent-client read a conversation's history up to its own `now()`, while a
   message's `timestamp` is stamped by the database. When the database clock was

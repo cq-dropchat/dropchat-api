@@ -113,8 +113,15 @@ async function written(client: Client, record: MessageRow) {
     .select("sender_address, agent_id, content, status")
     .eq("conversation_id", record.conversation_id)
     .gt("created_at", record.created_at)
-    .order("timestamp")
+    // Both clocks, in the order that makes each one decisive where it is the
+    // reliable one. `created_at` is the database's and separates writes:
+    // H1's assignment note is its own transaction, so it lands where it was
+    // written (ordering by `timestamp` put it among the tool traces or not,
+    // depending on a millisecond of skew between the database's clock and the
+    // function's). `timestamp` is agent-client's own and separates the rows
+    // of ONE batch, which share a `created_at` — a tool use from its result.
     .order("created_at")
+    .order("timestamp")
     .throwOnError();
   return data;
 }

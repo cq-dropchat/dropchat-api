@@ -8,6 +8,7 @@ import {
   type MessageRow,
 } from "../_shared/supabase.ts";
 import type { AgentRowWithExtra, ContactInfo } from "./protocols/base.ts";
+import type { OrganizationExtra } from "../_shared/types/extra_types.ts";
 import { fromContact } from "./conversation.ts";
 
 export /**
@@ -105,30 +106,115 @@ export async function loadContact(
   return contact;
 }
 
-// AGENT SELECTION
+// AGENT SELECTION (H1)
 //
-// External: the oldest active AI agent in the organization — an AI agent
-// being one that is nobody's membership (no user_id) and has not been
-// retired (deleted_at). There is no per-conversation override: nothing can
-// write one, since members hold no UPDATE on conversations outside `local`.
+// Who answers is a property OF THE CONVERSATION, not a fresh decision per
+// message. The order:
 //
-// Local DM: there is nothing to select — the address names the agent.
+//   local DM   the address names the agent; nothing to assign.
+//   group      nobody, unless the organization turned `ai_in_groups` on.
+//   assigned   an eligible AI answers; a human keeps it (the AI stays out);
+//              an agent that is no longer eligible falls through to routing.
+//   otherwise  the entry agent if it is eligible, else the oldest eligible
+//              one — and the result is PERSISTED by the caller, so the next
+//              message of this conversation does not re-decide.
 //
-// Selected before the delay because the delay is the agent's own.
+// Eligible means: nobody's membership (no user_id), not retired
+// (deleted_at), and a mode that is neither `inactive` nor `draft`. `draft`
+// was selectable before H1 — the mode the UI offers for "not ready yet"
+// answered real contacts, and being the oldest row it won over every live
+// agent.
+//
+// Pure: the caller resolves the assigned agent's row (it may be a human, who
+// is not in the AI-only embed) and performs the write.
+
+/** The vocabulary of `set_conversation_assignment`; M1 aggregates on it. */
+export type AssignmentCause =
+  | "routing"
+  | "entry"
+  | "escalation"
+  | "manual"
+  | "takeover"
+  | "expiry";
+
+/** What the selection needs from the organization. */
+export type EntryConfig = {
+  entry_agent_id: string | null;
+  extra: OrganizationExtra | null;
+};
+
+export type AgentSelection = {
+  agent: AgentRowWithExtra | undefined;
+  /**
+   * Set when the conversation's assignment has to be written. Absent when
+   * the conversation already points at the agent that answers — or when
+   * nobody answers, which is not a decision worth recording.
+   */
+  assign?: { agent_id: string | null; cause: AssignmentCause };
+};
+
+export function isEligibleAI(agent: AgentRow): boolean {
+  const mode = (agent as AgentRowWithExtra).extra?.mode;
+
+  return agent.user_id === null &&
+    agent.deleted_at === null &&
+    mode !== "inactive" &&
+    mode !== "draft";
+}
+
 export function selectAgent(
   conv: ConversationRow,
   agents: AgentRow[],
   dmAI: AgentRowWithExtra | undefined,
-): AgentRowWithExtra | undefined {
-  return conv.service === "local"
-    ? (dmAI?.extra?.mode !== "inactive" ? dmAI : undefined)
-    : agents
-      .filter((a) =>
-        a.user_id === null && a.deleted_at === null &&
-        a.extra?.mode !== "inactive"
-      )
+  org: EntryConfig,
+): AgentSelection {
+  if (conv.service === "local") {
+    // A DM's roster IS the decision; an assignment would have nothing to add.
+    return { agent: dmAI && isEligibleAI(dmAI) ? dmAI : undefined };
+  }
+
+  // NO AI IN GROUPS (H1)
+  //
+  // Nothing looked at `conversations.type` before, so the AI answered inside
+  // WhatsApp groups, to whoever wrote last. With one agent assigned per
+  // conversation and escalation to a human, a room of participants has no
+  // clear semantics — who is the contact being handed over? Opt-in per
+  // organization for the cases that do want it.
+  if (conv.type && conv.type !== "direct" && !org.extra?.ai_in_groups) {
+    return { agent: undefined };
+  }
+
+  const eligible = agents.filter(isEligibleAI) as AgentRowWithExtra[];
+
+  if (conv.assigned_agent_id) {
+    const assigned = agents.find((a) => a.id === conv.assigned_agent_id);
+
+    if (assigned && isEligibleAI(assigned)) {
+      return { agent: assigned as AgentRowWithExtra };
+    }
+
+    // A human holds it (a membership row, or an id the AI-only embed did not
+    // carry and the caller resolved as a member): the AI does not take it
+    // back. Only an explicit hand-back (H3) or a lifecycle expiry (H4) does.
+    if (assigned && assigned.user_id !== null) {
+      return { agent: undefined };
+    }
+
+    // Anything else — retired, inactive, draft, or an agent that no longer
+    // exists — is a dead assignment, and the conversation routes again.
+  }
+
+  const entry = eligible.find((a) => a.id === org.entry_agent_id);
+
+  const agent = entry ??
+    eligible
+      .slice()
       .sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))
-      .at(0) as AgentRowWithExtra | undefined;
+      .at(0);
+
+  return agent
+    ? { agent, assign: { agent_id: agent.id, cause: "entry" } }
+    : { agent: undefined };
 }
 
 // Authorship is space-relative: outside, the peer is whoever carries a

@@ -103,6 +103,10 @@ export async function loadRecentMessages(
     .from("messages")
     .select()
     .eq("conversation_id", incoming.conversation_id)
+    // H1: assignment notes are a record of who answers, addressed to the
+    // people reading the chat — not something the model should read as a
+    // turn. Filtered in the query so both protocols get the same history.
+    .not("content->>kind", "eq", "assignment")
     .gt(
       "timestamp",
       new Date(+new Date() - MESSAGES_TIME_LIMIT).toISOString(),

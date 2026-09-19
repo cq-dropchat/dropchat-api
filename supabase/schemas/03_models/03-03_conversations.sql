@@ -64,6 +64,19 @@ create table public.conversations (
   -- API role UPDATE on any service but `local`: the policy is what keeps
   -- members out, so nothing here needs a column of its own.
   extra jsonb,
+  -- H1: who answers THIS conversation. An AI agent (the one that replies), a
+  -- human member (the AI stays out), or null (nobody has been chosen yet, so
+  -- the next inbound message routes).
+  --
+  -- Not a column any API role may write: 05-03 grants no UPDATE outside
+  -- `local`, and on `local` the guard trigger below refuses it. Every change
+  -- goes through public.set_conversation_assignment (04-13), which writes the
+  -- audit note in the same transaction.
+  assigned_agent_id uuid,
+  -- When the current assignment was made — how long the human has had it
+  -- (H4's TTL) and what the UI shows. Moves only when assigned_agent_id
+  -- actually changes.
+  assigned_at timestamp with time zone,
   created_at timestamp with time zone default now() not null,
   updated_at timestamp with time zone default now() not null
 );
@@ -180,6 +193,23 @@ when (
   new.service = 'local'::public.service
 )
 execute function public.after_insert_on_local_conversation();
+
+-- H1: the assignment columns have ONE writer,
+-- public.set_conversation_assignment, so that no change can land without its
+-- audit note. Members hold UPDATE on `local` conversations (05-03) and the
+-- policy cannot restrict columns, so the refusal lives here instead — a
+-- BEFORE trigger sees the attempted values, and the assignment function
+-- announces itself with a transaction-local flag nothing else can set
+-- through PostgREST.
+create trigger guard_assignment
+before update
+on public.conversations
+for each row
+when (
+  new.assigned_agent_id is distinct from old.assigned_agent_id
+  or new.assigned_at is distinct from old.assigned_at
+)
+execute function public.guard_conversation_assignment();
 
 create trigger set_updated_at
 before update

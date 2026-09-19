@@ -55,6 +55,10 @@ insert into service_only values
   ('public.finish_organization_export(uuid, text, text)'),
   ('public.expired_organization_exports(integer)'),
   ('public.mark_organization_export_expired(uuid)'),
+  -- H1: the one gate that writes a conversation's assignment, and the
+  -- trigger function that refuses every other path.
+  ('public.set_conversation_assignment(uuid, uuid, boolean, uuid, jsonb)'),
+  ('public.guard_conversation_assignment()'),
   ('billing.renew_subscriptions(integer)'),
   ('billing.grant_included_products(uuid, text, timestamp with time zone)');
 
@@ -74,6 +78,9 @@ select ok(
   (select bool_and(has_function_privilege('service_role', fn::regprocedure, 'execute')) from service_only
    where fn not like '%agent_turn%' and fn not like '%sweep_deletions%' and fn not like '%purge_expired_rows%'
      and fn not like '%request_id_header%'
+     -- guard_conversation_assignment is a trigger function: nothing calls it
+     -- by name, service role included.
+     and fn not like '%guard_conversation_assignment%'
      and fn not like 'billing.%'),
   'service_role still executes them'
 );

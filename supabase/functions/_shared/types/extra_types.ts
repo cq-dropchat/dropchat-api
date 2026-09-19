@@ -19,6 +19,14 @@ export type PreprocessingConfig = {
 export type OrganizationExtra = {
   media_preprocessing?: PreprocessingConfig;
   error_messages_direction?: "internal" | "outgoing";
+  /**
+   * H1: whether the AI answers in conversations that are not `direct`
+   * (WhatsApp groups, channels). Off by default — with one agent assigned per
+   * conversation and escalation to a human, a room of participants has no
+   * clear semantics, and before H1 the AI answered in them by accident,
+   * having never looked at `conversations.type`.
+   */
+  ai_in_groups?: boolean;
 };
 
 export type WhatsAppOrganizationAddressExtra = {

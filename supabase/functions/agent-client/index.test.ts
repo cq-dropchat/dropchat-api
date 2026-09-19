@@ -75,6 +75,9 @@ async function replies(client: ReturnType<typeof service>, since: string) {
     .select("id")
     .eq("conversation_id", CONV_A2)
     .is("sender_address", null)
+    // H1: record-only rows are outgoing rows too (the assignment note carries
+    // no sender_address). What this counts is what the contact would receive.
+    .is("content->internal", null)
     .gte("created_at", since)
     .throwOnError();
   return data.length;
@@ -378,6 +381,197 @@ Deno.test({
     } finally {
       clock.restore();
       llm.restore();
+      await cleanup(client, since);
+    }
+  },
+});
+
+// ---------------------------------------------------------------------------
+// H1 — who answers is a property of the CONVERSATION. Before this, the choice
+// was remade on every message ("the oldest AI agent that is not inactive"), so
+// creating an agent could silently move conversations already underway onto
+// it, and nothing recorded who was answering.
+// ---------------------------------------------------------------------------
+
+async function assignmentOf(client: ReturnType<typeof service>) {
+  const { data } = await client
+    .from("conversations")
+    .select("assigned_agent_id")
+    .eq("id", CONV_A2)
+    .single()
+    .throwOnError();
+
+  return data.assigned_agent_id;
+}
+
+async function assignmentNotes(
+  client: ReturnType<typeof service>,
+  since: string,
+) {
+  const { data } = await client
+    .from("messages")
+    .select("content, status")
+    .eq("conversation_id", CONV_A2)
+    .eq("content->>kind", "assignment")
+    .gte("created_at", since)
+    .throwOnError();
+
+  return data as unknown as {
+    content: { data: Record<string, unknown> };
+    status: Record<string, unknown>;
+  }[];
+}
+
+/**
+ * The entry agent is set explicitly in these two cases. `withTestAgent`
+ * parks Robot A and adds its own agent, but a local database also carries the
+ * retired-and-not-so-retired leftovers of earlier runs (see
+ * IMPLEMENTATION_STATUS), so "the oldest eligible agent" is not a stable
+ * fixture. The entry agent is: it is the organization's own answer to who
+ * takes a new conversation.
+ */
+async function setEntryAgent(
+  client: ReturnType<typeof service>,
+  agentId: string | null,
+) {
+  await client
+    .from("organizations")
+    .update({ entry_agent_id: agentId })
+    .eq("id", fixture.orgA)
+    .throwOnError();
+}
+
+/** The gate is the only writer, so the reset goes through it too. */
+async function unassign(client: ReturnType<typeof service>) {
+  await client.rpc("set_conversation_assignment", {
+    p_conversation_id: CONV_A2,
+    p_agent_id: null as unknown as string,
+    p_awaiting_human: false,
+    p_actor_agent_id: null as unknown as string,
+    p_reason: { cause: "manual" },
+  });
+}
+
+Deno.test({
+  name: "H1: the first answer assigns the conversation and records why",
+  ignore: !up,
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    const client = service();
+    const since = new Date(Date.now() - 1000).toISOString();
+    await unassign(client);
+    await cleanup(client, since);
+    const llm = stubLlm();
+
+    try {
+      await withTestAgent(client, async (agentId) => {
+        await setEntryAgent(client, agentId);
+
+        const m = await inbound(client, "hola");
+        await settle();
+        await invoke(m);
+
+        assertEquals(llm.calls(), 1);
+        assertEquals(await assignmentOf(client), agentId);
+
+        const notes = await assignmentNotes(client, since);
+
+        assertEquals(notes.length, 1);
+        assertEquals(notes[0].content.data.cause, "entry");
+        assertEquals(notes[0].content.data.to, agentId);
+        assertEquals(notes[0].content.data.from, null);
+        // Record-only: unarmed, so no dispatcher ever looks at it.
+        assertEquals(notes[0].status, {});
+      });
+    } finally {
+      llm.restore();
+      await setEntryAgent(client, null);
+      await unassign(client);
+      await cleanup(client, since);
+    }
+  },
+});
+
+Deno.test({
+  name:
+    "H1: the second message keeps the same agent, even if an older one appeared meanwhile",
+  ignore: !up,
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    const client = service();
+    const since = new Date(Date.now() - 1000).toISOString();
+    await unassign(client);
+    await cleanup(client, since);
+    const llm = stubLlm();
+    let intruderId: string | undefined;
+
+    try {
+      await withTestAgent(client, async (agentId) => {
+        await setEntryAgent(client, agentId);
+
+        const m1 = await inbound(client, "hola");
+        await settle();
+        await invoke(m1);
+
+        assertEquals(await assignmentOf(client), agentId);
+
+        // An agent created now but backdated before the one answering: under
+        // the old rule it would have taken over the conversation mid-thread.
+        const { data: intruder } = await client
+          .from("agents")
+          .insert({
+            organization_id: fixture.orgA,
+            name: "Robot H1 intruder",
+            created_at: "2000-01-01T00:00:00.000Z",
+            extra: {
+              mode: "active",
+              protocol: "chat_completions",
+              api_url: "https://api.groq.com/openai/v1",
+              api_key: "sk-test-h1-not-a-key",
+              model: "openai/gpt-oss-20b",
+              instructions: "You are the wrong robot.",
+              response_delay_seconds: 0,
+            },
+          })
+          .select("id")
+          .single()
+          .throwOnError();
+
+        intruderId = intruder.id;
+
+        const m2 = await inbound(client, "¿están?");
+        await settle();
+        await invoke(m2);
+
+        assertEquals(await assignmentOf(client), agentId);
+
+        const { data: answers } = await client
+          .from("messages")
+          .select("agent_id")
+          .eq("conversation_id", CONV_A2)
+          .is("sender_address", null)
+          .is("content->internal", null)
+          .gte("created_at", since)
+          .throwOnError();
+
+        assert(answers.length >= 2);
+        assertEquals(
+          answers.every((a) => a.agent_id === agentId),
+          true,
+        );
+
+        // Assignment happened once: the second message found an owner.
+        assertEquals((await assignmentNotes(client, since)).length, 1);
+      });
+    } finally {
+      llm.restore();
+      if (intruderId) {
+        await client.from("agents").delete().eq("id", intruderId);
+      }
+      await setEntryAgent(client, null);
+      await unassign(client);
       await cleanup(client, since);
     }
   },

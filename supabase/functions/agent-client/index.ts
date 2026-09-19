@@ -15,6 +15,7 @@ import { withRequestLogging } from "../_shared/logger.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { revealAgent } from "../_shared/secrets.ts";
 import {
+  type AgentRow,
   createUnsecureClient,
   type MessageInsert,
   type MessageRow,
@@ -45,6 +46,11 @@ import {
   selectAgent,
   TEAM_CHAT_SERVICES,
 } from "./selection.ts";
+import {
+  assignConversation,
+  clearAssignmentOnRestart,
+  loadAssignedAgent,
+} from "./assignment.ts";
 import { startTyping } from "./typing.ts";
 import { waitForPendingPreprocessing } from "./preprocessing.ts";
 import { buildAgentTools, initMCPServers } from "./toolset.ts";
@@ -72,12 +78,17 @@ export async function handler(req: Request): Promise<Response> {
   // F23: only the agents that can answer — no user_id, not retired. The
   // embed used to carry every member row and retired AI with its `extra`,
   // and all of their secrets were decrypted, on every invocation.
+  //
+  // H1: the relationship is named. organizations.entry_agent_id gave
+  // organizations a SECOND path to agents, and PostgREST refuses an ambiguous
+  // embed outright ("more than one relationship was found") — the query threw
+  // and no contact got an answer until this said which one it means.
 
   const { data: conv } = await client
     .from("conversations")
     .select(`
       *,
-      organizations (*, agents (*))
+      organizations (*, agents!agents_organization_id_fkey (*))
     `)
     .eq("id", incoming.conversation_id)
     .is("organizations.agents.user_id", null)
@@ -109,6 +120,13 @@ export async function handler(req: Request): Promise<Response> {
   // from public.secrets — revealed below for the selected agent only (F23).
   const { agents, ...organization } = org;
 
+  // The embed's generated type went to "one row or null" when H1 added
+  // conversations.assigned_agent_id → agents: PostgREST sees a second path
+  // between the two tables. The query is still the to-many one (it filters
+  // `organizations.agents.user_id`), so the shape is normalized here, once.
+  const aiAgents =
+    (Array.isArray(agents) ? agents : agents ? [agents] : []) as AgentRow[];
+
   // AI DM DETECTION (local only)
   //
   // A local direct's address IS its roster (two agent ids, sorted,
@@ -120,7 +138,7 @@ export async function handler(req: Request): Promise<Response> {
   // attached. This re-verifies what handle_local_message_to_agent already
   // checked: the trigger is the doorbell, this is the authority.
 
-  const dmAI = findDmAI(conv, agents, incoming);
+  const dmAI = findDmAI(conv, aiAgents, incoming);
 
   // NO AI IN TEAM CHAT — except a DM with one.
   //
@@ -162,9 +180,32 @@ export async function handler(req: Request): Promise<Response> {
   //
   // Selected before the delay because the delay is the agent's own.
 
-  const selected = selectAgent(conv, agents, dmAI);
+  // H1: the agent a conversation is assigned to may be a human or a retired
+  // AI, and neither is in the AI-only embed above — so it is resolved here,
+  // and only when there is an assignment the embed did not already carry.
+  const assigned = await loadAssignedAgent(client, conv, aiAgents);
 
-  const agent = selected && await revealAgent(client, selected);
+  const selection = selectAgent(
+    conv,
+    assigned ? [...aiAgents, assigned] : aiAgents,
+    dmAI,
+    organization,
+  );
+
+  // Persisted before the delay, so the conversation has an owner even if this
+  // invocation ends up superseded — and conditionally, so a concurrent
+  // invocation's decision is not overwritten.
+  if (selection.assign) {
+    await assignConversation(
+      client,
+      conv,
+      selection.assign.agent_id,
+      selection.assign.cause,
+      selection.agent?.id ?? null,
+    );
+  }
+
+  const agent = selection.agent && await revealAgent(client, selection.agent);
 
   const fromPeer = peerPredicate(conv, dmAI);
 
@@ -239,7 +280,19 @@ export async function handler(req: Request): Promise<Response> {
 
     // SESSION RESTART if /new is found — USEFUL FOR WHATSAPP TESTING
 
+    const messagesBeforeRestart = messages.length;
+
     await restartSessionIfAsked(client, conv, incoming, messages, fromPeer);
+
+    // H1: `/new` resets the conversation's memory, and who answers it is part
+    // of that — otherwise a restart would keep the human who took it, or an
+    // agent chosen for a conversation that no longer has a history.
+    await clearAssignmentOnRestart(
+      client,
+      conv,
+      messages,
+      messagesBeforeRestart,
+    );
 
     log.info("Contact request", messages.at(-1)?.content);
 
