@@ -1,3 +1,4 @@
+import { isServiceToken } from "../_shared/service_auth.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
 import { withRequestLogging } from "../_shared/logger.ts";
@@ -26,7 +27,6 @@ import { insertLog } from "../_shared/logs.ts";
 const API_VERSION = "v24.0";
 const DEFAULT_ACCESS_TOKEN = Deno.env.get("META_SYSTEM_USER_ACCESS_TOKEN") ||
   "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // A business-scoped user ID (BSUID) is the user's ISO 3166 alpha-2 country code,
 // a period, then alphanumerics (e.g. US.13491208655302741918; parent BSUIDs add
@@ -493,7 +493,7 @@ export async function handler(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
 
-  if (token !== SERVICE_ROLE_KEY) {
+  if (!isServiceToken(token)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

@@ -16,6 +16,7 @@
 // when other members' UIs can attribute the message — clients should prefer
 // not to render unechoed (sender null) rows in Slack conversations to avoid
 // mis-attributing them as their own.
+import { isServiceToken } from "../_shared/service_auth.ts";
 import { revealAddress } from "../_shared/secrets.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Context, Hono } from "@hono/hono";
@@ -36,8 +37,6 @@ import {
   SlackError,
 } from "../_shared/slack.ts";
 import { syncBotConnection, syncConnection } from "./sync.ts";
-
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // authorize-url only composes the public OAuth URL (client_id + scopes);
 // refresh-tokens authenticates with the service-role key (cron).
@@ -459,7 +458,7 @@ app.delete("/slack-management/connect", async (c) => {
 app.post("/slack-management/refresh-tokens", async (c) => {
   const token = c.req.header("Authorization")?.replace("Bearer ", "");
 
-  if (token !== SERVICE_ROLE_KEY) {
+  if (!isServiceToken(token)) {
     throw new HTTPException(401, { message: "Unauthorized" });
   }
 

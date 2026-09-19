@@ -26,6 +26,7 @@
 //
 // `media_url` is a short-lived signed download URL for `content.file.uri`
 // (`internal://media/...`) so the connector never needs storage credentials.
+import { isServiceToken } from "../_shared/service_auth.ts";
 import * as log from "../_shared/logger.ts";
 import { withRequestLogging } from "../_shared/logger.ts";
 import {
@@ -40,8 +41,6 @@ import {
   releaseDispatch,
 } from "../_shared/dispatch.ts";
 import type { Json } from "../_shared/db_types.ts";
-
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 /** Derives the service from the function slug (e.g. /whatsapp-web-dispatcher)
  * or, when invoked under the generic slug, from the subpath
@@ -81,7 +80,7 @@ export async function handler(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
 
-  if (token !== SERVICE_ROLE_KEY) {
+  if (!isServiceToken(token)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

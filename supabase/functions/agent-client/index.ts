@@ -8,6 +8,7 @@
 //   toolset.ts        MCP servers and the tools offered per iteration
 //   tool_uses.ts      running tool uses into result rows
 //   store.ts          storing an iteration; the record-only error row
+import { isServiceToken } from "../_shared/service_auth.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import * as log from "../_shared/logger.ts";
 import { withRequestLogging } from "../_shared/logger.ts";
@@ -54,13 +55,11 @@ export type { AgentTool } from "./agent_tool.ts";
 
 const RESPONSE_DELAY_SECS = 3; // 3 seconds
 
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
 export async function handler(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
 
-  if (token !== SERVICE_ROLE_KEY) {
+  if (!isServiceToken(token)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

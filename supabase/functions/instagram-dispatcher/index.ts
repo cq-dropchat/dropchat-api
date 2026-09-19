@@ -1,3 +1,4 @@
+import { isServiceToken } from "../_shared/service_auth.ts";
 import { getAddressSecrets } from "../_shared/secrets.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as log from "../_shared/logger.ts";
@@ -27,7 +28,6 @@ import { insertLog } from "../_shared/logs.ts";
 import { Json } from "../_shared/db_types.ts";
 
 const API_VERSION = "v25.0";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 class InstagramError extends Error {
   constructor(
@@ -227,7 +227,7 @@ export async function handler(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
 
-  if (token !== SERVICE_ROLE_KEY) {
+  if (!isServiceToken(token)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

@@ -1,3 +1,4 @@
+import { isServiceToken } from "../_shared/service_auth.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createUnsecureClient } from "../_shared/supabase.ts";
@@ -27,8 +28,6 @@ import { withRequestLogging } from "../_shared/logger.ts";
  * content-addressed, so a shared one is kept. Removing an object already gone
  * is a no-op, so a run that dies before forgetting its rows is safe to repeat.
  */
-
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 const BUCKET = "media";
 const LIST_LIMIT = 1000; // max page size for Storage list()
@@ -184,7 +183,7 @@ export async function handler(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
 
-  if (token !== SERVICE_ROLE_KEY) {
+  if (!isServiceToken(token)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

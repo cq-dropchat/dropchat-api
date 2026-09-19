@@ -1,3 +1,4 @@
+import { isServiceToken } from "../_shared/service_auth.ts";
 import type { ApiKeyRow } from "../_shared/types/database_types.ts";
 import { findApiKey } from "../_shared/api_keys.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -29,8 +30,6 @@ import {
   requireRoles,
   requireScope,
 } from "../_shared/management_auth.ts";
-
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Routes that do not use the user/API-key auth middleware. Each has its own
 // auth: an onboarding token, the service-role key, or a signed_request HMAC.
@@ -381,7 +380,7 @@ app.post("/instagram-management/onboard", async (c) => {
 app.post("/instagram-management/refresh-tokens", async (c) => {
   const token = c.req.header("Authorization")?.replace("Bearer ", "");
 
-  if (token !== SERVICE_ROLE_KEY) {
+  if (!isServiceToken(token)) {
     throw new HTTPException(401, { message: "Unauthorized" });
   }
 

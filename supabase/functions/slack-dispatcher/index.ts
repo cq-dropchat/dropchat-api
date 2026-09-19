@@ -12,6 +12,7 @@
 // external_id is stamped as `${team}:${channel}:${ts}` — the same format the
 // webhook uses — so the echo Slack sends back merges into this row (or, if
 // the echo lands first, commitDispatchedMessage folds the duplicate).
+import { isServiceToken } from "../_shared/service_auth.ts";
 import * as log from "../_shared/logger.ts";
 import { withRequestLogging } from "../_shared/logger.ts";
 import {
@@ -37,8 +38,6 @@ import {
   SlackError,
 } from "../_shared/slack.ts";
 import { shortcodeFromEmoji } from "../_shared/emoji.ts";
-
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 /**
  * Transient Slack errors worth retrying (the retry cron re-fires pending
@@ -299,7 +298,7 @@ async function send(
 export async function handler(req: Request): Promise<Response> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
 
-  if (token !== SERVICE_ROLE_KEY) {
+  if (!isServiceToken(token)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

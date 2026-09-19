@@ -1,3 +1,4 @@
+import { isServiceToken } from "../_shared/service_auth.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createUnsecureClient } from "../_shared/supabase.ts";
 import type { Database } from "../_shared/types/database_types.ts";
@@ -19,7 +20,6 @@ import { buildOrganizationExport } from "./export.ts";
  * function's memory or Storage's upload limit ends `failed` with the reason.
  */
 
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const BUCKET = "exports";
 
 type Client = SupabaseClient<Database>;
@@ -50,7 +50,7 @@ async function expireExports(client: Client): Promise<number> {
 
 export async function handler(req: Request): Promise<Response> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
-  if (!SERVICE_ROLE_KEY || token !== SERVICE_ROLE_KEY) {
+  if (!isServiceToken(token)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

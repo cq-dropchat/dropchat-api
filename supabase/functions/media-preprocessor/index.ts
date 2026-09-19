@@ -1,3 +1,4 @@
+import { isServiceToken } from "../_shared/service_auth.ts";
 import {
   DEFAULT_MAX_OUTPUT_TOKENS,
   recordAiConsumption,
@@ -119,8 +120,6 @@ function calculateCost(
 const MAX_SMALL_DOCUMENT_SIZE = 2 * 1000; // 2 KB
 const INLINE_DATA_SIZE_LIMIT = 19 * 1000 * 1000; // 19MB
 
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
 // F12: a claim older than this belongs to an invocation that died; the same
 // window the `preprocess-pending-messages` sweep uses.
 const PREPROCESSING_LEASE_MS = 10 * 60 * 1000;
@@ -129,7 +128,7 @@ export async function handler(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
 
-  if (token !== SERVICE_ROLE_KEY) {
+  if (!isServiceToken(token)) {
     return new Response("Unauthorized", { status: 401 });
   }
 
