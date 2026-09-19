@@ -111,3 +111,21 @@ entrypoint = "./functions/slack-webhook/index.ts"
 verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/slack-dispatcher/index.ts"
+
+# Production overrides. `config.toml` is the LOCAL development config, and both
+# `supabase config push` and the GitHub integration apply it to the linked
+# project — pushing `site_url = localhost` over the real one. A [remotes.<name>]
+# block whose project_id matches the target wins for that project, so the
+# values that differ between a laptop and production live here.
+[remotes.production]
+project_id = "qqfrzurledgywyhcxdse"
+
+[remotes.production.auth]
+site_url = "https://dropchat-ui.pages.dev"
+additional_redirect_urls = ["https://dropchat-ui.pages.dev/**"]
+
+# Off in production until the MCP clients are wanted there: enabled, any client
+# can register itself against the project and authenticate.
+[remotes.production.auth.oauth_server]
+enabled = false
+authorization_url_path = "/oauth/consent"
