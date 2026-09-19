@@ -25,7 +25,7 @@ snapshot[`H2 characterization: chat completions, external conversation 1`] = `
     },
     {
       content: "Soy Carla del equipo, ya te lo cambio: es el 4021",
-      role: "user",
+      role: "assistant",
     },
     {
       content: "gracias Carla",
@@ -49,7 +49,7 @@ snapshot[`H2 characterization: responses, external conversation 1`] = `
     },
     {
       content: "Soy Carla del equipo, ya te lo cambio: es el 4021",
-      role: "user",
+      role: "assistant",
     },
     {
       content: "gracias Carla",
@@ -95,4 +95,30 @@ snapshot[`H2 characterization: chat completions, local DM 1`] = `
   ],
   tools: [],
 }
+`;
+
+snapshot[`H2: the brand voice leads the system prompt, the agent's instructions follow 1`] = `
+"Tutea al cliente. Firma como «el equipo».
+
+Eres Sofía, la asistente de la tienda.
+
+{
+  now: '<now>',
+  user: {
+    name: 'Pedro',
+    phone: '+56912345678'
+  }
+}"
+`;
+
+snapshot[`H2: an organization with no brand voice keeps the prompt it had 1`] = `
+"Eres Sofía, la asistente de la tienda.
+
+{
+  now: '<now>',
+  user: {
+    name: 'Pedro',
+    phone: '+56912345678'
+  }
+}"
 `;

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- **What a human of the organization typed is no longer read as the customer's
+  words** (H2). Building the history for the model, the role of a message was
+  decided by "did THIS agent write it" (`agent_id === agent.id`), so a reply a
+  person sent by hand arrived as `user`: the agent answered a colleague's
+  promise as if the customer had asked for it, or contradicted it in the next
+  turn. On external services the role now follows authorship of the SPACE —
+  everything the company sent (AI or human) is `assistant`, everything with a
+  `sender_address` is `user`. In a `local` DM the old rule stands, because there
+  the peer really is a colleague.
+
+  This changes what the model reads in conversations already underway, so deploy
+  it when traffic is low.
+
+- **An organization has a brand voice** (H2). `organizations.extra.brand_voice`
+  (free text: tone, tú/usted, how to sign off) leads the system prompt of every
+  one of its agents, ahead of the agent's own instructions. The order of the
+  prompt is now fixed: brand voice → business profile → agent instructions →
+  guardrails → runtime context (date, contact). Unset changes nothing.
+
 - **A conversation now has an assigned agent** (H1). `conversations` carries
   `assigned_agent_id` and `assigned_at`, and `organizations` carries
   `entry_agent_id` — the agent that takes a conversation nobody has taken yet.

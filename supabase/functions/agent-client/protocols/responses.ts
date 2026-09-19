@@ -27,9 +27,9 @@ import type { AgentTool } from "../agent_tool.ts";
 import * as log from "../../_shared/logger.ts";
 import { getFileMetadata } from "../../_shared/media.ts";
 import { serializePartAsXML } from "./serializer.ts";
+import { buildSystemPrompt, historyRole } from "./prompt.ts";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
-import { inspect } from "node:util";
 dayjs.extend(utc);
 
 // Handler for the Open Responses protocol (https://openresponses.org), the
@@ -236,7 +236,7 @@ export class ResponsesHandler
    */
   private toResponseInput(row: MessageRow): ResponseInputItem {
     const part = row.content as Part & ToolInfo;
-    const role = row.agent_id === this.context.agent.id ? "assistant" : "user";
+    const role = historyRole(this.context, row);
 
     if (part.tool?.provider === "local") {
       const name = ["label" in part.tool && part.tool.label, part.tool.name]
@@ -325,30 +325,9 @@ export class ResponsesHandler
       this.toResponseInput(row)
     );
 
-    // Runtime context, delivered via the `instructions` field (the Responses
-    // analog of Chat Completions' leading system message).
-    const contextInfo = {
-      now: dayjs.utc().format("dddd, YYYY-MM-DD HH:mm [UTC]"),
-      user: {
-        name: this.context.contact?.name,
-        // The '+address' spelling is a phone-space thing; a local DM's
-        // address is a roster of agent ids, not something to dial.
-        phone: this.context.conversation.service !== "local" &&
-            this.context.conversation.address
-          ? "+" + this.context.conversation.address
-          : undefined,
-      },
-    };
-
-    let instructions = inspect(contextInfo, {
-      compact: false,
-      depth: Infinity,
-      colors: false,
-    });
-
-    if (agent.extra.instructions) {
-      instructions = agent.extra.instructions + "\n\n" + instructions;
-    }
+    // Delivered via the `instructions` field — the Responses analog of Chat
+    // Completions' leading system message, and the same string.
+    const instructions = buildSystemPrompt(this.context);
 
     const tools: ResponsesTool[] = this.tools.map((tool) => ({
       type: "function" as const,

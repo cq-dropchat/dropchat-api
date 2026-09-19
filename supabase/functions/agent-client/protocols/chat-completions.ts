@@ -36,9 +36,9 @@ import type { AgentTool } from "../agent_tool.ts";
 import * as log from "../../_shared/logger.ts";
 import { getFileMetadata } from "../../_shared/media.ts";
 import { serializePartAsXML } from "./serializer.ts";
+import { buildSystemPrompt, historyRole } from "./prompt.ts";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
-import { inspect } from "node:util";
 dayjs.extend(utc);
 
 // Whether this agent answers by calling `respond` (several messages per
@@ -266,7 +266,7 @@ export class ChatCompletionsHandler
     row: MessageRow,
   ): ChatCompletionMessageParam {
     const part = row.content as Part & ToolInfo;
-    const role = row.agent_id === this.context.agent.id ? "assistant" : "user";
+    const role = historyRole(this.context, row);
 
     if (part.tool?.provider === "local") {
       if (part.tool.event === "use") {
@@ -386,32 +386,9 @@ export class ChatCompletionsHandler
 
     const chatCompletionMessages = this.mergeToolUseMessages(messages);
 
-    const context = {
-      now: dayjs.utc().format("dddd, YYYY-MM-DD HH:mm [UTC]"),
-      user: {
-        name: this.context.contact?.name,
-        // The '+address' spelling is a phone-space thing; a local DM's
-        // address is a roster of agent ids, not something to dial.
-        phone: this.context.conversation.service !== "local" &&
-            this.context.conversation.address
-          ? "+" + this.context.conversation.address
-          : undefined,
-      },
-    };
-
-    let content = inspect(context, {
-      compact: false,
-      depth: Infinity,
-      colors: false,
-    });
-
-    if (agent.extra.instructions) {
-      content = agent.extra.instructions + "\n\n" + content;
-    }
-
     chatCompletionMessages.unshift({
       role: "system",
-      content,
+      content: buildSystemPrompt(this.context),
     });
 
     const chatCompletionTools: ChatCompletionTool[] = this.tools.map((

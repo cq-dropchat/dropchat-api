@@ -12,6 +12,7 @@
 // change — or contradicts a promise the company already made.
 //
 // Pure: no database, no network.
+import { assertEquals } from "jsr:@std/assert@1";
 import { assertSnapshot } from "jsr:@std/testing@1/snapshot";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
@@ -145,4 +146,140 @@ Deno.test("H2 characterization: chat completions, local DM", async (t) => {
   ).prepareRequest();
 
   await assertSnapshot(t, stable(request));
+});
+
+// ---------------------------------------------------------------------------
+// H2 — the rule itself, stated as cases rather than as a snapshot.
+// ---------------------------------------------------------------------------
+
+function roles(request: { messages: { role: string; content?: unknown }[] }) {
+  return request.messages
+    .filter((m) => m.role !== "system")
+    .map((m) => [m.role, m.content]);
+}
+
+Deno.test("H2: on an external service, what the company said is assistant — whoever typed it", async () => {
+  const chat = await new ChatCompletionsHandler(
+    [],
+    context("whatsapp"),
+    noClient,
+  )
+    .prepareRequest();
+
+  assertEquals(roles(chat), [
+    ["user", "hola, quiero cambiar mi pedido"],
+    ["assistant", "¡Hola! ¿Qué pedido sería?"],
+    ["assistant", "Soy Carla del equipo, ya te lo cambio: es el 4021"],
+    ["user", "gracias Carla"],
+  ]);
+
+  const responses = await new ResponsesHandler(
+    [],
+    context("whatsapp"),
+    noClient,
+  )
+    .prepareRequest();
+
+  assertEquals(
+    responses.input.map((i) => [
+      (i as { role?: string }).role,
+      (i as { content?: unknown }).content,
+    ]),
+    [
+      ["user", "hola, quiero cambiar mi pedido"],
+      ["assistant", "¡Hola! ¿Qué pedido sería?"],
+      ["assistant", "Soy Carla del equipo, ya te lo cambio: es el 4021"],
+      ["user", "gracias Carla"],
+    ],
+  );
+});
+
+Deno.test("H2: in a local DM the rule does not move — the peer is a colleague", async () => {
+  const chat = await new ChatCompletionsHandler(
+    [],
+    context("local", [
+      message("l1", "probá contestar esto", { agent_id: HUMAN }),
+      message("l2", "listo", { agent_id: AI }),
+    ]),
+    noClient,
+  ).prepareRequest();
+
+  assertEquals(roles(chat), [
+    ["user", "probá contestar esto"],
+    ["assistant", "listo"],
+  ]);
+});
+
+Deno.test("H2: the agent's own error notes stay assistant", async () => {
+  // Record-only rows the agent wrote about itself. They were `assistant`
+  // before H2 (same agent id) and must stay there: the new rule reads
+  // authorship of the SPACE, and these are ours.
+  const errorRow = {
+    ...message("e1", "No pude consultar el stock.", { agent_id: AI }),
+    content: {
+      version: "1",
+      type: "text",
+      kind: "text",
+      internal: true,
+      text: "No pude consultar el stock.",
+    },
+  } as unknown as MessageRow;
+
+  const chat = await new ChatCompletionsHandler(
+    [],
+    context("whatsapp", [HISTORY[0], errorRow]),
+    noClient,
+  ).prepareRequest();
+
+  assertEquals(roles(chat), [
+    ["user", "hola, quiero cambiar mi pedido"],
+    ["assistant", "No pude consultar el stock."],
+  ]);
+});
+
+// ---------------------------------------------------------------------------
+// H2 — brand voice, and the order of the system prompt.
+//
+// Fixed for the whole spec: brand voice → business profile (T1) → the agent's
+// own instructions → guardrails (T6) → runtime context. The two middle blocks
+// do not exist yet; the order does, so nothing has to move when they arrive.
+// ---------------------------------------------------------------------------
+
+function withBrandVoice(service: ConversationRow["service"] = "whatsapp") {
+  const ctx = context(service);
+  ctx.organization = {
+    ...ctx.organization,
+    extra: { brand_voice: "Tutea al cliente. Firma como «el equipo»." },
+  } as unknown as OrganizationRow;
+  return ctx;
+}
+
+Deno.test("H2: the brand voice leads the system prompt, the agent's instructions follow", async (t) => {
+  const chat = await new ChatCompletionsHandler([], withBrandVoice(), noClient)
+    .prepareRequest();
+
+  const system = chat.messages[0] as { role: string; content: string };
+
+  assertEquals(system.role, "system");
+  await assertSnapshot(t, stable(system.content));
+
+  const responses = await new ResponsesHandler([], withBrandVoice(), noClient)
+    .prepareRequest();
+
+  // Both protocols say the same thing; Responses carries it in `instructions`.
+  assertEquals(stable(responses.instructions), stable(system.content));
+});
+
+Deno.test("H2: an organization with no brand voice keeps the prompt it had", async (t) => {
+  const chat = await new ChatCompletionsHandler(
+    [],
+    context("whatsapp"),
+    noClient,
+  )
+    .prepareRequest();
+
+  await assertSnapshot(
+    t,
+    stable((chat.messages[0] as { content: string }).content),
+  );
 });

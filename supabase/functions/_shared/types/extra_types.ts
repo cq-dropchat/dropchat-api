@@ -27,6 +27,12 @@ export type OrganizationExtra = {
    * having never looked at `conversations.type`.
    */
   ai_in_groups?: boolean;
+  /**
+   * H2: how the organization sounds — tone, tú/usted, how it signs off. One
+   * voice of the brand (D3), so it leads the system prompt of every agent,
+   * ahead of the agent's own instructions.
+   */
+  brand_voice?: string;
 };
 
 export type WhatsAppOrganizationAddressExtra = {
