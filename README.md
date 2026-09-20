@@ -1079,27 +1079,26 @@ This event-driven flow ensures that each component is decoupled and scalable.
   from the external service, or managed by members on the internal `local` chat.
   Also carries each member's own state for the conversation.
 - **logs**: Application-level log entries (errors, warnings) written by Edge
-  Functions. Per-organization and readable by its members — it is an audit
-  trail for the tenant, not crash reporting for the product (see
-  **error_issues**).
+  Functions. Per-organization and readable by its members — it is an audit trail
+  for the tenant, not crash reporting for the product (see **error_issues**).
 - **error_issues**: One row per distinct error in the product, browser and Edge
   Functions alike. Not per-organization and readable only by a
   **platform_admins** row. See "Error panel" below.
 - **error_settings**: Single row holding the error panel's baseline switch.
-- **platform_admins**: Who may read the error panel. The only permission in
-  this schema that is not a membership in an organization.
+- **platform_admins**: Who may read the error panel. The only permission in this
+  schema that is not a membership in an organization.
 
 ## Error panel
 
-A crash reporter without an external APM, at `/errors` in the UI (no menu
-entry: it crosses tenants, so it does not belong in a customer's settings).
+A crash reporter without an external APM, at `/errors` in the UI (no menu entry:
+it crosses tenants, so it does not belong in a customer's settings).
 
-The unit of storage is the *issue* — one row per distinct error — not the
+The unit of storage is the _issue_ — one row per distinct error — not the
 occurrence. A repeat costs an UPDATE of two counters, so the table grows with
 the number of distinct bugs and not with traffic. Errors are grouped by a
-fingerprint of source, kind, culprit and the message with its ids, numbers,
-URLs and timestamps normalized away (`public.normalize_error_message`), so the
-same bug seen on a hundred conversations is one row.
+fingerprint of source, kind, culprit and the message with its ids, numbers, URLs
+and timestamps normalized away (`public.normalize_error_message`), so the same
+bug seen on a hundred conversations is one row.
 
 **The baseline** is what keeps the panel about the present. While
 `error_settings.baseline_open` is true — which is the shipped state, including
