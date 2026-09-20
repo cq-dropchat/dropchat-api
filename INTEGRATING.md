@@ -24,7 +24,7 @@ API key. Everything else is REST.
 
 ## Conventions
 
-- **Base URL:** `https://nheelwshzbgenpavwhcy.supabase.co`
+- **Base URL:** `https://qqfrzurledgywyhcxdse.supabase.co`
 - **Dashboard:** `https://web.openbsp.dev`
 - Every REST call sends **two** headers:
 
@@ -71,11 +71,11 @@ PostgREST is exposed at `/rest/v1/<table>`; edge functions at
 
 ```bash
 # Connected accounts (phone numbers) in your org
-curl 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/organizations_addresses?service=eq.whatsapp&select=address,status,extra' \
+curl 'https://qqfrzurledgywyhcxdse.supabase.co/rest/v1/organizations_addresses?service=eq.whatsapp&select=address,status,extra' \
   -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_API_KEY>'
 
 # Recent platform/Meta events for your org (account updates, signup/history errors)
-curl 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/logs?select=level,category,service,message,metadata,created_at&order=created_at.desc&limit=20' \
+curl 'https://qqfrzurledgywyhcxdse.supabase.co/rest/v1/logs?select=level,category,service,message,metadata,created_at&order=created_at.desc&limit=20' \
   -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_API_KEY>'
 ```
 
@@ -85,7 +85,7 @@ So your app is _pushed_ events. Dashboard → **Settings → Webhooks → New**,
 via REST:
 
 ```bash
-curl -X POST 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/webhooks' \
+curl -X POST 'https://qqfrzurledgywyhcxdse.supabase.co/rest/v1/webhooks' \
   -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_API_KEY>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -163,7 +163,7 @@ This is how you hand a customer a link to connect their WhatsApp. Create an
 set `callback_url` + `verify_token` (the per-account webhook override):
 
 ```bash
-curl -X POST 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/onboarding_tokens?select=id' \
+curl -X POST 'https://qqfrzurledgywyhcxdse.supabase.co/rest/v1/onboarding_tokens?select=id' \
   -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OWNER_OPENBSP_API_KEY>' \
   -H 'Content-Type: application/json' -H 'Prefer: return=representation' \
   -d '{
@@ -401,11 +401,11 @@ If you'd rather pull than receive pushes:
 
 ```bash
 # Has the account connected yet?
-curl 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/organizations_addresses?service=eq.whatsapp&status=eq.connected&select=address,extra,updated_at' \
+curl 'https://qqfrzurledgywyhcxdse.supabase.co/rest/v1/organizations_addresses?service=eq.whatsapp&status=eq.connected&select=address,extra,updated_at' \
   -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_API_KEY>'
 
 # Any onboarding/Meta errors?
-curl 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/logs?level=eq.error&select=category,service,message,metadata,created_at&order=created_at.desc' \
+curl 'https://qqfrzurledgywyhcxdse.supabase.co/rest/v1/logs?level=eq.error&select=category,service,message,metadata,created_at&order=created_at.desc' \
   -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_API_KEY>'
 ```
 
@@ -425,16 +425,16 @@ so its numbers are of the export and not of the database.
 
 ```bash
 # File the export (returns its id; while one is pending you get that one)
-curl -X POST 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/rpc/request_organization_export' \
+curl -X POST 'https://qqfrzurledgywyhcxdse.supabase.co/rest/v1/rpc/request_organization_export' \
   -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_OWNER_API_KEY>' \
   -H 'Content-Type: application/json' -d '{"_organization_id": "<ORG_ID>"}'
 
 # Wait for status "ready" (pending → processing → ready | failed)
-curl 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/organization_exports?id=eq.<EXPORT_ID>&select=status,object_name,error,expires_at' \
+curl 'https://qqfrzurledgywyhcxdse.supabase.co/rest/v1/organization_exports?id=eq.<EXPORT_ID>&select=status,object_name,error,expires_at' \
   -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_OWNER_API_KEY>'
 
 # Sign a download URL for object_name (valid 1 hour here)
-curl -X POST 'https://nheelwshzbgenpavwhcy.supabase.co/storage/v1/object/sign/exports/<OBJECT_NAME>' \
+curl -X POST 'https://qqfrzurledgywyhcxdse.supabase.co/storage/v1/object/sign/exports/<OBJECT_NAME>' \
   -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_OWNER_API_KEY>' \
   -H 'Content-Type: application/json' -d '{"expiresIn": 3600}'
 ```

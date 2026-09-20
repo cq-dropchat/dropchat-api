@@ -28,7 +28,7 @@ import {
   restoreSession,
   startLogin,
 } from "./auth.ts";
-import { loadConfig } from "./config.ts";
+import { loadConfig, requireEndpoint } from "./config.ts";
 import { API_REFERENCE } from "./api-reference.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
@@ -239,14 +239,14 @@ async function handleQuery(
     };
   }
 
-  const config = loadConfig();
+  const { url: base, anonKey } = requireEndpoint();
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
-  const url = `${config.supabaseUrl}${path}`;
+  const url = `${base}${path}`;
   const reqHeaders: Record<string, string> = {
-    apikey: config.supabaseAnonKey,
+    apikey: anonKey,
     "Content-Type": "application/json",
     ...headers,
   };
