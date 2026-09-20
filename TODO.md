@@ -180,3 +180,15 @@ Monetization
 - [x] S1 — drills stay out of the organization export (F18). The exporter drops
       any row whose `service` is `sandbox`, the same rule `notify_webhook`
       applies. No new table, so `12_deletions` needed nothing.
+
+- [ ] Flaky: `F29: agent-client stops after ten iterations (characterization)`
+      failed once in eight full `deno task test:coverage` runs on 2026-09-20,
+      and passed alone and on the very next full run. Likely the snapshot
+      stabiliser rather than the code: `stable()` masks a timestamp only when
+      `Date.parse(value) >= since`, and `since` is `Date.now() - 1000` — a
+      one-second tolerance for the skew between the database's clock and Deno's,
+      which this repo already knows about (P1). Under a loaded run a row written
+      with the database's clock can fall outside it, and the real timestamp then
+      reaches the snapshot. Same family as the intermittency
+      `gaps/webhook-queue-scope` fixed. Widen the window, or mask by shape (any
+      ISO timestamp in these rows) instead of by age.
