@@ -45,6 +45,7 @@ and offer messaging services to other organizations.
 #### Development
 
 - [Architecture](#architecture)
+- [Error panel](#error-panel)
 - [Local development](#local-development)
 
 #### Community
@@ -1078,7 +1079,57 @@ This event-driven flow ensures that each component is decoupled and scalable.
   from the external service, or managed by members on the internal `local` chat.
   Also carries each member's own state for the conversation.
 - **logs**: Application-level log entries (errors, warnings) written by Edge
-  Functions.
+  Functions. Per-organization and readable by its members — it is an audit
+  trail for the tenant, not crash reporting for the product (see
+  **error_issues**).
+- **error_issues**: One row per distinct error in the product, browser and Edge
+  Functions alike. Not per-organization and readable only by a
+  **platform_admins** row. See "Error panel" below.
+- **error_settings**: Single row holding the error panel's baseline switch.
+- **platform_admins**: Who may read the error panel. The only permission in
+  this schema that is not a membership in an organization.
+
+## Error panel
+
+A crash reporter without an external APM, at `/errors` in the UI (no menu
+entry: it crosses tenants, so it does not belong in a customer's settings).
+
+The unit of storage is the *issue* — one row per distinct error — not the
+occurrence. A repeat costs an UPDATE of two counters, so the table grows with
+the number of distinct bugs and not with traffic. Errors are grouped by a
+fingerprint of source, kind, culprit and the message with its ids, numbers,
+URLs and timestamps normalized away (`public.normalize_error_message`), so the
+same bug seen on a hundred conversations is one row.
+
+**The baseline** is what keeps the panel about the present. While
+`error_settings.baseline_open` is true — which is the shipped state, including
+when the table is empty — every fingerprint seen for the first time is filed as
+`preexisting`: recorded and counted, but hidden from the panel's default view.
+Closing it from the panel draws the line: from then on, anything unseen arrives
+as `new`. Nothing ever leaves `preexisting` on its own, because an old bug
+happening again is still an old bug. A `resolved` issue that fires again is the
+one exception — that is a regression, and it comes back as `new`.
+
+Two things have to be set up once, by hand:
+
+```sql
+-- 1. Who can see the panel. There is no UI for this on purpose: an admin who
+-- could appoint admins is a privilege escalation from one stolen session.
+insert into public.platform_admins (user_id, note)
+select id, 'first platform admin' from auth.users where email = 'you@example.com';
+```
+
+2. **`ERROR_REPORTING=on`** as an Edge Function secret, for the backend half.
+   Reporting hooks `log.error`, which every function reaches on every failure,
+   so it is opt-in rather than on wherever credentials exist — otherwise the
+   test suite and any local script start writing rows to whatever project the
+   environment names. It doubles as a kill switch that works without a deploy.
+   The browser half needs nothing: it calls `public.report_error`, which `anon`
+   may execute so that an error which stops someone logging in is still caught.
+
+Retention is part of the hourly `purge-expired-rows` job: `resolved` issues go
+90 days after their last occurrence, `preexisting` after 180. An open issue is
+never purged, however old.
 
 ## Local development
 

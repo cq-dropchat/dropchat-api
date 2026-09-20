@@ -9,6 +9,13 @@
 --                             are what members read on account errors; a
 --                             quarter covers any billing or support question.
 --   public.onboarding_tokens  expired more than 30 days ago, used or not.
+--   public.error_issues       E1: settled issues that have gone quiet —
+--                             'resolved' after 90 days without a new
+--                             occurrence, 'preexisting' after 180. An open
+--                             issue is never purged however old it is: age is
+--                             not a reason to stop showing an unfixed bug.
+--                             'ignored' is never purged either, or the panel
+--                             would keep re-reporting what was dismissed.
 --
 -- cron.job_run_details already has its own 7-day job; net._http_response has
 -- pg_net's TTL.
@@ -24,6 +31,7 @@ declare
   _logs integer;
   _tokens integer;
   _exports integer;
+  _errors integer;
 begin
   delete from supabase_functions.hooks
   where id in (
@@ -59,11 +67,25 @@ begin
   );
   get diagnostics _exports = row_count;
 
+  -- E1. Deleting a settled issue also forgets its fingerprint, so if the bug
+  -- ever comes back it is reported as new rather than reviving a row from last
+  -- year — which is the right answer: after 90 days without a sighting, a
+  -- recurrence is news.
+  delete from public.error_issues
+  where id in (
+    select i.id from public.error_issues i
+    where (i.status = 'resolved' and i.last_seen < now() - interval '90 days')
+       or (i.status = 'preexisting' and i.last_seen < now() - interval '180 days')
+    limit _batch
+  );
+  get diagnostics _errors = row_count;
+
   return jsonb_build_object(
     'hooks', _hooks,
     'logs', _logs,
     'onboarding_tokens', _tokens,
-    'organization_exports', _exports
+    'organization_exports', _exports,
+    'error_issues', _errors
   );
 end;
 $$;
