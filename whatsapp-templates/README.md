@@ -59,6 +59,23 @@ done
 La aprobación suele tardar minutos; puede llegar a 24 horas. El estado se ve en
 la misma pantalla de plantillas de la app.
 
+## Decisiones pendientes (2026-09-20)
+
+Tres textos prometen algo que depende de la operación, y todavía no está
+definido. **Hay que resolverlas antes de mandar las plantillas a aprobación**:
+cambiar el texto después obliga a crear la plantilla de nuevo y esperar otra
+aprobación, porque Meta no deja editar una ya aprobada sin volver a revisarla.
+
+| Plantilla                                   | Promesa                                    | Qué falta definir                                                       |
+| ------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------- |
+| `pedido_en_camino`                          | "llega {{3}}", con `mañana` de ejemplo     | el plazo real, y si cambia en regiones frente a la Región Metropolitana |
+| `pedido_en_camino`, `pedido_en_reparto_hoy` | "ten listos $X para el repartidor"         | si el courier recibe solo efectivo o también transferencia              |
+| `entrega_fallida_reintento`                 | "podemos intentarlo una vez más sin costo" | si el courier cobra el segundo intento                                  |
+
+Mientras no estén resueltas, el plazo se puede dejar como variable y llenarlo
+por pedido con lo que diga Dropi — es lo que hace hoy `{{3}}` — pero la promesa
+del reintento sin costo es texto fijo: o se cumple, o sale de la plantilla.
+
 ## Antes de enviarlas
 
 Revisa que el texto calce con **tu** operación: el plazo de entrega que promete
