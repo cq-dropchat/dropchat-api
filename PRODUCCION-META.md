@@ -18,16 +18,55 @@ este repositorio y en el proyecto de Supabase.
 | Número de prueba `+1 555 172 8031`                           | registrado, suscrito, probado de ida y vuelta                                                                              |
 | Webhook a `whatsapp-webhook`                                 | recibiendo y persistiendo                                                                                                  |
 | Secretos del backend                                         | `META_APP_ID`, `META_APP_SECRET`, `META_SYSTEM_USER_ACCESS_TOKEN`, `META_SYSTEM_USER_ID`, `WHATSAPP_VERIFY_TOKEN` cargados |
-| Verificación del negocio                                     | **no iniciada**                                                                                                            |
+| Empresa constituida                                          | **no**, ni SpA ni inicio de actividades (2026-09-20)                                                                       |
+| Verificación del negocio                                     | **no iniciada**, depende de lo anterior                                                                                    |
 | Número real                                                  | **no registrado**                                                                                                          |
 | Embedded Signup                                              | **implementado en el código, no habilitado en Meta**                                                                       |
 | Plantillas en español                                        | escritas, sin enviar (`whatsapp-templates/`)                                                                               |
 
+## 0. Todavía no hay empresa
+
+DropChat no está constituido: no hay SpA ni inicio de actividades. Eso **no
+bloquea el piloto**, pero sí pone techo a lo que se puede hacer.
+
+**Lo que se puede hacer sin verificar el negocio:** conectar un número real y
+escribirle a unos 250 clientes distintos cada 24 horas, con hasta dos números en
+la cuenta. Para un piloto con uno o dos vendedores sobra. El límite se vuelve un
+problema recién cuando el piloto crece o entra el segundo cliente grande — y la
+verificación es obligatoria para App Review, o sea para Embedded Signup. Los
+límites exactos cambian; confirmarlos en la documentación el día que se registre
+el número.
+
+**Lo que igual hay que resolver antes de cobrar:** estar formalizado ante el
+SII, porque hay que emitir boleta o factura y porque Meta va a pedir un
+documento tributario para verificar. Dos caminos:
+
+|              | Persona natural con giro                       | SpA por Empresa en un Día                                                               |
+| ------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Trámite      | inicio de actividades en el SII con ClaveÚnica | constitución en `registrodeempresasysociedades.cl`, después RUT e inicio de actividades |
+| Plazo        | el mismo día                                   | un día con firma electrónica avanzada; más si se firma ante notario                     |
+| Costo        | gratis                                         | constitución gratis; la FEA ronda los $30.000                                           |
+| Nombre legal | el tuyo                                        | `DropChat SpA`                                                                          |
+| Patrimonio   | respondes con el personal                      | separado                                                                                |
+
+El nombre legal importa más de lo que parece: **es el que ve el cliente en la
+ficha del negocio de WhatsApp**, no el nombre de fantasía. Como persona natural,
+tus clientes verán tu nombre.
+
+Para lo que DropChat quiere ser —cobrarle a otras empresas y llegar a proveedor
+técnico de Meta— la SpA es el camino. La diferencia de tiempo entre las dos es
+de días, y cambiar de persona natural a empresa después obliga a **rehacer la
+verificación de Meta desde cero**, porque cambia el titular.
+
+Esto tiene efectos tributarios; conviene consultarlo con un contador antes de
+firmar. Nada de este documento es asesoría legal ni contable.
+
 ## 1. Verificación del negocio
 
-Es el cuello de botella: sin ella no hay revisión de la app, y sin revisión de
-la app no hay Embedded Signup. Conviene iniciarla antes que todo lo demás,
-porque es lo único que depende de terceros. Se hace en el portfolio DropChat, en
+Sin ella no hay revisión de la app, y sin revisión de la app no hay Embedded
+Signup. No hace falta para el piloto, pero sí para vender a varios clientes, y
+es lo único de esta lista que depende de terceros: una vez que exista la
+empresa, iniciarla cuanto antes. Se hace en el portfolio DropChat, en
 **Configuración del negocio → Centro de seguridad → Iniciar verificación**.
 
 Meta contrasta tres cosas: que la empresa existe, que la dirección es suya y que
@@ -104,8 +143,9 @@ El flujo completo está implementado, no hay que programarlo:
 
 ### Lo que falta, en orden
 
-1. **Verificación del negocio** aprobada (punto 1). Es requisito previo de todo
-   lo demás.
+1. **Empresa constituida y verificación del negocio** aprobada (puntos 0 y 1).
+   Es requisito previo de todo lo demás de esta lista, y lo único que el piloto
+   no necesita.
 
 2. **Revisión de la app (App Review)** para los permisos
    `whatsapp_business_management` y `whatsapp_business_messaging` en modo
@@ -164,17 +204,41 @@ ellas.
 
 ## Orden recomendado
 
-1. Iniciar la verificación del negocio **hoy**: es lo que más demora y no
-   depende de nosotros.
-2. Mientras corre: completar los datos públicos de la app (ícono, términos),
-   conseguir el correo del dominio y cerrar las
-   [decisiones pendientes de las plantillas](whatsapp-templates/README.md).
-3. Verificación aprobada → registrar el número real y enviar las plantillas a
-   aprobación.
-4. Con las plantillas aprobadas y el número andando, correr un piloto real con
-   un cliente usando **nuestro** número.
-5. Recién entonces App Review y Embedded Signup, que es lo que permite vender a
-   varios clientes a la vez.
+El plan va **primero el piloto, después la verificación**. Al revés se esperan
+semanas de trámite antes de saber si el producto sirve, y esa espera no enseña
+nada: el límite de 250 clientes al día alcanza de sobra para descubrir si un
+vendedor deja de perder plata con DropChat.
 
-El orden importa: App Review revisa un flujo que tiene que funcionar de verdad,
-y la forma más rápida de que lo aprueben es mostrar el producto ya operando.
+**Ahora, sin depender de nadie:**
+
+1. Cerrar las
+   [decisiones pendientes de las plantillas](whatsapp-templates/README.md):
+   plazo de entrega, medio de pago y costo del reintento.
+2. Dominio propio y correo corporativo. Después los piden para verificar, y el
+   correo cierra el hueco de la política de privacidad
+   (`PRIVACY_CONTACT_EMAIL`).
+3. Datos públicos de la app: ícono y URL de términos, que hoy apunta a
+   `facebook.com`.
+4. Catálogo de facturación en CLP en la base de datos de producción: hoy está
+   vacío, y por eso la organización no tiene suscripción ni cuotas.
+
+**Formalizarse (punto 0):** SpA o persona natural. Define el nombre que verá el
+cliente, así que va antes de registrar el número.
+
+**El piloto, con negocio sin verificar:**
+
+5. Registrar el número real y enviar las plantillas a aprobación.
+6. Correr el piloto con uno o dos vendedores, sobre **nuestro** número, dentro
+   del límite de 250 clientes cada 24 horas.
+
+**Escalar:**
+
+7. Verificación del negocio (punto 1), apenas exista la empresa: tarda, y sin
+   ella no se sube del límite.
+8. App Review y Embedded Signup (punto 3), que es lo que permite que cada
+   cliente conecte su propio número.
+
+El orden importa en las dos puntas: la verificación demora y conviene tenerla
+corriendo temprano, y App Review revisa un flujo que tiene que funcionar de
+verdad — la forma más rápida de que lo aprueben es mostrar el producto ya
+operando con clientes reales.
