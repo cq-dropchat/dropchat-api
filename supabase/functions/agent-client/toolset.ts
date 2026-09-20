@@ -4,6 +4,7 @@ import type { AgentTool } from "./agent_tool.ts";
 import type { AgentRowWithExtra, RequestContext } from "./protocols/base.ts";
 import { describeRemoteTool, initMCP, type MCPServer } from "./tools/mcp.ts";
 import { Toolbox } from "./tools/index.ts";
+import { EscalateToHumanTool } from "./tools/escalate.ts";
 
 /** Connects the agent's MCP servers not connected yet. */
 export async function initMCPServers(
@@ -33,6 +34,7 @@ export async function initMCPServers(
 export function buildAgentTools(
   agent: AgentRowWithExtra,
   mcpServers: Map<string, MCPServer>,
+  context?: RequestContext,
 ): AgentTool[] {
   /**
    * Tools to be passed the agent are gruped in two main categories:
@@ -49,6 +51,18 @@ export function buildAgentTools(
    * - `AgentTool`, the combination of config and definition, to be passed to the agent.
    */
   const tools: AgentTool[] = [];
+
+  // H3: handing the conversation to a person only means something where
+  // there IS a contact on the other side — not in team chat, where the peer
+  // is a colleague already. On per default, because an organization that
+  // sells cash on delivery needs it before it knows it does; off per agent
+  // with extra.can_escalate = false.
+  if (
+    context && context.conversation.service !== "local" &&
+    agent.extra.can_escalate !== false
+  ) {
+    tools.push(EscalateToHumanTool as unknown as AgentTool);
+  }
 
   for (const toolConfig of agent.extra.tools || []) {
     if (toolConfig.provider !== "local") {

@@ -77,6 +77,14 @@ create table public.conversations (
   -- (H4's TTL) and what the UI shows. Moves only when assigned_agent_id
   -- actually changes.
   assigned_at timestamp with time zone,
+  -- H3: since when this conversation is waiting for a person. Set by an
+  -- escalation (the agent's escalate_to_human tool), cleared as soon as
+  -- anybody — a human or the AI — is assigned. While it is set, no AI
+  -- answers: the contact was told a person would come.
+  --
+  -- A timestamp rather than a flag because H4's sweep measures the wait
+  -- against the organization's business hours, and H6 shows it.
+  awaiting_human_since timestamp with time zone,
   created_at timestamp with time zone default now() not null,
   updated_at timestamp with time zone default now() not null
 );
@@ -208,6 +216,7 @@ for each row
 when (
   new.assigned_agent_id is distinct from old.assigned_agent_id
   or new.assigned_at is distinct from old.assigned_at
+  or new.awaiting_human_since is distinct from old.awaiting_human_since
 )
 execute function public.guard_conversation_assignment();
 

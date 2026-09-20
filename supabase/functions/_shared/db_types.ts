@@ -798,6 +798,7 @@ export type Database = {
           address: string
           assigned_agent_id: string | null
           assigned_at: string | null
+          awaiting_human_since: string | null
           created_at: string
           extra: Json | null
           id: string
@@ -812,6 +813,7 @@ export type Database = {
           address: string
           assigned_agent_id?: string | null
           assigned_at?: string | null
+          awaiting_human_since?: string | null
           created_at?: string
           extra?: Json | null
           id?: string
@@ -826,6 +828,7 @@ export type Database = {
           address?: string
           assigned_agent_id?: string | null
           assigned_at?: string | null
+          awaiting_human_since?: string | null
           created_at?: string
           extra?: Json | null
           id?: string
@@ -1620,6 +1623,30 @@ export type Database = {
     Functions: {
       accept_invitation: { Args: { invitation_id: string }; Returns: string }
       agent_turn_lease: { Args: never; Returns: string }
+      assign_conversation: {
+        Args: { p_agent_id?: string; p_conversation_id: string }
+        Returns: {
+          address: string
+          assigned_agent_id: string | null
+          assigned_at: string | null
+          awaiting_human_since: string | null
+          created_at: string
+          extra: Json | null
+          id: string
+          name: string | null
+          organization_address: string
+          organization_id: string
+          service: Database["public"]["Enums"]["service"]
+          type: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       begin_agent_turn: {
         Args: {
           _conversation_id: string
@@ -1833,6 +1860,7 @@ export type Database = {
           address: string
           assigned_agent_id: string | null
           assigned_at: string | null
+          awaiting_human_since: string | null
           created_at: string
           extra: Json | null
           id: string

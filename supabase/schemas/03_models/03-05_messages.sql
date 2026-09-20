@@ -176,6 +176,27 @@ when (
 -- F12: queued (edge_calls), not posted from the trigger.
 execute function public.enqueue_edge_call('agent-client');
 
+-- H3: answering by hand takes the conversation (A2). The WHEN clause is the
+-- cheap half of the question — an outgoing row (no sender_address) with an
+-- author, sent for real (armed, not a record-only note), on a service where
+-- there is a contact to take over from. Whether the author is a person, and
+-- whether the organization wants this at all, is the function's half.
+--
+-- Named to run after the assignment note's own insert cannot re-enter it:
+-- that note is internal, which this clause excludes.
+create trigger handle_implicit_takeover
+after insert
+on public.messages
+for each row
+when (
+  new.sender_address is null
+  and new.agent_id is not null
+  and new.service not in ('local'::public.service, 'slack'::public.service)
+  and (new.status ->> 'pending') is not null
+  and (new.content ->> 'internal') is null
+)
+execute function public.handle_implicit_takeover();
+
 -- The internal mirror of the trigger above: `agent_id` is authorship in
 -- member space the way `sender_address` is in contact space. Only `local`
 -- and only armed rows; whether the room actually IS an AI DM is the

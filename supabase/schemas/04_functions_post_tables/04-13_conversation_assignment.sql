@@ -48,19 +48,24 @@ begin
       using errcode = 'P0002';
   end if;
 
-  -- `p_awaiting_human` only reaches the note in H1: the column it will also
-  -- write, conversations.awaiting_human_since, arrives with escalation (H3).
-  -- The parameter is here from the start so every caller is written against
-  -- the final signature.
-  --
   -- `p_reason` carries two control keys besides the recorded ones:
-  -- `cause` (required in practice, defaults to 'manual') and `if_unassigned`.
+  -- `cause` (required in practice, defaults to 'manual') and `expect_from`.
   --
-  -- The routing path (agent-client) only wants to persist what it decided if
-  -- nobody decided first: two inbound messages can race into the same
-  -- conversation, and the loser must not overwrite the winner.
-  if coalesce((p_reason ->> 'if_unassigned')::boolean, false)
-    and _conv.assigned_agent_id is not null then
+  -- `expect_from` is compare-and-set, for the routing path: agent-client
+  -- decides who answers by reading the conversation, and by the time it
+  -- writes, another invocation — or a person — may have decided something
+  -- else. It states what it believed the assignment was (null for "nobody",
+  -- or the id of the agent that turned out not to answer any more); if the
+  -- row says otherwise, nothing is written and the caller learns it lost by
+  -- getting null back.
+  --
+  -- A plain "only if unassigned" was not enough: a conversation pinned to a
+  -- retired or deactivated agent has to be re-routed, and that is precisely
+  -- a write over an existing assignment.
+  if p_reason ? 'expect_from'
+    and _conv.assigned_agent_id is distinct from
+      (p_reason ->> 'expect_from')::uuid
+  then
     return null;
   end if;
 
@@ -89,6 +94,13 @@ begin
       assigned_at = case
         when p_agent_id is distinct from _from then now()
         else assigned_at
+      end,
+      -- H3: the wait starts with the escalation and ends the moment anybody
+      -- takes the conversation. `coalesce` so a second escalation of the same
+      -- conversation does not restart a clock the team is already late on.
+      awaiting_human_since = case
+        when p_awaiting_human then coalesce(awaiting_human_since, now())
+        else null
       end
   where id = p_conversation_id
   returning * into _conv;
@@ -146,5 +158,89 @@ begin
   );
 
   return _conv;
+end;
+$$;
+
+-- H3 — the member-facing door.
+--
+-- No API role can write the assignment columns (the guard trigger refuses
+-- it), so this is how a person takes a conversation the AI is holding, hands
+-- it back, or returns it to routing. Being the only door, it is also where
+-- "may you?" is answered.
+--
+-- Who: anybody who can SEE the conversation — the same rule as the select
+-- policy of 05-03, asked through rls.is_conversation_visible — plus an API
+-- key of the organization, which satisfies the shared-inbox half of that
+-- rule. Not a role check: a member who cannot see a personal account's
+-- conversation has no business assigning it either.
+create function public.assign_conversation(
+  p_conversation_id uuid,
+  p_agent_id uuid default null
+) returns public.conversations
+language plpgsql
+security definer
+set search_path to ''
+as $$
+declare
+  _conv public.conversations;
+  _agent public.agents;
+  _actor uuid;
+begin
+  select * into _conv
+  from public.conversations
+  where id = p_conversation_id;
+
+  -- "Does not exist" and "not yours" answer the same, so this cannot be used
+  -- to probe for conversation ids.
+  if not found
+    or _conv.organization_id not in (select rls.get_authorized_orgs('member'))
+    or not rls.is_conversation_visible(
+      _conv.id, _conv.organization_id, _conv.organization_address, _conv.service
+    )
+  then
+    raise exception 'conversation % is not yours to assign', p_conversation_id
+      using errcode = '42501';
+  end if;
+
+  if p_agent_id is not null then
+    select * into _agent
+    from public.agents
+    where id = p_agent_id and organization_id = _conv.organization_id;
+
+    if not found then
+      raise exception 'agent % is not in organization %',
+        p_agent_id, _conv.organization_id
+        using errcode = '23503';
+    end if;
+
+    if _agent.deleted_at is not null then
+      raise exception 'agent % is retired', p_agent_id;
+    end if;
+
+    -- An AI that would not answer cannot be handed a conversation: that is
+    -- indistinguishable from nobody, except that nothing routes it away.
+    if _agent.user_id is null
+      and coalesce(_agent.extra ->> 'mode', 'active') in ('draft', 'inactive')
+    then
+      raise exception 'agent % does not answer (mode %)',
+        p_agent_id, coalesce(_agent.extra ->> 'mode', 'active');
+    end if;
+  end if;
+
+  -- The caller's own agent row, when they have one: an API key has none, and
+  -- the note then records that nobody in particular did it.
+  select a.id into _actor
+  from public.agents a
+  where a.organization_id = _conv.organization_id
+    and a.id in (select rls.get_own_agents());
+
+  return public.set_conversation_assignment(
+    p_conversation_id,
+    p_agent_id,
+    -- Taking a conversation, or sending it back to the AI, ends the wait.
+    false,
+    _actor,
+    '{"cause": "manual"}'::jsonb
+  );
 end;
 $$;

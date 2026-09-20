@@ -134,7 +134,16 @@ export async function runToolUses({
       switch (toolInfo.type) {
         case "custom":
         case "function": {
-          const result = await agentTool.implementation(args);
+          // The wider signature of the special tools (config, context,
+          // client), so a function tool that needs the conversation — H3's
+          // escalate_to_human — can have it. The ones that do not, like the
+          // calculator, ignore the extra arguments.
+          const result = await agentTool.implementation(
+            args,
+            agentTool.config,
+            context,
+            client,
+          );
 
           parts = [
             {

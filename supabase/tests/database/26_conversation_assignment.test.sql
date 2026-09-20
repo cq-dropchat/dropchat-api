@@ -11,7 +11,7 @@
 -- leaves exactly one note; and the backfill picks the agent the old rule
 -- picked.
 begin;
-select plan(29);
+select plan(50);
 
 select has_column('public', 'conversations', 'assigned_agent_id', 'conversations.assigned_agent_id exists');
 select has_column('public', 'conversations', 'assigned_at', 'conversations.assigned_at exists');
@@ -181,14 +181,37 @@ select public.set_conversation_assignment(
   tests.id('conv_a2'), tests.id('agent_robot_a'), false, null, '{"cause": "entry"}'::jsonb
 );
 
-select ok(
+-- `.id is null` and not `row is null`: a composite is NULL only when every
+-- field is, so testing the row itself would answer about the nulls inside it.
+select is(
   (
-    select public.set_conversation_assignment(
+    select (public.set_conversation_assignment(
       tests.id('conv_a2'), tests.id('agent_alice'), false, null,
-      '{"cause": "entry", "if_unassigned": true}'::jsonb
-    ) is null
+      '{"cause": "entry", "expect_from": null}'::jsonb
+    )).id
   ),
-  'if_unassigned skips a conversation that was assigned meanwhile'
+  null,
+  'expect_from skips a conversation somebody assigned meanwhile'
+);
+
+-- …and writes when the row still says what the caller believed: this is how
+-- a conversation pinned to an agent that no longer answers is re-routed.
+select is(
+  (
+    select (public.set_conversation_assignment(
+      tests.id('conv_a2'), tests.id('agent_alice'), false, null,
+      jsonb_build_object(
+        'cause', 'entry', 'expect_from', tests.id('agent_robot_a')
+      )
+    )).assigned_agent_id
+  ),
+  tests.id('agent_alice'),
+  'expect_from writes over the assignment it expected to find'
+);
+
+select public.set_conversation_assignment(
+  tests.id('conv_a2'), tests.id('agent_robot_a'), false, null,
+  '{"cause": "manual"}'::jsonb
 );
 
 select is(
@@ -382,6 +405,305 @@ select is(
   (select entry_agent_id from public.organizations where id = tests.id('org_b')),
   null,
   'an organization whose only agent is a human gets no entry agent'
+);
+
+-- ---------------------------------------------------------------------------
+-- H3 — assign_conversation: the member-facing door, and the implicit takeover.
+--
+-- Failure scenario: without an RPC, a person who has to step into a
+-- conversation cannot tell the AI to stop — no API role can write the columns
+-- — so the agent keeps answering over them. Without the takeover trigger,
+-- stepping in by hand (the thing a person actually does) leaves the
+-- conversation assigned to the AI.
+-- ---------------------------------------------------------------------------
+
+select has_column(
+  'public', 'conversations', 'awaiting_human_since',
+  'conversations.awaiting_human_since exists'
+);
+
+-- A personal account of alice's, so amber (a member of the same org) cannot
+-- see its conversations: the visibility rule the RPC has to honour.
+insert into public.organizations_addresses (
+  organization_id, service, address, agent_id, status
+)
+values (
+  tests.id('org_a'), 'whatsapp', '56900000001', tests.id('agent_alice'),
+  'connected'
+);
+
+insert into public.conversations (
+  id, organization_id, service, organization_address, address, type, name
+)
+values (
+  'aaaaaaaa-0000-4000-8000-0000000000cf',
+  tests.id('org_a'), 'whatsapp', '56900000001', '56955555555', 'direct',
+  'Privada de Alice'
+);
+
+-- Start from a conversation the AI holds.
+select public.set_conversation_assignment(
+  tests.id('conv_a1'), tests.id('agent_robot_a'), false, null,
+  '{"cause": "entry"}'::jsonb
+);
+
+select tests.authenticate_as('alice@test.local');
+
+select lives_ok(
+  format(
+    'select public.assign_conversation(%L, %L)',
+    tests.id('conv_a1'), tests.id('agent_alice')
+  ),
+  'user A (owner) takes a conversation she can see'
+);
+
+select is(
+  (select assigned_agent_id from public.conversations where id = tests.id('conv_a1')),
+  tests.id('agent_alice'),
+  'and the conversation is hers'
+);
+
+select is(
+  (
+    select count(*)::int
+    from public.messages
+    where conversation_id = tests.id('conv_a1')
+      and content -> 'data' ->> 'cause' = 'manual'
+      and content -> 'data' ->> 'by' = tests.id('agent_alice')::text
+      and content -> 'data' ->> 'to' = tests.id('agent_alice')::text
+  ),
+  1,
+  'the note says who did it'
+);
+
+select throws_ok(
+  format(
+    'select public.assign_conversation(%L, %L)',
+    tests.id('conv_a1'), tests.id('agent_bob')
+  ),
+  '23503',
+  null,
+  'an agent of another organization is refused'
+);
+
+-- A retired AI cannot be handed a conversation: nothing would answer it.
+insert into public.agents (id, organization_id, user_id, name, extra, deleted_at)
+values (
+  'aaaaaaaa-0000-4000-8000-00000000a0e1', tests.id('org_a'), null,
+  'Robot retirado', '{"mode": "active"}'::jsonb, now()
+);
+
+select throws_ok(
+  format(
+    'select public.assign_conversation(%L, %L)',
+    tests.id('conv_a1'), 'aaaaaaaa-0000-4000-8000-00000000a0e1'
+  ),
+  'P0001',
+  null,
+  'a retired agent is refused'
+);
+
+insert into public.agents (id, organization_id, user_id, name, extra)
+values (
+  'aaaaaaaa-0000-4000-8000-00000000a0e2', tests.id('org_a'), null,
+  'Robot borrador', '{"mode": "draft"}'::jsonb
+);
+
+select throws_ok(
+  format(
+    'select public.assign_conversation(%L, %L)',
+    tests.id('conv_a1'), 'aaaaaaaa-0000-4000-8000-00000000a0e2'
+  ),
+  'P0001',
+  null,
+  'a draft agent is refused — it does not answer'
+);
+
+select tests.clear_authentication();
+select tests.authenticate_as('amber@test.local');
+
+select throws_ok(
+  format(
+    'select public.assign_conversation(%L, %L)',
+    'aaaaaaaa-0000-4000-8000-0000000000cf', tests.id('agent_amber')
+  ),
+  '42501',
+  null,
+  'a member of the organization who cannot SEE the conversation is refused'
+);
+
+select tests.clear_authentication();
+select tests.authenticate_as('bob@test.local');
+
+select throws_ok(
+  format(
+    'select public.assign_conversation(%L, %L)',
+    tests.id('conv_a1'), tests.id('agent_bob')
+  ),
+  '42501',
+  null,
+  'user B cannot assign a conversation of organization A'
+);
+
+select tests.clear_authentication();
+select tests.authenticate_with_api_key(tests.val('key_a_member'));
+
+select lives_ok(
+  format(
+    'select public.assign_conversation(%L, null)',
+    tests.id('conv_a1')
+  ),
+  'API key A hands the conversation back to routing'
+);
+
+select is(
+  (select assigned_agent_id from public.conversations where id = tests.id('conv_a1')),
+  null,
+  'and nobody holds it'
+);
+
+select tests.clear_authentication();
+select tests.authenticate_with_api_key(tests.val('key_b_member'));
+
+select throws_ok(
+  format(
+    'select public.assign_conversation(%L, %L)',
+    tests.id('conv_a1'), tests.id('agent_robot_a')
+  ),
+  '42501',
+  null,
+  'API key B cannot assign a conversation of organization A'
+);
+
+select tests.clear_authentication();
+select tests.authenticate_as_anon();
+
+select throws_ok(
+  format(
+    'select public.assign_conversation(%L, %L)',
+    tests.id('conv_a1'), tests.id('agent_robot_a')
+  ),
+  '42501',
+  null,
+  'anon cannot assign anything'
+);
+
+select tests.clear_authentication();
+
+-- ---------------------------------------------------------------------------
+-- Escalation clears the assignment and starts the clock.
+-- ---------------------------------------------------------------------------
+
+select public.set_conversation_assignment(
+  tests.id('conv_a2'), null, true, tests.id('agent_robot_a'),
+  '{"cause": "escalation", "category": "reclamo"}'::jsonb
+);
+
+select ok(
+  (
+    select awaiting_human_since is not null and assigned_agent_id is null
+    from public.conversations where id = tests.id('conv_a2')
+  ),
+  'an escalation leaves the conversation waiting for a human and held by nobody'
+);
+
+select public.set_conversation_assignment(
+  tests.id('conv_a2'), tests.id('agent_robot_a'), false, null,
+  '{"cause": "manual"}'::jsonb
+);
+
+select is(
+  (select awaiting_human_since from public.conversations where id = tests.id('conv_a2')),
+  null,
+  'assigning somebody clears the wait'
+);
+
+-- ---------------------------------------------------------------------------
+-- The implicit takeover (A2): answering by hand takes the conversation.
+-- ---------------------------------------------------------------------------
+
+create function pg_temp.outgoing(_agent uuid, _text text, _internal boolean default false)
+returns void language plpgsql as $$
+begin
+  insert into public.messages (
+    organization_id, conversation_id, service, organization_address,
+    conversation_address, agent_id, status, content
+  )
+  values (
+    tests.id('org_a'), tests.id('conv_a1'), 'whatsapp', tests.val('wa_a'),
+    tests.val('contact_a1'), _agent,
+    case when _internal then '{}'::jsonb else jsonb_build_object('pending', now()) end,
+    jsonb_strip_nulls(jsonb_build_object(
+      'version', '1', 'type', 'text', 'kind', 'text', 'text', _text,
+      'internal', case when _internal then true else null end
+    ))
+  );
+end;
+$$;
+
+select public.set_conversation_assignment(
+  tests.id('conv_a1'), tests.id('agent_robot_a'), false, null,
+  '{"cause": "entry"}'::jsonb
+);
+
+-- The AI answering does not change anything.
+select pg_temp.outgoing(tests.id('agent_robot_a'), 'te ayudo con eso');
+
+select is(
+  (select assigned_agent_id from public.conversations where id = tests.id('conv_a1')),
+  tests.id('agent_robot_a'),
+  'the AI answering does not trigger a takeover'
+);
+
+-- An internal note by a human does not either: it was never sent.
+select pg_temp.outgoing(tests.id('agent_alice'), 'nota para el equipo', true);
+
+select is(
+  (select assigned_agent_id from public.conversations where id = tests.id('conv_a1')),
+  tests.id('agent_robot_a'),
+  'an internal note does not trigger a takeover'
+);
+
+-- A human answering by hand does.
+select pg_temp.outgoing(tests.id('agent_alice'), 'hola, soy Alice');
+
+select is(
+  (select assigned_agent_id from public.conversations where id = tests.id('conv_a1')),
+  tests.id('agent_alice'),
+  'a human answering by hand takes the conversation'
+);
+
+-- By cause, not by "the last one": notes written in the same transaction
+-- share created_at, so "latest" is not a total order here.
+select is(
+  (
+    select count(*)::int
+    from public.messages
+    where conversation_id = tests.id('conv_a1')
+      and content ->> 'kind' = 'assignment'
+      and content -> 'data' ->> 'cause' = 'takeover'
+      and content -> 'data' ->> 'to' = tests.id('agent_alice')::text
+  ),
+  1,
+  'and the note says why, and who now holds it'
+);
+
+-- With auto_takeover off, nothing moves.
+select public.set_conversation_assignment(
+  tests.id('conv_a1'), tests.id('agent_robot_a'), false, null,
+  '{"cause": "manual"}'::jsonb
+);
+
+update public.organizations
+set extra = jsonb_build_object('attention', jsonb_build_object('auto_takeover', false))
+where id = tests.id('org_a');
+
+select pg_temp.outgoing(tests.id('agent_alice'), 'otra vez Alice');
+
+select is(
+  (select assigned_agent_id from public.conversations where id = tests.id('conv_a1')),
+  tests.id('agent_robot_a'),
+  'with auto_takeover off, answering by hand changes nothing'
 );
 
 select * from finish();

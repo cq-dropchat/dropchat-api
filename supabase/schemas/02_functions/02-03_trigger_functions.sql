@@ -996,3 +996,81 @@ begin
     using errcode = '42501';
 end;
 $$;
+
+-- H3 — the implicit takeover (A2).
+--
+-- Lives here, with the other trigger functions, because the trigger that
+-- uses it is declared on public.messages (03-05) — earlier in schema order
+-- than 04-13, where the assignment gate it calls is defined. plpgsql resolves
+-- that call at run time, so the order between the two is not a problem.
+--
+-- What a person actually does is answer. Expecting them to press "take the
+-- conversation" first means the AI keeps answering over them, so answering
+-- IS taking: an outgoing message a human sent by hand, on an external
+-- service, moves the assignment to them.
+--
+-- Only from the AI or from a wait: a conversation another person holds is
+-- theirs, and an unassigned one is left to routing. Off per organization
+-- with extra.attention.auto_takeover = false, because it can surprise.
+create function public.handle_implicit_takeover() returns trigger
+language plpgsql
+security definer
+set search_path to ''
+as $$
+declare
+  -- Scalars, not %rowtype: this file is loaded before the tables exist, so
+  -- their composite types cannot be named here.
+  _author_is_human boolean;
+  _auto_takeover boolean;
+  _assigned uuid;
+  _awaiting timestamp with time zone;
+  _assigned_is_human boolean;
+begin
+  select a.user_id is not null into _author_is_human
+  from public.agents a
+  where a.id = new.agent_id;
+
+  -- An AI writing is the AI doing its job, not somebody stepping in.
+  if _author_is_human is not true then
+    return null;
+  end if;
+
+  select coalesce(
+    (o.extra -> 'attention' ->> 'auto_takeover')::boolean, true
+  ) into _auto_takeover
+  from public.organizations o
+  where o.id = new.organization_id;
+
+  if _auto_takeover is not true then
+    return null;
+  end if;
+
+  select c.assigned_agent_id, c.awaiting_human_since
+  into _assigned, _awaiting
+  from public.conversations c
+  where c.id = new.conversation_id;
+
+  if not found or _assigned = new.agent_id then
+    return null;
+  end if;
+
+  select a.user_id is not null into _assigned_is_human
+  from public.agents a
+  where a.id = _assigned;
+
+  -- From the AI, or from a conversation waiting for anybody to come. One
+  -- another person holds is theirs; an unassigned one is left to routing.
+  if _awaiting is null
+    and (_assigned is null or _assigned_is_human is true)
+  then
+    return null;
+  end if;
+
+  perform public.set_conversation_assignment(
+    new.conversation_id, new.agent_id, false, new.agent_id,
+    '{"cause": "takeover"}'::jsonb
+  );
+
+  return null;
+end;
+$$;

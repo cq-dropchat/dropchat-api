@@ -113,6 +113,7 @@ export async function loadContact(
 //
 //   local DM   the address names the agent; nothing to assign.
 //   group      nobody, unless the organization turned `ai_in_groups` on.
+//   waiting    nobody, while awaiting_human_since is set (H3).
 //   assigned   an eligible AI answers; a human keeps it (the AI stays out);
 //              an agent that is no longer eligible falls through to routing.
 //   otherwise  the entry agent if it is eligible, else the oldest eligible
@@ -171,6 +172,15 @@ export function selectAgent(
   if (conv.service === "local") {
     // A DM's roster IS the decision; an assignment would have nothing to add.
     return { agent: dmAI && isEligibleAI(dmAI) ? dmAI : undefined };
+  }
+
+  // WAITING FOR A PERSON (H3)
+  //
+  // The agent told the contact a person would come. Answering anyway makes
+  // that a lie, and the conversation is not free to be routed either — it is
+  // held for whoever takes it.
+  if (conv.awaiting_human_since) {
+    return { agent: undefined };
   }
 
   // NO AI IN GROUPS (H1)

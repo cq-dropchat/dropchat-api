@@ -576,3 +576,75 @@ Deno.test({
     }
   },
 });
+
+Deno.test({
+  name: "H3: a human who takes the conversation mid-answer gets the last word",
+  ignore: !up,
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    const client = service();
+    const since = new Date(Date.now() - 1000).toISOString();
+    await unassign(client);
+    await cleanup(client, since);
+    // Slow enough to step in while the model is still thinking.
+    const llm = stubLlm(1500);
+
+    try {
+      await withTestAgent(client, async (agentId) => {
+        await setEntryAgent(client, agentId);
+
+        const m = await inbound(client, "quiero hablar con alguien");
+        await settle();
+        const answering = invoke(m);
+
+        // The LLM call is in flight; a person answers by hand, which takes
+        // the conversation (the implicit takeover of H3).
+        await new Promise((r) => setTimeout(r, 700));
+
+        await client
+          .from("messages")
+          .insert({
+            organization_id: fixture.orgA,
+            service: "whatsapp",
+            organization_address: fixture.waA,
+            conversation_address: CONTACT_A2,
+            agent_id: fixture.agentAlice,
+            content: {
+              version: "1",
+              type: "text",
+              kind: "text",
+              text: "Hola, soy Alice del equipo.",
+            },
+            // Armed, like the row the UI writes when a person hits send:
+            // the takeover trigger is about messages that actually go out.
+            status: { pending: new Date().toISOString() },
+          })
+          .throwOnError();
+
+        await answering;
+
+        assertEquals(await assignmentOf(client), fixture.agentAlice);
+
+        // The answer that was in flight is dropped: nothing the agent wrote
+        // lands on top of the person who is now handling this.
+        const { data: written } = await client
+          .from("messages")
+          .select("agent_id, content")
+          .eq("conversation_id", CONV_A2)
+          .is("sender_address", null)
+          .is("content->internal", null)
+          .gte("created_at", since)
+          .throwOnError();
+
+        assertEquals(written.length, 1, JSON.stringify(written));
+        assertEquals(written[0].agent_id, fixture.agentAlice);
+      });
+    } finally {
+      llm.restore();
+      await setEntryAgent(client, null);
+      await unassign(client);
+      await cleanup(client, since);
+    }
+  },
+});

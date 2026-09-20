@@ -50,6 +50,7 @@ import {
   assignConversation,
   clearAssignmentOnRestart,
   loadAssignedAgent,
+  takenFromUs,
 } from "./assignment.ts";
 import { startTyping } from "./typing.ts";
 import { waitForPendingPreprocessing } from "./preprocessing.ts";
@@ -195,14 +196,30 @@ export async function handler(req: Request): Promise<Response> {
   // Persisted before the delay, so the conversation has an owner even if this
   // invocation ends up superseded — and conditionally, so a concurrent
   // invocation's decision is not overwritten.
+  let ours = true;
+
   if (selection.assign) {
-    await assignConversation(
+    ours = await assignConversation(
       client,
-      conv,
+      // `conversation` and not `conv`: the context (and so the escalation
+      // tool) holds this object, and the assignment checks below compare the
+      // database against it. Two copies would read each other's writes as a
+      // stranger's.
+      conversation,
       selection.assign.agent_id,
       selection.assign.cause,
       selection.agent?.id ?? null,
     );
+  }
+
+  if (!ours) {
+    // Another invocation won the routing race and holds the conversation; it
+    // is the one that answers.
+    log.info(
+      `Conversation ${conv.id} was assigned by another invocation. Skipping response.`,
+    );
+
+    return new Response("ok", { headers: corsHeaders });
   }
 
   const agent = selection.agent && await revealAgent(client, selection.agent);
@@ -391,6 +408,7 @@ export async function handler(req: Request): Promise<Response> {
     const mcpServers: Map<string, MCPServer> = new Map();
 
     let iteration = 0;
+    let iterationsAfterEscalation = 0;
     const max_iterations = 10;
     let shouldContinue = true;
 
@@ -427,6 +445,19 @@ export async function handler(req: Request): Promise<Response> {
         //
         // Covers a newer message whose own invocation has not registered yet.
 
+        // STILL OURS? (H3) A person who answers by hand takes the
+        // conversation (the implicit takeover), and an escalation hands it
+        // away. Neither is a peer message, so agent_turns cannot see them:
+        // without this the answer in flight would land on top of the human's.
+        if (await takenFromUs(client, conversation)) {
+          log.info(
+            `Conversation ${conv.id} is no longer this agent's. Skipping response.`,
+            { conversation_id: conv.id, message_id: incoming.id },
+          );
+
+          return new Response("ok", { headers: corsHeaders });
+        }
+
         const new_message = await findNewerPeerMessage(
           client,
           conv,
@@ -449,7 +480,7 @@ export async function handler(req: Request): Promise<Response> {
 
         // CURRENT ITERATION TOOLS
 
-        const tools = buildAgentTools(agent, mcpServers);
+        const tools = buildAgentTools(agent, mcpServers, context);
 
         // AGENT CLIENT REQUEST AND RESPONSE
 
@@ -495,9 +526,40 @@ export async function handler(req: Request): Promise<Response> {
       }
 
       // STORE CURRENT ITERATION MESSAGES
+      //
+      // H3: the same question again, because the LLM call takes seconds and
+      // a person can answer inside them. What this agent itself did in this
+      // turn — routing, an escalation — is already in `conv`, so it does not
+      // read as somebody else.
+
+      if (await takenFromUs(client, conversation)) {
+        log.info(
+          `Conversation ${conv.id} was taken while answering. Dropping the response.`,
+          { conversation_id: conv.id, message_id: incoming.id },
+        );
+
+        return new Response("ok", { headers: corsHeaders });
+      }
 
       if (!(await storeIterationMessages(client, conv, messages, response))) {
         shouldContinue = false;
+      }
+
+      // An escalation gives the agent ONE more iteration — its goodbye — and
+      // then the turn is over: from there the conversation belongs to
+      // whoever takes it.
+      //
+      // One and not zero because a `respond` call ends the round on its own
+      // (the protocol returns its messages and drops any other tool call in
+      // the same message), so an agent that escalated could not also say
+      // goodbye. One and not "until it stops" because nothing else would
+      // bound what it does after handing the conversation away.
+      if (conversation.awaiting_human_since) {
+        if (iterationsAfterEscalation >= 1) {
+          shouldContinue = false;
+        }
+
+        iterationsAfterEscalation++;
       }
     }
 

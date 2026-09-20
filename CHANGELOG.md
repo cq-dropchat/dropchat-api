@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+- **An agent can hand a conversation to a person** (H3). A new tool,
+  `escalate_to_human(category, reason)`, is offered to every agent on external
+  services (turn it off per agent with `agents.extra.can_escalate = false`).
+  Calling it clears the assignment, stamps `conversations.awaiting_human_since`
+  and records the reason in the assignment note; from then on no AI answers that
+  conversation until somebody takes it or hands it back. `category` is a closed
+  list — `reclamo`, `pedido_fuera_de_alcance`, `pide_persona`, `pago`, `envio`,
+  `cambio_devolucion`, `otro` — so escalations can be counted.
+
+- **`rpc/assign_conversation(p_conversation_id, p_agent_id)`** (H3). The
+  member-facing way to move an assignment, since no API role may write the
+  columns: pass a member to take the conversation, an AI agent to hand it back,
+  or `null` to return it to routing. Whoever calls it must be able to SEE the
+  conversation (the rule of the select policy), and an API key of the
+  organization can call it too. It refuses an agent of another organization
+  (`23503`), a retired one, and an AI in `draft` or `inactive` — those would
+  hold a conversation nothing answers.
+
+- **Answering by hand takes the conversation** (H3, A2). An outgoing message a
+  member sends on an external service, while the conversation is the AI's or is
+  waiting for a person, moves the assignment to that member, with an assignment
+  note of cause `takeover`. Internal notes do not count, nor does a conversation
+  another person already holds. Off per organization with
+  `organizations.extra.attention.auto_takeover = false`.
+
+  An answer already in flight is dropped rather than sent on top: the agent
+  re-reads the assignment before each model call and before storing anything.
+
 - **What a human of the organization typed is no longer read as the customer's
   words** (H2). Building the history for the model, the role of a message was
   decided by "did THIS agent write it" (`agent_id === agent.id`), so a reply a

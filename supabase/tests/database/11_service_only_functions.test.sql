@@ -59,6 +59,9 @@ insert into service_only values
   -- trigger function that refuses every other path.
   ('public.set_conversation_assignment(uuid, uuid, boolean, uuid, jsonb)'),
   ('public.guard_conversation_assignment()'),
+  -- H3: the trigger behind the implicit takeover. assign_conversation is NOT
+  -- here on purpose — it is the member-facing door and checks its caller.
+  ('public.handle_implicit_takeover()'),
   ('billing.renew_subscriptions(integer)'),
   ('billing.grant_included_products(uuid, text, timestamp with time zone)');
 
@@ -81,6 +84,7 @@ select ok(
      -- guard_conversation_assignment is a trigger function: nothing calls it
      -- by name, service role included.
      and fn not like '%guard_conversation_assignment%'
+     and fn not like '%handle_implicit_takeover%'
      and fn not like 'billing.%'),
   'service_role still executes them'
 );

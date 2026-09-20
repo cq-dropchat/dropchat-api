@@ -288,6 +288,12 @@ export type AIAgentExtra = {
    * this is safe to flip on a conversation already underway.
    */
   multi_message_response?: boolean;
+  /**
+   * H3: whether this agent may hand a conversation to a person
+   * (escalate_to_human). Default true — an agent that cannot escalate has
+   * only silence to offer when it is out of its depth.
+   */
+  can_escalate?: boolean;
   instructions?: string;
   send_inline_files_up_to_size_mb?: number;
   tools?: ToolConfig[];

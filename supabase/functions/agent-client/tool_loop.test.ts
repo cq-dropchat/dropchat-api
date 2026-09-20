@@ -13,6 +13,7 @@
 // LLM provider is stubbed. Regenerate only for an intended change:
 //   deno test -A agent-client/tool_loop.test.ts -- --update
 import "../_shared/testing/env.ts"; // before index.ts: keys are read at import
+import { assert, assertEquals } from "jsr:@std/assert@1";
 import { assertSnapshot } from "jsr:@std/testing@1/snapshot";
 import { createClient } from "@supabase/supabase-js";
 import type { Database, MessageRow } from "../_shared/types/database_types.ts";
@@ -284,6 +285,155 @@ test("F29: agent-client greets a new conversation (characterization)", async (t)
         ),
       );
     }, { welcome_message: "¡Bienvenido! ¿En qué te ayudo?" });
+  } finally {
+    llm.restore();
+    await cleanup(client, contact);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// H3 — handing the conversation to a person.
+//
+// Failure scenario without it: the agent's only exits are to keep trying or
+// to go quiet, so a complaint or a payment gone wrong stays with the bot
+// until the customer gives up.
+// ---------------------------------------------------------------------------
+
+test("H3: escalate_to_human stops the AI and records why", async () => {
+  const client = service();
+  const contact = "5491129100004";
+  await cleanup(client, contact);
+  // Hand over, then say goodbye — the flow the tool's description asks for.
+  // It cannot be one message: a `respond` call ends the round and the
+  // protocol drops every other tool call in it, so the goodbye is the one
+  // iteration the agent has left after escalating.
+  const llm = scriptedLlm((call) =>
+    call === 1
+      ? {
+        tool_calls: [{
+          name: "escalate_to_human",
+          arguments: JSON.stringify({
+            category: "reclamo",
+            reason: "el pedido llegó dañado",
+          }),
+        }],
+      }
+      : {
+        tool_calls: [{
+          name: "respond",
+          arguments: JSON.stringify({
+            messages: [{
+              type: "text",
+              text: "Lamento lo del pedido. Te atiende una persona del equipo.",
+            }],
+          }),
+        }],
+      }
+  );
+
+  try {
+    await withTestAgent(client, async (agentId) => {
+      const record = await inbound(client, contact, "me llegó roto el pedido");
+      await settle();
+      await invoke(record);
+
+      const { data: conv } = await client
+        .from("conversations")
+        .select("assigned_agent_id, awaiting_human_since")
+        .eq("id", record.conversation_id)
+        .single()
+        .throwOnError();
+
+      assertEquals(conv.assigned_agent_id, null);
+
+      // The goodbye was sent: the escalation of this same turn does not eat
+      // the message that explains it.
+      const said = (await written(client, record)).filter((r) =>
+        r.sender_address === null &&
+        (r.content as { internal?: boolean }).internal !== true
+      );
+
+      assertEquals(
+        said.length,
+        1,
+        JSON.stringify({
+          rows: await written(client, record),
+          calls: llm.requests.length,
+        }),
+      );
+      // Two rounds and no more: the escalation buys exactly one goodbye.
+      assertEquals(llm.requests.length, 2);
+      assertEquals(
+        (said[0].content as { text: string }).text,
+        "Lamento lo del pedido. Te atiende una persona del equipo.",
+      );
+      assert(conv.awaiting_human_since !== null);
+
+      const { data: notes } = await client
+        .from("messages")
+        .select("content")
+        .eq("conversation_id", record.conversation_id)
+        .eq("content->>kind", "assignment")
+        .eq("content->data->>cause", "escalation")
+        .throwOnError();
+
+      assertEquals(notes.length, 1);
+
+      const data = (notes[0].content as { data: Record<string, unknown> }).data;
+
+      assertEquals(data.category, "reclamo");
+      assertEquals(data.reason, "el pedido llegó dañado");
+      assertEquals(data.awaiting_human, true);
+      assertEquals(data.by, agentId);
+
+      // A message from the contact now goes unanswered: a person was
+      // promised, and the LLM is not called again.
+      const callsBefore = llm.requests.length;
+      const followUp = await inbound(client, contact, "¿hay alguien?");
+      await settle();
+      await invoke(followUp);
+
+      assertEquals(llm.requests.length, callsBefore);
+
+      // Handed back to the AI, it answers again.
+      await client.rpc("set_conversation_assignment", {
+        p_conversation_id: record.conversation_id,
+        p_agent_id: agentId,
+        p_awaiting_human: false,
+        p_actor_agent_id: null as unknown as string,
+        p_reason: { cause: "manual" },
+      });
+
+      const third = await inbound(client, contact, "sigo esperando");
+      await settle();
+      await invoke(third);
+
+      assert(llm.requests.length > callsBefore);
+    });
+  } finally {
+    llm.restore();
+    await cleanup(client, contact);
+  }
+});
+
+test("H3: an agent with can_escalate false is not offered the tool", async () => {
+  const client = service();
+  const contact = "5491129100005";
+  await cleanup(client, contact);
+  const llm = scriptedLlm(() => ({ content: "listo" }));
+
+  try {
+    await withTestAgent(client, async () => {
+      const record = await inbound(client, contact, "hola");
+      await settle();
+      await invoke(record);
+
+      const names =
+        (llm.requests[0] as { tools?: { function: { name: string } }[] })
+          .tools?.map((t) => t.function.name) ?? [];
+
+      assertEquals(names.includes("escalate_to_human"), false);
+    }, { can_escalate: false, multi_message_response: false });
   } finally {
     llm.restore();
     await cleanup(client, contact);

@@ -45,6 +45,7 @@ function conversation(
     address: "56922220000",
     type: "direct",
     assigned_agent_id: null,
+    awaiting_human_since: null,
     ...overrides,
   } as unknown as ConversationRow;
 }
@@ -196,6 +197,43 @@ Deno.test("H1: a conversation with no type yet is treated as direct", () => {
   );
 
   assertEquals(selection.agent?.id, OLDEST.id);
+});
+
+// H3 — an escalation is a promise to the contact that a person will come.
+// Until somebody does, no AI answers: `awaiting_human_since` outranks even a
+// live assignment (the escalation clears it, but a race could leave one).
+Deno.test("H3: a conversation waiting for a human gets no AI answer", () => {
+  const waiting = conversation(
+    {
+      assigned_agent_id: null,
+      awaiting_human_since: "2026-09-19T12:00:00.000Z",
+    } as Partial<ConversationRow>,
+  );
+
+  const selection = selectAgent(
+    waiting,
+    [OLDEST, NEWER],
+    undefined,
+    org({ entry_agent_id: OLDEST.id }),
+  );
+
+  assertEquals(selection.agent, undefined);
+  // And nothing is routed: the conversation is not free to be taken.
+  assertEquals(selection.assign, undefined);
+});
+
+Deno.test("H3: once a human hands it back, the AI answers again", () => {
+  const returned = conversation(
+    {
+      assigned_agent_id: OLDEST.id,
+      awaiting_human_since: null,
+    } as Partial<ConversationRow>,
+  );
+
+  assertEquals(
+    selectAgent(returned, [OLDEST], undefined, org()).agent?.id,
+    OLDEST.id,
+  );
 });
 
 Deno.test("H1: a local DM with a draft AI gets no answer", () => {

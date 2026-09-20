@@ -305,6 +305,37 @@ escalation to a human, from H3). Two consequences for an integrator:
 On external services the AI answers `direct` conversations only. To let it
 answer in groups, set `organizations.extra.ai_in_groups = true`.
 
+### Handing a conversation to a person (H3)
+
+`conversations.awaiting_human_since` is set when the agent escalates — its
+`escalate_to_human` tool — and cleared as soon as anybody is assigned. While it
+is set, no AI answers that conversation. The assignment note of the escalation
+carries `category` (a closed list: `reclamo`, `pedido_fuera_de_alcance`,
+`pide_persona`, `pago`, `envio`, `cambio_devolucion`, `otro`) and a free-text
+`reason`.
+
+To move an assignment yourself:
+
+```bash
+curl -X POST "$SUPABASE_URL/rest/v1/rpc/assign_conversation" \
+  -H "apikey: $API_KEY" -H "Content-Type: application/json" \
+  -d '{"p_conversation_id": "<uuid>", "p_agent_id": "<agent uuid or null>"}'
+```
+
+- `p_agent_id` a member → they hold it, and the AI stays out.
+- `p_agent_id` an AI agent → it answers again.
+- `null` → back to routing; the next inbound message picks an agent.
+
+You must be able to SEE the conversation (the same rule that decides what
+`/rest/v1/conversations` returns). An agent of another organization is refused
+with `23503`; a retired agent, or an AI in `draft`/`inactive`, with a plain
+error — they would hold a conversation nothing answers.
+
+Sending an outgoing message as a member, while the conversation belongs to the
+AI or is waiting for a person, also takes it (an assignment note of cause
+`takeover`). Record-only rows (`content.internal`) do not. Turn it off per
+organization with `organizations.extra.attention.auto_takeover = false`.
+
 ## 8. (Optional) Poll instead of webhooks
 
 If you'd rather pull than receive pushes:
