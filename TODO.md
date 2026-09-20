@@ -181,6 +181,14 @@ Monetization
       any row whose `service` is `sandbox`, the same rule `notify_webhook`
       applies. No new table, so `12_deletions` needed nothing.
 
+- [x] T1 — `extra.attention` se valida al escribir. Las reglas son las de la UI
+      (`frontend/src/utils/businessHours.ts`), en un trigger y no en un CHECK
+      porque `extra` llega como merge patch y sólo la fila mergeada vale.
+      Encontrado al escribirlo: `{"attention": null}` en un INSERT hacía que
+      `attention_config` devolviera un **array**, con todas las claves en NULL,
+      y el guard del barrido comparaba contra NULL —que no es verdadero—, así
+      que barría toda conversación escalada de una vez.
+
 - [ ] Decidir los dos toggles de auth que producción tiene prendidos y este repo
       no declara (`supabase config diff`, 20/09/2026):
       `auth.external.github.enabled` y `auth.sms.twilio.enabled`. Importan

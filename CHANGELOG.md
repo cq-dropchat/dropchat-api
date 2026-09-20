@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- **`extra.attention` is validated when it is written** (H4). The defaults of A6
+  were applied on read and nothing looked at what was stored, so an API key
+  could save a Wednesday that closes before it opens, a negative wait, or a
+  timezone that does not exist. The UI refused all of that; PostgREST did not.
+
+  **A write that used to succeed silently now fails with `422` and a message
+  naming the key.** The rules are the ones the UI already applied: times as
+  `HH:MM` (with `24:00` for midnight), a window that closes after it opens, no
+  two windows of a day over the same hour, the seven day keys, non-negative
+  numbers, and a resolvable timezone. `business_hours: null` still means 24/7
+  and `[]` still means closed; a TTL of `0` still means "never".
+
+  The one that was not cosmetic: **`{"attention": null}` on INSERT.**
+  `attention_config` is `defaults || extra->'attention'`, and jsonb's `||` with
+  a non-object builds an ARRAY instead of raising. Every key then read NULL, and
+  the guard of `sweep_awaiting_human` compares the wait against it — a NULL
+  comparison, which is not true, so the sweep stopped skipping and treated every
+  escalated conversation as overdue at once. Reachable because `set_extra`
+  merges on UPDATE only, and any authenticated user may insert an organization.
+
 - **`category` is an enum in the published content contract** (H3). The
   escalation vocabulary was declared beside the tool that enforces it, and
   `AssignmentData.category` was typed `string`, so

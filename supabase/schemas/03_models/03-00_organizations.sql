@@ -45,6 +45,17 @@ on public.organizations
 for each row
 execute function public.moddatetime('updated_at');
 
+-- H4: named `validate_` so it sorts after `set_extra`, because BEFORE
+-- triggers fire in alphabetical order and only the MERGED row is worth
+-- validating. On INSERT there is no merge and `extra` arrives whole, which is
+-- why this covers both events and `set_extra` only covers UPDATE.
+create trigger validate_extra
+before insert or update
+on public.organizations
+for each row
+when (new.extra is not null)
+execute function public.validate_organization_attention();
+
 -- F18: an owner's DELETE files a deletion request and marks the row instead
 -- (see request_organization_deletion); only the sweep deletes for real.
 create trigger request_deletion
