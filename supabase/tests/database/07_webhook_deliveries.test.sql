@@ -9,7 +9,18 @@ select plan(27);
 -- The trigger only enqueues.
 -- ---------------------------------------------------------------------------
 
-create temp table q0 on commit drop as select count(*) as n from net.http_request_queue;
+-- `net.http_request_queue` is the whole database's outbox, and a background
+-- worker drains it: a bare count of it reads whatever else is in flight at
+-- that second — the edge-call sweep, another test, a retry. So the test plants
+-- a request to the webhook's own URL first and then takes the high-water mark;
+-- everything it asserts about the queue is scoped to what came after.
+create temp table decoy on commit drop as
+select net.http_post(
+  url := 'https://hooks.example.test/messages', body := '{}'::jsonb
+) as request_id;
+
+create temp table marks on commit drop as
+select (select coalesce(max(id), 0) from net.http_request_queue) as queue_id;
 
 insert into public.messages (
   id, organization_id, service, organization_address, conversation_address,
@@ -46,7 +57,8 @@ select is(
 -- message triggers still enqueue their own edge-function calls.)
 select is(
   (select count(*) from net.http_request_queue
-   where url = 'https://hooks.example.test/messages'),
+   where id > (select queue_id from marks)
+     and url = 'https://hooks.example.test/messages'),
   0::bigint,
   'the trigger itself sends nothing through pg_net'
 );
