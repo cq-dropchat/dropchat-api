@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- **A new service, `sandbox`, that never leaves the building** (S1). "Probar
+  como cliente" opens a conversation on it and the member writes as the
+  customer, so an agent can be tried against the real path — agent selection and
+  assignment (H1), the welcome message, `escalate_to_human` and the wait for a
+  person (H3/H4) — none of which the `local` DM that preceded it exercised.
+
+  **For integrators, this is a value you may see and should filter.**
+  `public.service` now has an eighth member, `sandbox`, and rows carrying it are
+  drills: a colleague rehearsing against an agent, not a customer. Three
+  guarantees, each pinned by a test:
+
+  - **No webhook fires for a `sandbox` row**, on any subscribed table. If you
+    subscribe to `messages` or `conversations`, nothing changes for you and no
+    drill will ever arrive as an order, a lead or a reply.
+  - **Nothing is dispatched.** There is no `sandbox` carrier; outgoing rows are
+    marked `delivered` in place, like `local`, and no read receipt is sent.
+  - **Billing is unaffected by the exclusion**: a drill makes a real call to a
+    real provider, so it appears in `billing.ledger` and counts against usage
+    exactly as any other message does.
+
+  If you poll instead of subscribing (`## 8`), add `&service=neq.sandbox` to
+  keep drills out of your queries — polling has no filter of its own.
+
+  Every organization has one `sandbox` account in `organizations_addresses`,
+  addressed by its own id, created with the `local` one and backfilled for
+  organizations that already existed. Members can DELETE their organization's
+  `sandbox` conversations (the "Reiniciar" button); that is the only widening of
+  an RLS policy in this change, and it extends the rule that already covered
+  `local`.
+
 - **`content.kind = "assignment"` is part of the v1 contract** (H6, closing H1).
   The assignment note H1 writes now has a type and a place in
   `contracts/message-content.v1.schema.json` (`AssignmentPart`), regenerated

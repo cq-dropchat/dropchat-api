@@ -96,6 +96,9 @@ curl -X POST 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/webhooks' \
   }'
 ```
 
+No delivery is ever queued for a row whose `service` is `sandbox` — those are
+the simulator's drills, not your customers'. See "Drills" under `## 7`.
+
 Subscribable tables: `organizations_addresses` (account connected /
 disconnected; credentials in `extra` read as `********`), `logs` (Meta events &
 errors), `contacts_addresses`, plus `messages` / `conversations` (the latter two
@@ -335,6 +338,30 @@ Sending an outgoing message as a member, while the conversation belongs to the
 AI or is waiting for a person, also takes it (an assignment note of cause
 `takeover`). Record-only rows (`content.internal`) do not. Turn it off per
 organization with `organizations.extra.attention.auto_takeover = false`.
+
+### Drills: the `sandbox` service (S1)
+
+`public.service` has a value your integration will never be sent but may read:
+`sandbox`. It is the simulator — a member of the organization writing as if they
+were a customer, to try an agent out against the real path. Every organization
+has one `sandbox` account in `organizations_addresses`, addressed by the
+organization's own id.
+
+**Webhooks never carry it.** No `sandbox` row fires a delivery, on any
+subscribed table, so nothing you receive is a drill and you need no filter
+there.
+
+**Polling does carry it**, because a query is yours to write. If you poll
+`messages` or `conversations` (`## 8`), exclude drills:
+
+```
+&service=neq.sandbox
+```
+
+Nothing is dispatched for a drill — there is no `sandbox` carrier, outgoing rows
+are marked `delivered` in place and no read receipt is sent — but the agent's
+replies are real LLM calls, so they appear in `billing.ledger` and count against
+usage like any other message.
 
 ### How long an assignment lasts (H4)
 

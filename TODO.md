@@ -170,3 +170,14 @@ Monetization
 - [x] Sanitize tool names Error: 400 Invalid 'tools[0].function.name': string
       does not match pattern. Expected a string that matches the pattern
       '^[a-zA-Z0-9_-]+$'.
+
+- [ ] S1 — the simulator is organization-wide to reset but per-member to write
+      in: `sim:<agent id>` gives each member their own drill, while "Reiniciar"
+      deletes every drill in the organization (what §5 of `SPEC_CONTINUACION.md`
+      asks for). Revisit if two people ever use it at once — a per-member reset
+      is one more `eq` on the delete.
+
+- [ ] S1 — `sandbox` conversations are included in the organization export
+      (F18). No new table, so nothing had to be added to `12_deletions`, but an
+      export now carries drills alongside real traffic. Decide whether to filter
+      them out before anybody exports for real.
