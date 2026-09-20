@@ -121,8 +121,13 @@ entrypoint = "./functions/slack-dispatcher/index.ts"
 project_id = "qqfrzurledgywyhcxdse"
 
 [remotes.production.auth]
-site_url = "https://dropchat-ui.pages.dev"
-additional_redirect_urls = ["https://dropchat-ui.pages.dev/**"]
+site_url = "https://app.dropchat.club"
+# El dominio de Pages queda permitido como respaldo: si el dominio propio falla
+# —DNS, certificado, la cuenta de Cloudflare— todavía se entra por él.
+additional_redirect_urls = [
+  "https://app.dropchat.club/**",
+  "https://dropchat-ui.pages.dev/**",
+]
 
 # Off in production until the MCP clients are wanted there: enabled, any client
 # can register itself against the project and authenticate.
