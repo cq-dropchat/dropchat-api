@@ -315,7 +315,10 @@ answer in groups, set `organizations.extra.ai_in_groups = true`.
 is set, no AI answers that conversation. The assignment note of the escalation
 carries `category` (a closed list: `reclamo`, `pedido_fuera_de_alcance`,
 `pide_persona`, `pago`, `envio`, `cambio_devolucion`, `otro`) and a free-text
-`reason`.
+`reason`. That list is published as an enum in
+`contracts/message-content.v1.schema.json` (`EscalationCategory`) — validate
+against the schema rather than against this paragraph, which is prose and can
+fall behind.
 
 To move an assignment yourself:
 

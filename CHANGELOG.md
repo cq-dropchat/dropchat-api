@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **`category` is an enum in the published content contract** (H3). The
+  escalation vocabulary was declared beside the tool that enforces it, and
+  `AssignmentData.category` was typed `string`, so
+  `contracts/message-content.v1.schema.json` told you an assignment note carried
+  "a string" while three other places — this file's `## 12`, the agent-client,
+  the UI that renders the note — each kept their own copy of the seven words.
+  Nothing compared them.
+
+  The list now lives in the mirrored types, and the generated schema names it:
+  `EscalationCategory`, with the same seven values. **Validate against the
+  schema, not against the prose.** No value changed, so nothing you already
+  parse breaks; what changes is that the contract is now specific enough to
+  reject a category that does not exist.
+
 - **The base URL in this repo was a different project.** Every address the docs
   gave an integrator — the base URL in `## 2` of INTEGRATING, the curl recipes,
   the `host` of `openapi.json`, the MCP endpoint in README, the plugin's

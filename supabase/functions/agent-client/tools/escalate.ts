@@ -14,21 +14,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RequestContext } from "../protocols/base.ts";
 import type { ToolDefinition } from "./base.ts";
 import * as log from "../../_shared/logger.ts";
+// The vocabulary lives among the mirrored types, not here: the UI renders
+// every category, and check-type-sync.sh is what keeps its copy honest.
+import { ESCALATION_CATEGORIES } from "../../_shared/types/message_types.ts";
 
-/**
- * Closed on purpose: M1 counts escalations by category to say what the AI
- * cannot handle, and a free-text field would make that ungroupable. `otro`
- * is the escape hatch, with `reason` carrying the specifics.
- */
-export const ESCALATION_CATEGORIES = [
-  "reclamo",
-  "pedido_fuera_de_alcance",
-  "pide_persona",
-  "pago",
-  "envio",
-  "cambio_devolucion",
-  "otro",
-] as const;
+export { ESCALATION_CATEGORIES };
 
 const EscalateInputSchema = z.object({
   category: z.enum(ESCALATION_CATEGORIES).describe(
