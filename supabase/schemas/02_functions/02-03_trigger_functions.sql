@@ -645,6 +645,18 @@ security definer
 set search_path = ''
 as $$
 begin
+  -- S1 (B2): the simulator is out of webhooks. An integrator subscribed to
+  -- `messages` wants their customers' traffic, not a colleague rehearsing
+  -- against an agent — a drill arriving as a real event would be a false
+  -- order, a false lead, a false anything their system acts on.
+  --
+  -- Asked of the row rather than of a column, because this one trigger is on
+  -- five tables and only three of them have `service`. The three that do are
+  -- exactly the ones a sandbox row can be written to.
+  if to_jsonb(new) ->> 'service' = 'sandbox' then
+    return new;
+  end if;
+
   insert into public.webhook_deliveries (organization_id, webhook_id, event, payload)
   select
     new.organization_id,

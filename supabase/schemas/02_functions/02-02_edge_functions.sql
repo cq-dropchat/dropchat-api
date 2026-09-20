@@ -75,7 +75,16 @@ declare
   headers jsonb;
   timeout_ms integer := 10000;
 begin
-  if service = 'local' then
+  -- Two services have no carrier, and settle here instead of being posted
+  -- to a dispatcher that does not exist:
+  --
+  --   local     team chat: the row IS the delivery.
+  --   sandbox   S1's simulator: the tester is the only reader, and the UI
+  --             they read it in is this same table. Without this the trigger
+  --             would build '/sandbox-dispatcher' and POST into the void —
+  --             the message would sit pending for ever and the dispatch
+  --             sweep would keep picking it up.
+  if service in ('local', 'sandbox') then
     update public.messages set status = jsonb_build_object('delivered', now()) where id = new.id;
 
     return new;

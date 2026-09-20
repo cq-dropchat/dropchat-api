@@ -231,7 +231,13 @@ on public.messages
 for each row
 when (
   new.sender_address is not null
-  and new.service not in ('local'::public.service, 'slack'::public.service)
+  and new.service not in (
+    'local'::public.service,
+    'slack'::public.service,
+    -- S1: there is no contact on the other side of the simulator to tell
+    -- that their message was read — the tester is both ends of it.
+    'sandbox'::public.service
+  )
   and (
     (old.status ->> 'read') <> (new.status ->> 'read')
     or (old.status ->> 'typing') <> (new.status ->> 'typing')
