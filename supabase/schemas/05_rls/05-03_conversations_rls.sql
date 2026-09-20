@@ -87,7 +87,17 @@ with check (
   and service = 'local'::public.service
 );
 
-create policy "members can delete their orgs local conversations"
+-- S1 widened this by exactly one value. `local` was deletable because it is
+-- the organization's own room: there is no contact on the other side who
+-- would notice it vanish, and no external history being rewritten. A
+-- `sandbox` conversation is the same kind of thing — it is what the
+-- simulator's "Reiniciar" throws away — so the rule grows a value rather
+-- than a second door being cut beside it. messages cascade.
+--
+-- Deliberately NOT restricted to the member who opened the drill: §5 asks
+-- for "las conversaciones sandbox de la organizacion". Any member can reset
+-- any of them, colleagues' included.
+create policy "members can delete their orgs local and sandbox conversations"
 on public.conversations
 for delete
 to authenticated, anon
@@ -95,7 +105,7 @@ using (
   organization_id in (
     select rls.get_authorized_orgs('member')
   )
-  and service = 'local'::public.service
+  and service in ('local'::public.service, 'sandbox'::public.service)
   and (
     (
       (organization_id, service, organization_address) in (

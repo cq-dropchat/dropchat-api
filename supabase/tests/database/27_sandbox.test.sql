@@ -12,7 +12,7 @@
 -- through the REAL contact trigger; and none of it leaves the building —
 -- no dispatcher, no read receipt, no webhook.
 begin;
-select plan(19);
+select plan(26);
 
 -- ---------------------------------------------------------------------------
 -- The enum value. `db diff` cannot add this one (public.service is named by
@@ -265,6 +265,104 @@ select is(
    where (d.payload -> 'data' ->> 'id') = 'aaaaaaaa-0000-4000-8000-00000000f0f3'),
   1,
   'the same insert on whatsapp DOES fire the webhook: sandbox is the exception'
+);
+
+-- ---------------------------------------------------------------------------
+-- "Reiniciar": the simulator is the one conversation a member is allowed to
+-- throw away.
+--
+-- No new RPC for this. Members already hold DELETE on their `local`
+-- conversations (05-03) and on nothing else; a drill is the same kind of
+-- thing — the organization's own room, with no contact on the other side
+-- who would notice it vanish — so the existing policy grows one value
+-- instead of a second door being cut next to it. messages cascade.
+-- ---------------------------------------------------------------------------
+
+insert into public.conversations (
+  organization_id, id, service, organization_address, address
+) values (
+  tests.id('org_a'),
+  'aaaaaaaa-0000-4000-8000-0000000000cd',
+  'sandbox',
+  tests.id('org_a')::text,
+  'sandbox:to-be-reset'
+);
+
+insert into public.messages (
+  id, organization_id, conversation_id, sender_address, content
+) values (
+  'aaaaaaaa-0000-4000-8000-00000000f0fd', tests.id('org_a'),
+  'aaaaaaaa-0000-4000-8000-0000000000cd', 'sandbox:to-be-reset',
+  '{"version": "1", "type": "text", "kind": "text", "text": "se borra"}'
+);
+
+select tests.authenticate_as('bob@test.local');
+select lives_ok(
+  $$delete from public.conversations
+    where id = 'aaaaaaaa-0000-4000-8000-0000000000cd'$$,
+  'user B deleting org A''s simulator raises nothing — RLS filters, it does not throw'
+);
+select tests.clear_authentication();
+
+select is(
+  (select count(*)::int from public.conversations
+   where id = 'aaaaaaaa-0000-4000-8000-0000000000cd'),
+  1,
+  '...and deletes nothing: the row is still there'
+);
+
+select tests.authenticate_with_api_key(tests.val('key_b_member'));
+delete from public.conversations
+where id = 'aaaaaaaa-0000-4000-8000-0000000000cd';
+select tests.clear_authentication();
+
+select is(
+  (select count(*)::int from public.conversations
+   where id = 'aaaaaaaa-0000-4000-8000-0000000000cd'),
+  1,
+  'nor does API key B'
+);
+
+select tests.authenticate_as_anon();
+select throws_ok(
+  $$delete from public.conversations
+    where id = 'aaaaaaaa-0000-4000-8000-0000000000cd'$$,
+  null,
+  'authentication required',
+  'anon is refused outright'
+);
+select tests.clear_authentication();
+
+-- A member of the organization can. This is the button.
+select tests.authenticate_as('alice@test.local');
+delete from public.conversations
+where id = 'aaaaaaaa-0000-4000-8000-0000000000cd';
+select tests.clear_authentication();
+
+select is(
+  (select count(*)::int from public.conversations
+   where id = 'aaaaaaaa-0000-4000-8000-0000000000cd'),
+  0,
+  'user A resets their own organization''s simulator'
+);
+
+select is(
+  (select count(*)::int from public.messages
+   where id = 'aaaaaaaa-0000-4000-8000-00000000f0fd'),
+  0,
+  'and the messages go with it, by cascade'
+);
+
+-- The control: this widened DELETE by exactly one value and not by "any
+-- conversation the member can see".
+select tests.authenticate_as('alice@test.local');
+delete from public.conversations where id = tests.id('conv_a1');
+select tests.clear_authentication();
+
+select is(
+  (select count(*)::int from public.conversations where id = tests.id('conv_a1')),
+  1,
+  'a real whatsapp conversation is still undeletable by a member'
 );
 
 select * from finish();
