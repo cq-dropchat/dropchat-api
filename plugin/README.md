@@ -156,8 +156,8 @@ Env vars override everything (for CI or scripting):
 
 | Variable            | Description                                                      |
 | ------------------- | ---------------------------------------------------------------- |
-| `SUPABASE_URL`      | Supabase project URL                                             |
-| `SUPABASE_ANON_KEY` | Supabase anonymous key                                           |
+| `SUPABASE_URL`      | Supabase project URL (**required**)                              |
+| `SUPABASE_ANON_KEY` | Supabase publishable key for that same project (**required**)    |
 | `ORG_ID`            | Organization ID (multi-org)                                      |
 | `ACCOUNT_PHONE`     | WhatsApp account phone, digits only (multi-account)              |
 | `OPENBSP_STATE_DIR` | Override state directory (default: `~/.claude/channels/openbsp`) |
@@ -176,8 +176,12 @@ All settings are stored in `~/.claude/channels/openbsp/config.json`:
 }
 ```
 
-All fields are optional — missing keys fall back to hardcoded production
-defaults or auto-detection. An empty or missing `allowedContacts` blocks all
+`supabaseUrl` and `supabaseAnonKey` are required, here or as env vars, and they
+must belong to the same project: a key authenticates against the project it was
+issued for, so a mismatched pair answers every request `401`, which reads as a
+bad key rather than a wrong address. The plugin ships no built-in project — it
+refuses to start rather than guess one. The remaining fields are optional and
+fall back to auto-detection; an empty or missing `allowedContacts` blocks all
 channel messages (secure by default).
 
 ## Authentication

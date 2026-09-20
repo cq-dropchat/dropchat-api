@@ -108,7 +108,7 @@ await client.sendMessage("5491155551234@c.us", "Hello world");
 **OpenBSP**
 
 ```http
-POST https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/messages
+POST https://qqfrzurledgywyhcxdse.supabase.co/rest/v1/messages
 apikey: <publishable_key>
 api-key: <openbsp_api_key>
 Content-Type: application/json

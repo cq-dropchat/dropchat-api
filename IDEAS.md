@@ -64,7 +64,7 @@ The self-hosted owner has DB credentials. Procedure:
   checks, and webhook notifications.
 - **WhatsApp webhook URL must be updated** — after migration, each connected
   WhatsApp account's callback URL in the Meta App Dashboard still points to the
-  hosted instance (`nheelwshzbgenpavwhcy.supabase.co`). It needs to be
+  hosted instance (`qqfrzurledgywyhcxdse.supabase.co`). It needs to be
   re-pointed to the new Supabase project's `whatsapp-webhook` endpoint. This
   could be automated via the WhatsApp Business Management API
   (`POST /{app-id}/subscriptions`) or done manually per app in Meta > WhatsApp >

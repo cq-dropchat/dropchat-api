@@ -70,7 +70,7 @@ an endpoint, so you can use plain REST or any
 your URL:
 
 ```bash
-curl -X POST 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/webhooks' \
+curl -X POST 'https://qqfrzurledgywyhcxdse.supabase.co/rest/v1/webhooks' \
   -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <API_KEY>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -122,7 +122,7 @@ for status changes).
 **2. Send a message** — insert a row; OpenBSP dispatches it to WhatsApp:
 
 ```bash
-curl -X POST 'https://nheelwshzbgenpavwhcy.supabase.co/rest/v1/messages' \
+curl -X POST 'https://qqfrzurledgywyhcxdse.supabase.co/rest/v1/messages' \
   -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <API_KEY>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -145,7 +145,7 @@ The same insert through the Supabase JS SDK:
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
-  "https://nheelwshzbgenpavwhcy.supabase.co",
+  "https://qqfrzurledgywyhcxdse.supabase.co",
   "<PUBLISHABLE_KEY>",
   { global: { headers: { "api-key": "<API_KEY>" } } },
 );
@@ -278,7 +278,7 @@ For the hosted version at [web.openbsp.dev](https://web.openbsp.dev), the MCP
 server URL is:
 
 ```
-https://nheelwshzbgenpavwhcy.supabase.co/functions/v1/mcp
+https://qqfrzurledgywyhcxdse.supabase.co/functions/v1/mcp
 ```
 
 Two authentication methods:
@@ -297,7 +297,7 @@ Two authentication methods:
 Claude Code (then authenticate from the `/mcp` panel):
 
 ```bash
-claude mcp add --transport http openbsp https://nheelwshzbgenpavwhcy.supabase.co/functions/v1/mcp
+claude mcp add --transport http openbsp https://qqfrzurledgywyhcxdse.supabase.co/functions/v1/mcp
 ```
 
 In Claude Desktop or ChatGPT, add it as a custom connector with the same URL —
@@ -308,7 +308,7 @@ OAuth kicks in automatically. For headless clients, use an API key instead
 {
   "mcpServers": {
     "openbsp": {
-      "url": "https://nheelwshzbgenpavwhcy.supabase.co/functions/v1/mcp",
+      "url": "https://qqfrzurledgywyhcxdse.supabase.co/functions/v1/mcp",
       "headers": {
         "api-key": "<API_KEY>"
       }

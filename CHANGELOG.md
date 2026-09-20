@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+- **`category` is an enum in the published content contract** (H3). The
+  escalation vocabulary was declared beside the tool that enforces it, and
+  `AssignmentData.category` was typed `string`, so
+  `contracts/message-content.v1.schema.json` told you an assignment note carried
+  "a string" while three other places — this file's `## 12`, the agent-client,
+  the UI that renders the note — each kept their own copy of the seven words.
+  Nothing compared them.
+
+  The list now lives in the mirrored types, and the generated schema names it:
+  `EscalationCategory`, with the same seven values. **Validate against the
+  schema, not against the prose.** No value changed, so nothing you already
+  parse breaks; what changes is that the contract is now specific enough to
+  reject a category that does not exist.
+
+- **The base URL in this repo was a different project.** Every address the docs
+  gave an integrator — the base URL in `## 2` of INTEGRATING, the curl recipes,
+  the `host` of `openapi.json`, the MCP endpoint in README, the plugin's
+  built-in default — named `nheelwshzbgenpavwhcy`, while the project this repo
+  is linked to and deploys to is `qqfrzurledgywyhcxdse`.
+
+  **If you integrated against the old address, change it.** The old ref still
+  resolves — it is a live, separate project — so the mistake does not announce
+  itself: requests reach a real gateway and come back `401`, which reads as a
+  bad key rather than a wrong address. Your key is fine; the host was not.
+
+  The plugin (`plugin/`) no longer ships a built-in project at all. Its url and
+  key were a frozen pair, and a key only authenticates against the project it
+  was issued for, so the pair could not survive the project changing. Set
+  `SUPABASE_URL` and `SUPABASE_ANON_KEY`, or write `supabaseUrl` and
+  `supabaseAnonKey` into `~/.claude/channels/openbsp/config.json`; the plugin
+  now refuses to start rather than guess. Nothing else takes a default.
+
+  What keeps this from drifting again: `[remotes.production].project_id` in
+  `config.toml` is the single declaration, and a test walks the repo and fails
+  on any file that names a different ref.
+
 - **A new service, `sandbox`, that never leaves the building** (S1). "Probar
   como cliente" opens a conversation on it and the member writes as the
   customer, so an agent can be tried against the real path — agent selection and

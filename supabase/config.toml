@@ -120,6 +120,32 @@ entrypoint = "./functions/slack-dispatcher/index.ts"
 [remotes.production]
 project_id = "qqfrzurledgywyhcxdse"
 
+# Lo que producción tiene y este archivo NO declara (supabase config diff,
+# 20/09/2026). No están acá a propósito: `config push` deja sin tocar toda
+# propiedad que el archivo no declara, así que mientras sigan afuera el push
+# no puede pisarlas. Declarar cualquiera de estas líneas es ARMAR el push
+# para cambiar producción con ese valor — no se declara una sin quererlo.
+#
+#   auth.external.github.client_id     Ov23linQdwJpgxIRWqYv
+#   auth.external.github.enabled       true
+#   auth.sms.twilio.enabled            true   (local: false)
+#   db.pooler.default_pool_size        15     (local: 20)
+#   db.pooler.max_client_conn          200    (local: 100)
+#   storage.analytics.enabled          true   (local: false)
+#   storage.analytics.max_namespaces   10
+#   storage.image_transformation.enabled true
+#
+# Las tres últimas y las dos del pooler son ajustes del panel y no hacen daño.
+# Las dos primeras son decisiones pendientes, porque abren una puerta:
+# «users can create orgs» es `with check (true)` para cualquier authenticated,
+# y no hay trigger que exija invitación — con un proveedor de identidad
+# abierto, cualquiera que se registre puede crear su propia organización y
+# gastar contra nuestras credenciales de LLM. El login de la UI es Google;
+# GitHub está prendido sin que nadie lo pidiera. Twilio SMS prendido es un
+# segundo camino de autenticación (y el blanco habitual del SMS pumping);
+# desde acá se ve el toggle, no si tiene credenciales cargadas: eso se mira
+# en el panel.
+
 [remotes.production.auth]
 site_url = "https://app.dropchat.club"
 # El dominio de Pages queda permitido como respaldo: si el dominio propio falla

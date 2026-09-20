@@ -10,7 +10,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { loadConfig, SESSION_FILE, STATE_DIR } from "./config.ts";
+import { requireEndpoint, SESSION_FILE, STATE_DIR } from "./config.ts";
 
 type SavedSession = {
   access_token: string;
@@ -50,8 +50,8 @@ export function clearSavedSession(): void {
  * starts an interactive flow.
  */
 export function createSupabaseClient(): SupabaseClient {
-  const config = loadConfig();
-  const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+  const { url, anonKey } = requireEndpoint();
+  const supabase = createClient(url, anonKey, {
     auth: {
       flowType: "pkce",
       detectSessionInUrl: false,

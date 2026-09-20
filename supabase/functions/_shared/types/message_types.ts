@@ -236,6 +236,30 @@ export type ShareData = {
 export type SharePart = DataPart<"share", ShareData>;
 
 /**
+ * H3 — why an agent handed a conversation to a person, as a closed list.
+ *
+ * Closed on purpose: M1 counts escalations by category to say what the AI
+ * cannot handle, and a free-text field would make that ungroupable. `otro`
+ * is the escape hatch, with `reason` carrying the specifics.
+ *
+ * It lives HERE, among the mirrored types, rather than beside the tool that
+ * enforces it: the UI names every category to render it, and the API's copy
+ * is the authority. `check-type-sync.sh` compares this file against the UI's
+ * mirror, so the two lists cannot drift apart in silence.
+ */
+export const ESCALATION_CATEGORIES = [
+  "reclamo",
+  "pedido_fuera_de_alcance",
+  "pide_persona",
+  "pago",
+  "envio",
+  "cambio_devolucion",
+  "otro",
+] as const;
+
+export type EscalationCategory = (typeof ESCALATION_CATEGORIES)[number];
+
+/**
  * H1 — the audit note of an assignment, written by
  * public.set_conversation_assignment: who was answering, who is now, who
  * decided and why. Record-only (it always carries `internal`), never
@@ -248,7 +272,7 @@ export type AssignmentData = {
   by: string | null;
   cause: "routing" | "entry" | "escalation" | "manual" | "takeover" | "expiry";
   /** H3: the closed category of an escalation, when the note records one. */
-  category?: string;
+  category?: EscalationCategory;
   reason?: string;
 };
 

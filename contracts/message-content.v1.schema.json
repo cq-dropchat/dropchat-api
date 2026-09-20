@@ -1647,7 +1647,7 @@
           ]
         },
         "category": {
-          "type": "string",
+          "$ref": "#/definitions/EscalationCategory",
           "description": "H3: the closed category of an escalation, when the note records one."
         },
         "reason": {
@@ -1662,6 +1662,18 @@
         "cause"
       ],
       "description": "H1 — the audit note of an assignment, written by public.set_conversation_assignment: who was answering, who is now, who decided and why. Record-only (it always carries `internal`), never dispatched, and never part of the history the model reads."
+    },
+    "EscalationCategory": {
+      "type": "string",
+      "enum": [
+        "reclamo",
+        "pedido_fuera_de_alcance",
+        "pide_persona",
+        "pago",
+        "envio",
+        "cambio_devolucion",
+        "otro"
+      ]
     },
     "TaskState": {
       "type": "string",
