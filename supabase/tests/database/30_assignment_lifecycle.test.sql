@@ -11,7 +11,7 @@
 -- hours at all, and Chile's daylight saving change, where one day has 23
 -- hours and another 25.
 begin;
-select plan(38);
+select plan(41);
 
 -- ---------------------------------------------------------------------------
 -- Defaults (A6, with 24/7 as the unconfigured schedule).
@@ -530,6 +530,61 @@ select is(
   '*/15 * * * *',
   'the human expiry runs every fifteen minutes'
 );
+
+-- ---------------------------------------------------------------------------
+-- H5 — who gets told, and who decides that.
+--
+-- Without email (A7 was answered "no email in v1"), the notice is the app's:
+-- the conversation row travels by Realtime, where RLS already decides who
+-- sees it, and the member's own preference decides whether it interrupts
+-- them. What has to hold here is that the preference is THEIRS: an admin
+-- cannot decide what interrupts a colleague.
+-- ---------------------------------------------------------------------------
+
+select tests.authenticate_as('amber@test.local');
+
+select lives_ok(
+  format(
+    $$update public.agents
+      set extra = '{"notifications": {"escalation": false}}'::jsonb
+      where id = %L$$,
+    tests.id('agent_amber')
+  ),
+  'a member turns their own escalation notices off'
+);
+
+select is(
+  (
+    select (extra -> 'notifications' ->> 'escalation')::boolean
+    from public.agents where id = tests.id('agent_amber')
+  ),
+  false,
+  'and it is stored'
+);
+
+-- Alice is the owner, so she CAN write amber's row (the admin policy) — what
+-- she cannot do is pass herself off as amber, which the identity guard
+-- covers. The preference being per-member is the product rule; this pins
+-- that a plain member cannot reach anybody else's.
+select tests.clear_authentication();
+select tests.authenticate_as('amber@test.local');
+
+-- RLS hides the row from the UPDATE rather than raising, so what says
+-- "refused" is that nothing changed.
+update public.agents
+set extra = '{"notifications": {"escalation": false}}'::jsonb
+where id = tests.id('agent_alice');
+
+select is(
+  (
+    select extra -> 'notifications' ->> 'escalation'
+    from public.agents where id = tests.id('agent_alice')
+  ),
+  null,
+  'a member cannot change another member''s preference'
+);
+
+select tests.clear_authentication();
 
 select * from finish();
 rollback;

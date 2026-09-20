@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- **A handover now reaches somebody** (H5). When a conversation starts waiting
+  for a person, the app counts it in the browser tab's title and — with
+  permission, asked at the first handover and never on load — shows a browser
+  notification. Nothing is announced for the conversation already open on
+  screen, and each member decides for themselves with
+  `agents.extra.notifications.escalation` (absent = on); turning it off silences
+  the interruption, not the count.
+
+  For integrators: no new endpoint. The fact travels on the channels that
+  already exist — the `update` event of `conversations` on your webhooks, where
+  an escalation is a row whose `awaiting_human_since` went from null to a
+  timestamp, and the same row over Realtime for the UI.
+
+  **Email is not part of this version.** The spec's A7 proposed Resend with a
+  per-member preference; that was answered "no email in v1", so there is no
+  `notify` function, no provider and no `RESEND_API_KEY`. The preference key is
+  named for the channel it governs today (`escalation`), so an email flag can be
+  added beside it without moving anything.
+
 - **An assignment no longer lasts for ever** (H4). A conversation is one row per
   contact for the life of that contact, so nothing used to end an assignment.
   Now:
