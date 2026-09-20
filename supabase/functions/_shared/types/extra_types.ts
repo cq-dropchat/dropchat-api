@@ -16,7 +16,42 @@ export type PreprocessingConfig = {
   extra_prompt?: string;
 };
 
+/**
+ * H4: when the organization is reachable, and how long an assignment lasts.
+ * Every reader goes through the defaults (A6) — in SQL
+ * `public.attention_config`, in TypeScript `attentionConfig` — so a missing
+ * key is never a missing rule.
+ */
+export type AttentionConfig = {
+  /** IANA name; the market's zone by default. */
+  timezone?: string;
+  /**
+   * Weekly schedule, as local [from, to] pairs per day (several per day for
+   * a lunch break). Absent — or null — means 24/7, which is what an
+   * organization that never configured one gets.
+   */
+  business_hours?:
+    | Partial<
+      Record<
+        "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun",
+        [string, string][]
+      >
+    >
+    | null;
+  /** Days without the contact writing before the conversation routes again. */
+  ai_assignment_ttl_days?: number;
+  /** Hours without the person writing before it goes back to routing; 0 = never. */
+  human_assignment_ttl_hours?: number;
+  /** Business minutes a contact waits for a person after an escalation. */
+  human_wait_minutes?: number;
+  on_human_wait_timeout?: "notify_customer" | "return_to_ai";
+  human_wait_message?: string;
+  /** A2: answering by hand takes the conversation. */
+  auto_takeover?: boolean;
+};
+
 export type OrganizationExtra = {
+  attention?: AttentionConfig;
   media_preprocessing?: PreprocessingConfig;
   error_messages_direction?: "internal" | "outgoing";
   /**

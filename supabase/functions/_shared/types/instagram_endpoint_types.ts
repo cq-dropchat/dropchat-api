@@ -42,6 +42,13 @@ export type IgOutgoingLikeHeart = {
 export type IgEndpointMessage = {
   recipient: IgRecipient;
   message: IgOutgoingText | IgOutgoingAttachment | IgOutgoingLikeHeart;
+  /**
+   * H4: how Instagram is told why a message may go out past the 24-hour
+   * window. Only one tag is used here — HUMAN_AGENT, a person's reply, good
+   * for 7 days — and only a person's message may carry it.
+   */
+  messaging_type?: "RESPONSE" | "UPDATE" | "MESSAGE_TAG";
+  tag?: "HUMAN_AGENT";
 };
 
 // Reactions are delivered as sender actions carrying a payload.

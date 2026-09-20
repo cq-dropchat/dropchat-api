@@ -50,6 +50,7 @@ import {
   assignConversation,
   clearAssignmentOnRestart,
   loadAssignedAgent,
+  previousContactMessageAt,
   takenFromUs,
 } from "./assignment.ts";
 import { startTyping } from "./typing.ts";
@@ -191,6 +192,7 @@ export async function handler(req: Request): Promise<Response> {
     assigned ? [...aiAgents, assigned] : aiAgents,
     dmAI,
     organization,
+    await previousContactMessageAt(client, conv, incoming),
   );
 
   // Persisted before the delay, so the conversation has an owner even if this

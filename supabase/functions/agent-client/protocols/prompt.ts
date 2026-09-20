@@ -6,6 +6,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import { inspect } from "node:util";
 import type { MessageRow } from "../../_shared/supabase.ts";
+import { attentionContext } from "../../_shared/attention.ts";
 import type { RequestContext } from "./base.ts";
 dayjs.extend(utc);
 
@@ -77,8 +78,15 @@ export function buildSystemPrompt(context: RequestContext): string {
 
 /** The facts that change between one invocation and the next. */
 function runtimeContext(context: RequestContext) {
+  // H4: whether the team is reachable right now, and when it is next — so an
+  // agent handing a conversation over after hours says when somebody will
+  // answer instead of promising one immediately. Absent for an organization
+  // with no schedule, which is reachable at any hour.
+  const attention = attentionContext(context.organization.extra);
+
   return {
     now: dayjs.utc().format("dddd, YYYY-MM-DD HH:mm [UTC]"),
+    ...(attention && { attention }),
     user: {
       name: context.contact?.name,
       // The '+address' spelling is a phone-space thing; a local DM's address

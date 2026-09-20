@@ -62,6 +62,15 @@ insert into service_only values
   -- H3: the trigger behind the implicit takeover. assign_conversation is NOT
   -- here on purpose — it is the member-facing door and checks its caller.
   ('public.handle_implicit_takeover()'),
+  -- H4: the lifecycle sweeps and the attention arithmetic behind them.
+  ('public.expire_human_assignments(integer)'),
+  ('public.sweep_awaiting_human(integer)'),
+  ('public.attention_config(jsonb)'),
+  ('public.attention_day_windows(jsonb, date)'),
+  ('public.attention_business_minutes(jsonb, timestamp with time zone, timestamp with time zone)'),
+  ('public.attention_is_open(jsonb, timestamp with time zone)'),
+  ('public.attention_next_opening(jsonb, timestamp with time zone)'),
+  ('public.channel_window_open(uuid, timestamp with time zone)'),
   ('billing.renew_subscriptions(integer)'),
   ('billing.grant_included_products(uuid, text, timestamp with time zone)');
 

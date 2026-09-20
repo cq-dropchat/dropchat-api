@@ -1647,6 +1647,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      attention_business_minutes: {
+        Args: { p_config: Json; p_from: string; p_to: string }
+        Returns: number
+      }
+      attention_config: { Args: { p_extra: Json }; Returns: Json }
+      attention_day_windows: {
+        Args: { p_config: Json; p_date: string }
+        Returns: {
+          closes: string
+          opens: string
+        }[]
+      }
+      attention_is_open: {
+        Args: { p_at: string; p_config: Json }
+        Returns: boolean
+      }
+      attention_next_opening: {
+        Args: { p_at: string; p_config: Json }
+        Returns: string
+      }
       begin_agent_turn: {
         Args: {
           _conversation_id: string
@@ -1654,6 +1674,10 @@ export type Database = {
           _message_id: string
         }
         Returns: undefined
+      }
+      channel_window_open: {
+        Args: { p_at?: string; p_conversation_id: string }
+        Returns: boolean
       }
       claim_agent_turn: {
         Args: { _conversation_id: string; _message_id: string }
@@ -1714,6 +1738,7 @@ export type Database = {
       edge_call_max_attempts: { Args: never; Returns: number }
       edge_call_retry_delay: { Args: { attempt: number }; Returns: string }
       edge_functions_config: { Args: never; Returns: Record<string, unknown> }
+      expire_human_assignments: { Args: { p_limit?: number }; Returns: number }
       expired_organization_exports: {
         Args: { _limit?: number }
         Returns: {
@@ -1880,6 +1905,7 @@ export type Database = {
       }
       settle_edge_calls: { Args: never; Returns: number }
       settle_webhook_deliveries: { Args: never; Returns: number }
+      sweep_awaiting_human: { Args: { p_limit?: number }; Returns: number }
       sweep_deletions: { Args: { _budget?: number }; Returns: Json }
       sweep_pending_media: { Args: { _limit?: number }; Returns: number }
       webhook_max_attempts: { Args: never; Returns: number }

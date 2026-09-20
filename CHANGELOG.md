@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+- **An assignment no longer lasts for ever** (H4). A conversation is one row per
+  contact for the life of that contact, so nothing used to end an assignment.
+  Now:
+  - an AI assignment goes back to routing when the contact has not written for
+    `ai_assignment_ttl_days` (14 by default), checked lazily on the next message
+    — no cron, no background write;
+  - a human assignment goes back to routing when that person has not written in
+    it for `human_assignment_ttl_hours` (72; `0` means never), swept every
+    fifteen minutes;
+  - an escalation nobody answered within `human_wait_minutes` (30) of BUSINESS
+    time either tells the contact once (`notify_customer`, the default) or goes
+    back to the AI (`return_to_ai`), swept every minute.
+
+  All of it is configured in `organizations.extra.attention`, whose defaults
+  apply key by key: `timezone` (`America/Santiago`), `business_hours` (absent =
+  24/7), the three limits above, `on_human_wait_timeout`, `human_wait_message`
+  and `auto_takeover`. Note that `extra` is written as a JSON merge patch: a
+  `null` REMOVES a key (and restores its default), which is why "never expires"
+  is `0` and not `null`.
+
+- **The waiting message respects the channel's window** (H4). Nothing is sent to
+  a contact whose 24-hour window has closed — it would only fail at the
+  dispatcher — and nothing is sent twice
+  (`conversations.extra.human_wait_notified_at`).
+
+- **Instagram: a person's reply past 24 hours carries the HUMAN_AGENT tag**
+  (H4). The dispatcher now sends `messaging_type: "MESSAGE_TAG"` with
+  `tag: "HUMAN_AGENT"` when the author is a member of the organization and the
+  standard window has closed — the case an escalation creates over a weekend. An
+  AI reply is never tagged.
+
+- **The agent knows the business hours** (H4). The system prompt's context
+  carries `attention.open_now` and, when closed, `attention.next_opening`, so a
+  handover after hours says when somebody will answer instead of promising one
+  immediately. Absent for an organization with no schedule.
+
 - **An agent can hand a conversation to a person** (H3). A new tool,
   `escalate_to_human(category, reason)`, is offered to every agent on external
   services (turn it off per agent with `agents.extra.can_escalate = false`).

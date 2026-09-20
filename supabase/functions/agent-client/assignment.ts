@@ -195,3 +195,36 @@ export async function takenFromUs(
   return data.assigned_agent_id !== conv.assigned_agent_id ||
     (data.awaiting_human_since ?? null) !== (conv.awaiting_human_since ?? null);
 }
+
+/**
+ * H4 — when the contact last wrote BEFORE the message being answered.
+ *
+ * That gap is what decides whether an AI assignment is stale: a conversation
+ * is one row per contact for the life of that contact, so without this the
+ * agent that answered in March still owns the conversation in December.
+ *
+ * Only asked when there IS an assignment to question — one indexed lookup on
+ * (organization_id, conversation_id, timestamp), and none at all for the
+ * conversations that have no assignment yet.
+ */
+export async function previousContactMessageAt(
+  client: SupabaseClient<Database>,
+  conv: ConversationRow,
+  incoming: MessageRow,
+): Promise<string | null> {
+  if (!conv.assigned_agent_id) {
+    return null;
+  }
+
+  const { data } = await client
+    .from("messages")
+    .select("timestamp")
+    .eq("conversation_id", conv.id)
+    .not("sender_address", "is", null)
+    .lt("timestamp", incoming.timestamp)
+    .order("timestamp", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data?.timestamp ?? null;
+}

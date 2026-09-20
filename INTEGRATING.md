@@ -336,6 +336,31 @@ AI or is waiting for a person, also takes it (an assignment note of cause
 `takeover`). Record-only rows (`content.internal`) do not. Turn it off per
 organization with `organizations.extra.attention.auto_takeover = false`.
 
+### How long an assignment lasts (H4)
+
+`organizations.extra.attention` holds the settings, and every default applies
+key by key:
+
+| Key                          | Default            | Meaning                                                                                              |
+| ---------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------- |
+| `timezone`                   | `America/Santiago` | IANA zone the schedule is read in.                                                                   |
+| `business_hours`             | absent = 24/7      | `{ "mon": [["09:00","19:00"]], … }`, several windows a day for a break.                              |
+| `ai_assignment_ttl_days`     | `14`               | Days without the contact writing before the conversation routes again (checked on the next message). |
+| `human_assignment_ttl_hours` | `72`               | Hours without that person writing before it goes back to routing. `0` means never.                   |
+| `human_wait_minutes`         | `30`               | Business minutes a contact waits for a person after an escalation.                                   |
+| `on_human_wait_timeout`      | `notify_customer`  | Or `return_to_ai`, which hands the conversation back to the AI.                                      |
+| `human_wait_message`         | a Spanish default  | What `notify_customer` sends, once.                                                                  |
+| `auto_takeover`              | `true`             | Answering by hand takes the conversation.                                                            |
+
+`extra` is written as a **JSON merge patch**: sending `null` for a key removes
+it, which brings its default back. That is why "never expires" is `0` rather
+than `null`, and how a schedule is cleared (`"business_hours": null`).
+
+Two consequences on the wire: an assignment can change with no API call of yours
+(an `update` event of `conversations`, and a note whose cause is `expiry`), and
+a conversation waiting past the limit may receive one extra outgoing message —
+the waiting message — which is never sent outside the channel's 24-hour window.
+
 ## 8. (Optional) Poll instead of webhooks
 
 If you'd rather pull than receive pushes:

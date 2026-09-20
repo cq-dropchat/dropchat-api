@@ -168,6 +168,13 @@ export function selectAgent(
   agents: AgentRow[],
   dmAI: AgentRowWithExtra | undefined,
   org: EntryConfig,
+  /**
+   * H4: when the contact last wrote BEFORE the message being answered. An
+   * assignment older than the organization's TTL is stale — the conversation
+   * routes again — because a conversation is one row per contact for ever
+   * and nothing else ever ends an assignment.
+   */
+  previousContactAt?: string | null,
 ): AgentSelection {
   if (conv.service === "local") {
     // A DM's roster IS the decision; an assignment would have nothing to add.
@@ -196,18 +203,27 @@ export function selectAgent(
 
   const eligible = agents.filter(isEligibleAI) as AgentRowWithExtra[];
 
+  let cause: AssignmentCause = "entry";
+
   if (conv.assigned_agent_id) {
     const assigned = agents.find((a) => a.id === conv.assigned_agent_id);
 
-    if (assigned && isEligibleAI(assigned)) {
-      return { agent: assigned as AgentRowWithExtra };
+    if (assigned && assigned.user_id !== null) {
+      // A human holds it (a membership row, or an id the AI-only embed did
+      // not carry and the caller resolved as a member): the AI does not take
+      // it back. Only an explicit hand-back (H3) or the human TTL of H4 —
+      // a sweep, not this — does.
+      return { agent: undefined };
     }
 
-    // A human holds it (a membership row, or an id the AI-only embed did not
-    // carry and the caller resolved as a member): the AI does not take it
-    // back. Only an explicit hand-back (H3) or a lifecycle expiry (H4) does.
-    if (assigned && assigned.user_id !== null) {
-      return { agent: undefined };
+    if (assigned && isEligibleAI(assigned)) {
+      if (!isStale(org, previousContactAt)) {
+        return { agent: assigned as AgentRowWithExtra };
+      }
+
+      // The contact went away for longer than the organization allows, so
+      // the conversation is routed again and the note says why.
+      cause = "expiry";
     }
 
     // Anything else — retired, inactive, draft, or an agent that no longer
@@ -223,8 +239,30 @@ export function selectAgent(
       .at(0);
 
   return agent
-    ? { agent, assign: { agent_id: agent.id, cause: "entry" } }
+    ? { agent, assign: { agent_id: agent.id, cause } }
     : { agent: undefined };
+}
+
+/**
+ * Has the contact been away longer than the organization allows an AI
+ * assignment to last? Measured on the contact's PREVIOUS message, not on the
+ * one being answered: what matters is the gap they left.
+ */
+function isStale(
+  org: EntryConfig,
+  previousContactAt: string | null | undefined,
+): boolean {
+  if (!previousContactAt) {
+    return false;
+  }
+
+  const days = org.extra?.attention?.ai_assignment_ttl_days ?? 14;
+
+  if (days <= 0) {
+    return false;
+  }
+
+  return Date.now() - +new Date(previousContactAt) > days * 24 * 60 * 60 * 1000;
 }
 
 // Authorship is space-relative: outside, the peer is whoever carries a

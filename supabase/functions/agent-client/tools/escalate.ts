@@ -102,8 +102,8 @@ export async function escalateToHumanImplementation(
       .maybeSingle();
 
     context.conversation.assigned_agent_id = current?.assigned_agent_id ?? null;
-    context.conversation.awaiting_human_since =
-      current?.awaiting_human_since ?? null;
+    context.conversation.awaiting_human_since = current?.awaiting_human_since ??
+      null;
   }
 
   return { escalated: true };

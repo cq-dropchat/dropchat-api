@@ -36,6 +36,7 @@ type Route = (req: Request) => Promise<Response> | Response | undefined;
 /** Answers Instagram's hosts; counts Send API calls. Anything else is real. */
 function stubInstagram(route: Route) {
   const realFetch = globalThis.fetch;
+  const bodies: unknown[] = [];
   let sends = 0;
   globalThis.fetch = async (input, init) => {
     const req = input instanceof Request ? input : new Request(input, init);
@@ -44,7 +45,11 @@ function stubInstagram(route: Route) {
       url.hostname === "graph.instagram.com" ||
       url.hostname === "api.instagram.com"
     ) {
-      if (url.pathname.endsWith(`/${IG_ACCOUNT}/messages`)) sends++;
+      if (url.pathname.endsWith(`/${IG_ACCOUNT}/messages`)) {
+        sends++;
+        // H4: what was actually sent, so a test can assert the tag.
+        bodies.push(await req.clone().json().catch(() => null));
+      }
       const response = await route(req);
       if (response) return response;
       return Response.json({ error: { message: "unrouted", code: 100 } }, {
@@ -53,7 +58,11 @@ function stubInstagram(route: Route) {
     }
     return realFetch(input, init);
   };
-  return { sends: () => sends, restore: () => (globalThis.fetch = realFetch) };
+  return {
+    sends: () => sends,
+    bodies,
+    restore: () => (globalThis.fetch = realFetch),
+  };
 }
 
 const EXPIRED = () =>
@@ -401,4 +410,128 @@ Deno.test({
         graph.restore();
       }
     }),
+});
+
+// ---------------------------------------------------------------------------
+// H4 — the 24-hour window, and the one way past it.
+//
+// Instagram lets a business answer inside 24 hours of the contact's last
+// message. A PERSON's reply can go out for up to 7 days with the HUMAN_AGENT
+// tag — exactly the case this phase creates: a conversation escalated on
+// Friday evening and taken by somebody on Monday. Without the tag that reply
+// is rejected and the customer hears nothing.
+// ---------------------------------------------------------------------------
+
+/** An inbound message from the contact, stamped in the past. */
+async function inboundAt(client: Client, hoursAgo: number) {
+  const at = new Date(Date.now() - hoursAgo * 3_600_000).toISOString();
+
+  await client
+    .from("messages")
+    .insert({
+      organization_id: fixture.orgA,
+      service: "instagram",
+      organization_address: IG_ACCOUNT,
+      conversation_address: IG_CONTACT,
+      sender_address: IG_CONTACT,
+      timestamp: at,
+      status: { delivered: at },
+      content: { version: "1", type: "text", kind: "text", text: "hola" },
+    })
+    .throwOnError();
+}
+
+async function outgoingBy(client: Client, agentId: string, text: string) {
+  const { data } = await client
+    .from("messages")
+    .insert({
+      organization_id: fixture.orgA,
+      service: "instagram",
+      organization_address: IG_ACCOUNT,
+      conversation_address: IG_CONTACT,
+      sender_address: null,
+      agent_id: agentId,
+      content: { version: "1", type: "text", kind: "text", text },
+      status: { pending: new Date().toISOString() },
+    })
+    .select()
+    .single()
+    .throwOnError();
+
+  return data as MessageRow;
+}
+
+Deno.test({
+  name:
+    "H4: a person's reply past the 24-hour window carries the HUMAN_AGENT tag",
+  ignore: !up,
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    await withAccount(async (client) => {
+      const ig = stubInstagram(() => SENT());
+
+      try {
+        await inboundAt(client, 48);
+
+        await handler(
+          request(await outgoingBy(client, fixture.agentAlice, "Soy Alice.")),
+        );
+
+        const sent = ig.bodies.at(-1) as {
+          messaging_type?: string;
+          tag?: string;
+        };
+
+        assertEquals(sent.messaging_type, "MESSAGE_TAG");
+        assertEquals(sent.tag, "HUMAN_AGENT");
+      } finally {
+        ig.restore();
+      }
+    });
+  },
+});
+
+Deno.test({
+  name: "H4: inside the window, and for the AI, nothing is tagged",
+  ignore: !up,
+  sanitizeResources: false,
+  sanitizeOps: false,
+  async fn() {
+    await withAccount(async (client) => {
+      const ig = stubInstagram(() => SENT());
+
+      try {
+        await inboundAt(client, 1);
+
+        await handler(
+          request(await outgoingBy(client, fixture.agentAlice, "Hola.")),
+        );
+
+        assertEquals(
+          (ig.bodies.at(-1) as { tag?: string }).tag,
+          undefined,
+          "inside the window a person needs no tag",
+        );
+
+        // Past the window, an AI reply is still not a human agent: tagging it
+        // would be a false statement to Meta.
+        await inboundAt(client, 48);
+
+        await handler(
+          request(
+            await outgoingBy(client, fixture.agentRobotA, "Automática."),
+          ),
+        );
+
+        assertEquals(
+          (ig.bodies.at(-1) as { tag?: string }).tag,
+          undefined,
+          "an AI reply is never tagged as a human agent",
+        );
+      } finally {
+        ig.restore();
+      }
+    });
+  },
 });

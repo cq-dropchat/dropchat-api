@@ -193,6 +193,53 @@ async function outgoingMessageToPayloads({
   }
 }
 
+/**
+ * H4 — may this row use the HUMAN_AGENT tag?
+ *
+ * Instagram accepts a business message inside 24 hours of the contact's last
+ * one; a PERSON's reply may go out for up to 7 days with this tag. That is
+ * the case this phase creates — a conversation escalated on Friday evening
+ * and taken on Monday — and without the tag the reply is rejected, so the
+ * customer hears nothing from the person who did come.
+ *
+ * Two conditions, both required: the window has closed, and a member of the
+ * organization wrote the message. An AI reply never qualifies, whatever the
+ * clock says: tagging it would be a false statement to Meta.
+ */
+async function humanAgentTag(
+  client: SupabaseClient,
+  message: MessageRow,
+): Promise<boolean> {
+  if (!message.agent_id) {
+    return false;
+  }
+
+  const { data: author } = await client
+    .from("agents")
+    .select("user_id")
+    .eq("id", message.agent_id)
+    .maybeSingle();
+
+  if (!author?.user_id) {
+    return false;
+  }
+
+  const { data: lastInbound } = await client
+    .from("messages")
+    .select("timestamp")
+    .eq("conversation_id", message.conversation_id)
+    .not("sender_address", "is", null)
+    .order("timestamp", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!lastInbound) {
+    return false;
+  }
+
+  return Date.now() - +new Date(lastInbound.timestamp) > 24 * 3_600_000;
+}
+
 async function postPayloadToInstagramEndpoint({
   payload,
   ig_user_id,
@@ -306,11 +353,21 @@ export async function handler(req: Request): Promise<Response> {
         client,
       });
 
+      // H4: past the 24-hour window, only a person's reply may go out, and
+      // only if it says so.
+      const tagged = await humanAgentTag(client, message);
+
       const responses: IgEndpointMessageResponse[] = [];
       for (const payload of payloads) {
         responses.push(
           await postPayloadToInstagramEndpoint({
-            payload,
+            payload: tagged && "message" in payload
+              ? {
+                ...payload,
+                messaging_type: "MESSAGE_TAG",
+                tag: "HUMAN_AGENT",
+              }
+              : payload,
             ig_user_id: message.organization_address,
             access_token,
           }),
