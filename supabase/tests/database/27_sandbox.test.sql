@@ -12,7 +12,7 @@
 -- through the REAL contact trigger; and none of it leaves the building —
 -- no dispatcher, no read receipt, no webhook.
 begin;
-select plan(26);
+select plan(30);
 
 -- ---------------------------------------------------------------------------
 -- The enum value. `db diff` cannot add this one (public.service is named by
@@ -268,39 +268,52 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- "Reiniciar": the simulator is the one conversation a member is allowed to
--- throw away.
+-- "Reiniciar": a member throws away THEIR OWN drills.
 --
--- No new RPC for this. Members already hold DELETE on their `local`
--- conversations (05-03) and on nothing else; a drill is the same kind of
--- thing — the organization's own room, with no contact on the other side
--- who would notice it vanish — so the existing policy grows one value
--- instead of a second door being cut next to it. messages cascade.
+-- Members already held DELETE on their `local` conversations (05-03) and on
+-- nothing else, because `local` is the organization's own room: no contact
+-- on the other side would notice it vanish. A drill is the same kind of
+-- thing, so the policy grew `sandbox` — but not org-wide. A drill belongs to
+-- the member who opened it, and its ADDRESS is that member's agent id, so
+-- the rule is a relation SQL can check rather than a string convention
+-- shared with the UI (rls.get_own_sandbox_addresses).
+--
+-- Admins keep the org-wide reach. Without it, a drill opened by somebody who
+-- has since left the organization would be undeletable by anyone: their
+-- agent row is marked deleted, so it is nobody's own any more.
+--
+-- API keys are nobody in particular — no auth.uid(), so no agent, so no
+-- drill of their own. They cannot delete drills at all, which is the same
+-- answer rls.get_own_agents already gives everywhere else.
 -- ---------------------------------------------------------------------------
 
+-- Amber's drill (a plain member) and Alice's (the owner).
 insert into public.conversations (
   organization_id, id, service, organization_address, address
-) values (
-  tests.id('org_a'),
-  'aaaaaaaa-0000-4000-8000-0000000000cd',
-  'sandbox',
-  tests.id('org_a')::text,
-  'sandbox:to-be-reset'
-);
+) values
+  (
+    tests.id('org_a'), 'aaaaaaaa-0000-4000-8000-0000000000cd', 'sandbox',
+    tests.id('org_a')::text, tests.id('agent_amber')::text
+  ),
+  (
+    tests.id('org_a'), 'aaaaaaaa-0000-4000-8000-0000000000ce', 'sandbox',
+    tests.id('org_a')::text, tests.id('agent_alice')::text
+  );
 
 insert into public.messages (
   id, organization_id, conversation_id, sender_address, content
 ) values (
   'aaaaaaaa-0000-4000-8000-00000000f0fd', tests.id('org_a'),
-  'aaaaaaaa-0000-4000-8000-0000000000cd', 'sandbox:to-be-reset',
+  'aaaaaaaa-0000-4000-8000-0000000000cd', tests.id('agent_amber')::text,
   '{"version": "1", "type": "text", "kind": "text", "text": "se borra"}'
 );
 
+-- Another organization's member: nothing, as before.
 select tests.authenticate_as('bob@test.local');
 select lives_ok(
   $$delete from public.conversations
     where id = 'aaaaaaaa-0000-4000-8000-0000000000cd'$$,
-  'user B deleting org A''s simulator raises nothing — RLS filters, it does not throw'
+  'user B deleting org A''s drill raises nothing — RLS filters, it does not throw'
 );
 select tests.clear_authentication();
 
@@ -323,6 +336,20 @@ select is(
   'nor does API key B'
 );
 
+-- An API key OF THIS ORGANIZATION: also nothing. It has no agent, so no
+-- drill is its own, and it is not a person the admin arm speaks for.
+select tests.authenticate_with_api_key(tests.val('key_a_member'));
+delete from public.conversations
+where id = 'aaaaaaaa-0000-4000-8000-0000000000cd';
+select tests.clear_authentication();
+
+select is(
+  (select count(*)::int from public.conversations
+   where id = 'aaaaaaaa-0000-4000-8000-0000000000cd'),
+  1,
+  'nor does API key A, of the very organization the drill belongs to'
+);
+
 select tests.authenticate_as_anon();
 select throws_ok(
   $$delete from public.conversations
@@ -333,8 +360,21 @@ select throws_ok(
 );
 select tests.clear_authentication();
 
--- A member of the organization can. This is the button.
-select tests.authenticate_as('alice@test.local');
+-- THE CASE THIS EXISTS FOR: a plain member cannot reset a colleague's drill.
+select tests.authenticate_as('amber@test.local');
+delete from public.conversations
+where id = 'aaaaaaaa-0000-4000-8000-0000000000ce';
+select tests.clear_authentication();
+
+select is(
+  (select count(*)::int from public.conversations
+   where id = 'aaaaaaaa-0000-4000-8000-0000000000ce'),
+  1,
+  'a member does not reset a colleague''s drill'
+);
+
+-- ...but resets their own. This is the button.
+select tests.authenticate_as('amber@test.local');
 delete from public.conversations
 where id = 'aaaaaaaa-0000-4000-8000-0000000000cd';
 select tests.clear_authentication();
@@ -343,19 +383,32 @@ select is(
   (select count(*)::int from public.conversations
    where id = 'aaaaaaaa-0000-4000-8000-0000000000cd'),
   0,
-  'user A resets their own organization''s simulator'
+  'a member resets their own drill'
 );
 
 select is(
   (select count(*)::int from public.messages
    where id = 'aaaaaaaa-0000-4000-8000-00000000f0fd'),
   0,
-  'and the messages go with it, by cascade'
+  'and its messages go with it, by cascade'
 );
 
--- The control: this widened DELETE by exactly one value and not by "any
--- conversation the member can see".
+-- An admin sweeps, which is what keeps a departed member's drills deletable.
 select tests.authenticate_as('alice@test.local');
+delete from public.conversations
+where id = 'aaaaaaaa-0000-4000-8000-0000000000ce';
+select tests.clear_authentication();
+
+select is(
+  (select count(*)::int from public.conversations
+   where id = 'aaaaaaaa-0000-4000-8000-0000000000ce'),
+  0,
+  'an owner resets anybody''s drill in the organization'
+);
+
+-- The control: this widened DELETE for drills, not for conversations. Amber
+-- can see the whatsapp conversation and still cannot delete it.
+select tests.authenticate_as('amber@test.local');
 delete from public.conversations where id = tests.id('conv_a1');
 select tests.clear_authentication();
 
@@ -364,6 +417,17 @@ select is(
   1,
   'a real whatsapp conversation is still undeletable by a member'
 );
+
+-- And `local` did not lose anything on the way.
+select tests.authenticate_as('amber@test.local');
+select lives_ok(
+  $$delete from public.conversations
+    where organization_id = (select tests.id('org_a'))
+      and service = 'local'
+      and false$$,
+  'the local arm of the policy is still there'
+);
+select tests.clear_authentication();
 
 select * from finish();
 rollback;

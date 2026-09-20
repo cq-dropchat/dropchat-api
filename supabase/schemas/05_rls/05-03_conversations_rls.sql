@@ -94,9 +94,19 @@ with check (
 -- simulator's "Reiniciar" throws away — so the rule grows a value rather
 -- than a second door being cut beside it. messages cascade.
 --
--- Deliberately NOT restricted to the member who opened the drill: §5 asks
--- for "las conversaciones sandbox de la organizacion". Any member can reset
--- any of them, colleagues' included.
+-- A drill, unlike a `local` room, has ONE owner: the member who opened it,
+-- named by the conversation's address (rls.get_own_sandbox_addresses). So
+-- "Reiniciar" resets my rehearsals and leaves my colleague's alone — which
+-- matters because the two are told apart by nothing on screen, both being
+-- ordinary chats on the organization's shared simulator account.
+--
+-- Admins keep the org-wide reach, and it is not a courtesy: a member who
+-- leaves has their agent row marked deleted, so their drills stop being
+-- anybody's own and would otherwise be undeletable for ever.
+--
+-- An API key can delete no drill at all. It has no auth.uid() and therefore
+-- no agent, so none is its own — the same answer rls.get_own_agents gives
+-- everywhere else — and it is not a person for the admin arm to speak for.
 create policy "members can delete their orgs local and sandbox conversations"
 on public.conversations
 for delete
@@ -105,7 +115,19 @@ using (
   organization_id in (
     select rls.get_authorized_orgs('member')
   )
-  and service in ('local'::public.service, 'sandbox'::public.service)
+  and (
+    service = 'local'::public.service
+    or (
+      service = 'sandbox'::public.service
+      and (
+        (organization_id, address) in (
+          select s.organization_id, s.address
+          from rls.get_own_sandbox_addresses() s
+        )
+        or organization_id in (select rls.get_authorized_orgs('admin'))
+      )
+    )
+  )
   and (
     (
       (organization_id, service, organization_address) in (

@@ -32,10 +32,12 @@
 
   Every organization has one `sandbox` account in `organizations_addresses`,
   addressed by its own id, created with the `local` one and backfilled for
-  organizations that already existed. Members can DELETE their organization's
-  `sandbox` conversations (the "Reiniciar" button); that is the only widening of
-  an RLS policy in this change, and it extends the rule that already covered
-  `local`.
+  organizations that already existed. A drill is addressed by the agent id of
+  the member who opened it, and a member can DELETE their OWN drills (the
+  "Reiniciar" button) — admins can delete any, so that the drills of somebody
+  who has left do not become undeletable. That is the only widening of an RLS
+  policy in this change, and it extends the rule that already covered `local`.
+  An API key has no agent and so no drill of its own: it deletes none.
 
 - **`content.kind = "assignment"` is part of the v1 contract** (H6, closing H1).
   The assignment note H1 writes now has a type and a place in

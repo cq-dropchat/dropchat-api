@@ -23,6 +23,7 @@ create temp table helpers (fn text, args text[]);
 insert into helpers values
   ('get_authorized_orgs', array['public.role']),
   ('get_own_agents', array[]::text[]),
+  ('get_own_sandbox_addresses', array[]::text[]),
   ('get_visible_addresses', array[]::text[]),
   ('get_participant_conversations', array[]::text[]),
   ('get_restricted_conversations', array[]::text[]),
@@ -53,8 +54,8 @@ select is(
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'rls'
   ),
-  10,
-  'all ten are in rls'
+  (select count(*)::int from helpers),
+  'every helper the list names is in rls'
 );
 
 -- A policy runs as the invoking role: without USAGE here every policy that

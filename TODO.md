@@ -171,11 +171,11 @@ Monetization
       does not match pattern. Expected a string that matches the pattern
       '^[a-zA-Z0-9_-]+$'.
 
-- [ ] S1 — the simulator is organization-wide to reset but per-member to write
-      in: `sim:<agent id>` gives each member their own drill, while "Reiniciar"
-      deletes every drill in the organization (what §5 of `SPEC_CONTINUACION.md`
-      asks for). Revisit if two people ever use it at once — a per-member reset
-      is one more `eq` on the delete.
+- [x] S1 — the reset is per member. A drill's address IS its owner's agent id,
+      so `rls.get_own_sandbox_addresses` tells one member's rehearsal from
+      another's without a string convention shared between SQL and the UI.
+      Admins keep the org-wide reach (a departed member's drills would otherwise
+      be nobody's), and API keys, having no agent, delete none.
 
 - [x] S1 — drills stay out of the organization export (F18). The exporter drops
       any row whose `service` is `sandbox`, the same rule `notify_webhook`

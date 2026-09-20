@@ -363,6 +363,11 @@ are marked `delivered` in place and no read receipt is sent — but the agent's
 replies are real LLM calls, so they appear in `billing.ledger` and count against
 usage like any other message.
 
+Each member's drills are their own: a `sandbox` conversation is addressed by the
+agent id of the member who opened it, and only that member — or an admin — can
+delete it. An API key authenticates without a user, so it owns no drill and
+deletes none.
+
 Your organization's export (`## 9`) leaves drills out too.
 
 ### How long an assignment lasts (H4)

@@ -99,6 +99,31 @@ as $$
   where a.user_id = auth.uid() and a.deleted_at is null;
 $$;
 
+-- S1 — the drills that are mine: (organization, address) pairs a `sandbox`
+-- conversation of my own is addressed by.
+--
+-- A drill's address IS the agent id of the member who opened it. That is a
+-- deliberate choice over a string convention like `sim:<id>`: a format
+-- spelled in SQL and again in TypeScript is a vocabulary duplicated by hand
+-- between the two repos, which this project already has one of and does not
+-- need a second. An id compared to an id has no format to drift.
+--
+-- Empty for API keys, like rls.get_own_agents: they authenticate without
+-- auth.uid() and are nobody in particular, so no drill is theirs. Returned as
+-- pairs rather than bare ids so a caller who belongs to two organizations
+-- cannot reach into one of them with the other's agent id.
+create function rls.get_own_sandbox_addresses()
+returns table (organization_id uuid, address text)
+language sql
+stable
+security definer
+set search_path to ''
+as $$
+  select a.organization_id, a.id::text
+  from public.agents a
+  where a.user_id = auth.uid() and a.deleted_at is null;
+$$;
+
 -- Conversations whose account rule is suppressed — see the two cases at the
 -- top of this file. Scoped to the caller's orgs so the set stays bounded.
 --
