@@ -181,6 +181,21 @@ Monetization
       any row whose `service` is `sandbox`, the same rule `notify_webhook`
       applies. No new table, so `12_deletions` needed nothing.
 
+- [ ] Decidir los dos toggles de auth que producción tiene prendidos y este repo
+      no declara (`supabase config diff`, 20/09/2026):
+      `auth.external.github.enabled` y `auth.sms.twilio.enabled`. Importan
+      juntos con «users can create orgs», que es `with check (true)` para
+      cualquier `authenticated` y no exige invitación: con un proveedor de
+      identidad abierto, cualquiera que se registre crea su organización y
+      consume contra nuestras credenciales de LLM (no hay cobro: Stripe sigue
+      pendiente en este mismo archivo). El login de la UI es Google; GitHub está
+      prendido sin que nadie lo pidiera, y Twilio SMS agrega un segundo camino
+      de autenticación —el blanco habitual del SMS pumping—. Ambos se apagan en
+      el panel; declararlos en `config.toml` también los apagaría, pero recién
+      en el próximo `config push`, que cambia producción entero. Las otras seis
+      diferencias (pooler, storage) son ajustes del panel y quedan documentadas
+      en `config.toml`.
+
 - [ ] Flaky: `F29: agent-client stops after ten iterations (characterization)`
       failed once in eight full `deno task test:coverage` runs on 2026-09-20,
       and passed alone and on the very next full run. Likely the snapshot
