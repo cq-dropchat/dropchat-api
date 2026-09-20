@@ -8,8 +8,19 @@ declare
   user_id uuid := auth.uid();
   user_name text;
 begin
+  -- Two accounts, both addressed by the organization's own id because
+  -- neither has an external peer to be addressed by:
+  --
+  --   local     team chat, the members talking to each other.
+  --   sandbox   S1's simulator — the account a member writes to as if they
+  --             were a customer. Ownerless on purpose: agent_id null is what
+  --             rls.get_visible_addresses reads as a SHARED inbox, so every
+  --             member of the organization can test an agent, and the org
+  --             filter in that same function is what keeps it theirs.
   insert into public.organizations_addresses (organization_id, service, address)
-    values (new.id, 'local', new.id::text);
+    values
+      (new.id, 'local', new.id::text),
+      (new.id, 'sandbox', new.id::text);
 
   if user_id is not null then
     select coalesce(raw_user_meta_data->>'full_name', email, '?') into user_name

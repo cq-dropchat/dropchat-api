@@ -1922,6 +1922,7 @@ export type Database = {
         | "discord"
         | "teams"
         | "whatsapp-web"
+        | "sandbox"
       webhook_operation: "insert" | "update"
       webhook_table:
         | "messages"
@@ -2626,6 +2627,7 @@ export const Constants = {
         "discord",
         "teams",
         "whatsapp-web",
+        "sandbox",
       ],
       webhook_operation: ["insert", "update"],
       webhook_table: [

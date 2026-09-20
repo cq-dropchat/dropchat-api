@@ -84,10 +84,13 @@ select is(
 );
 
 -- The visibility RPC is public and SECURITY DEFINER: it must be scoped too.
+-- B's three accounts: its whatsapp number, its `local` team chat and, since
+-- S1, its `sandbox` simulator. What is asserted is the ORGANIZATION on every
+-- row — one of A's leaking in here is the failure this guards against.
 select results_eq(
   $$ select organization_id from rls.get_visible_addresses() $$,
-  $$ select tests.id('org_b') union all select tests.id('org_b') $$,
-  'get_visible_addresses() as key B only lists B''s two accounts'
+  $$ select tests.id('org_b') from generate_series(1, 3) $$,
+  'get_visible_addresses() as key B lists B''s three accounts and nothing else'
 );
 
 select tests.clear_authentication();

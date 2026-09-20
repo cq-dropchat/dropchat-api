@@ -1,0 +1,17 @@
+-- S1 — the `sandbox` value of public.service.
+--
+-- HAND-WRITTEN, and alone in its own file, for two reasons that both come
+-- from Postgres rather than from taste:
+--
+-- 1. `db diff` cannot produce it. public.service is named by RLS policies, so
+--    the rename/recreate/recast it generates fails to apply with "cannot
+--    alter type of a column used in a policy definition". `add value` appends
+--    in place and touches no column and no policy. (See CLAUDE.md, "Enum
+--    value additions".)
+--
+-- 2. A new enum value cannot be USED in the transaction that adds it
+--    ("unsafe use of new value of enum type"), and supabase applies each
+--    migration file as one transaction. So everything that writes a
+--    'sandbox' row — the backfill next door — has to be a separate file,
+--    committed after this one.
+alter type public.service add value if not exists 'sandbox';
