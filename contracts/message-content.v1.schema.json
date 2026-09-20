@@ -1357,6 +1357,9 @@
         },
         {
           "$ref": "#/definitions/SharePart"
+        },
+        {
+          "$ref": "#/definitions/AssignmentPart"
         }
       ]
     },
@@ -1574,6 +1577,91 @@
         "type",
         "url"
       ]
+    },
+    "AssignmentPart": {
+      "$ref": "#/definitions/DataPart%3C%22assignment%22%2CAssignmentData%3E"
+    },
+    "DataPart<\"assignment\",AssignmentData>": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "data"
+        },
+        "kind": {
+          "type": "string",
+          "const": "assignment"
+        },
+        "data": {
+          "$ref": "#/definitions/AssignmentData"
+        },
+        "text": {
+          "type": "string"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Part"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "kind",
+        "data"
+      ]
+    },
+    "AssignmentData": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "awaiting_human": {
+          "type": "boolean"
+        },
+        "by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cause": {
+          "type": "string",
+          "enum": [
+            "routing",
+            "entry",
+            "escalation",
+            "manual",
+            "takeover",
+            "expiry"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "description": "H3: the closed category of an escalation, when the note records one."
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "awaiting_human",
+        "by",
+        "cause"
+      ],
+      "description": "H1 — the audit note of an assignment, written by public.set_conversation_assignment: who was answering, who is now, who decided and why. Record-only (it always carries `internal`), never dispatched, and never part of the history the model reads."
     },
     "TaskState": {
       "type": "string",
@@ -4093,6 +4181,428 @@
             },
             "data": {
               "$ref": "#/definitions/ShareData"
+            },
+            "text": {
+              "type": "string"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Part"
+              }
+            },
+            "tool": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "function",
+                        "custom"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "sql",
+                        "http"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "label",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "google"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "google_search",
+                        "code_execution",
+                        "url_context"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "openai"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "web_search_preview",
+                        "file_search",
+                        "image_generation",
+                        "code_interpreter",
+                        "computer_use_preview"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "anthropic"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "bash",
+                        "code_execution",
+                        "computer",
+                        "str_replace_based_edit_tool",
+                        "web_search"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "use"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "function",
+                        "custom"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "local"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "sql",
+                        "http"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "label",
+                    "name",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "google"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "google_search",
+                        "code_execution",
+                        "url_context"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "openai"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "web_search_preview",
+                        "file_search",
+                        "image_generation",
+                        "code_interpreter",
+                        "computer_use_preview"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "const": "anthropic"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mcp",
+                        "bash",
+                        "code_execution",
+                        "computer",
+                        "str_replace_based_edit_tool",
+                        "web_search"
+                      ]
+                    },
+                    "use_id": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string",
+                      "const": "result"
+                    },
+                    "is_error": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "event",
+                    "provider",
+                    "type",
+                    "use_id"
+                  ]
+                }
+              ]
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/definitions/TaskState"
+                },
+                "session_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "const": "1"
+            },
+            "re_message_id": {
+              "type": "string"
+            },
+            "forwarded": {
+              "type": "boolean"
+            },
+            "mentions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mention"
+              }
+            },
+            "internal": {
+              "type": "boolean",
+              "const": true,
+              "description": "Record-only: this row is never dispatched, to anyone. Declared here so the marker travels with the content instead of living in a column readers must know to consult. Writers set it themselves AND insert the row unarmed (status {}, no pending) — agent-client does both on tool traces and errors; the database reads the marker (dispatch and agent triggers refuse it) but never stamps or strips anything."
+            }
+          },
+          "required": [
+            "data",
+            "kind",
+            "type",
+            "version"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "data"
+            },
+            "kind": {
+              "type": "string",
+              "const": "assignment"
+            },
+            "data": {
+              "$ref": "#/definitions/AssignmentData"
             },
             "text": {
               "type": "string"

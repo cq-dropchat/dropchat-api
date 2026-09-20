@@ -235,13 +235,34 @@ export type ShareData = {
 
 export type SharePart = DataPart<"share", ShareData>;
 
+/**
+ * H1 — the audit note of an assignment, written by
+ * public.set_conversation_assignment: who was answering, who is now, who
+ * decided and why. Record-only (it always carries `internal`), never
+ * dispatched, and never part of the history the model reads.
+ */
+export type AssignmentData = {
+  from: string | null;
+  to: string | null;
+  awaiting_human: boolean;
+  by: string | null;
+  cause: "routing" | "entry" | "escalation" | "manual" | "takeover" | "expiry";
+  /** H3: the closed category of an escalation, when the note records one. */
+  category?: string;
+  reason?: string;
+};
+
+export type AssignmentPart = DataPart<"assignment", AssignmentData>;
+
 // Multi-part messages
 
 export type Part =
   | TextPart
   | DataPart
   | FilePart
-  | SharePart;
+  | SharePart
+  // H1: only ever written by the database, and only into an internal row.
+  | AssignmentPart;
 
 // Parts type is not used yet. It is a proof of concept.
 export type Parts = {

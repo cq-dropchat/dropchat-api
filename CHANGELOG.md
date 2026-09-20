@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **`content.kind = "assignment"` is part of the v1 contract** (H6, closing H1).
+  The assignment note H1 writes now has a type and a place in
+  `contracts/message-content.v1.schema.json` (`AssignmentPart`), regenerated
+  with `deno task contracts`. Nothing about the rows changes; what changes is
+  that a consumer validating against the schema no longer sees them as an
+  unknown shape.
+
 - **A handover now reaches somebody** (H5). When a conversation starts waiting
   for a person, the app counts it in the browser tab's title and — with
   permission, asked at the first handover and never on load — shows a browser
