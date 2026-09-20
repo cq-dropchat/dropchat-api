@@ -28,9 +28,13 @@
 // module added there without tests turns CI red, which is the gate working,
 // but it is worth knowing before it happens.
 // (Phase 5: 74 / 55 / 58. Phase 4: 72 / 52 / 55. Phase 3: 66 / 29 / 35.)
+// Ratchet (end of the Fase H): reached − 2, rounded down. Reached
+// _shared 76.82 %, handlers 60.10 %, all 62.50 % — the phase added the
+// assignment gate, the escalation tool, the attention arithmetic and their
+// tests, and `_shared` grew with attention.ts, which is pure and covered.
 const DEFAULT_MIN_SHARED = 74;
-const DEFAULT_MIN_HANDLERS = 56;
-const DEFAULT_MIN_LINES = 58;
+const DEFAULT_MIN_HANDLERS = 58;
+const DEFAULT_MIN_LINES = 60;
 
 type Totals = { found: number; hit: number };
 
