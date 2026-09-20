@@ -18,6 +18,11 @@
     drill will ever arrive as an order, a lead or a reply.
   - **Nothing is dispatched.** There is no `sandbox` carrier; outgoing rows are
     marked `delivered` in place, like `local`, and no read receipt is sent.
+  - **The organization export leaves drills out** (`## 9` of INTEGRATING). The
+    export is otherwise scoped by `organization_id` alone, so without this a
+    rehearsal would travel in the same NDJSON as real customer traffic, with
+    nothing in the ZIP to tell them apart. `manifest.json` counts what was
+    written, so its numbers are of the export and not of the database.
   - **Billing is unaffected by the exclusion**: a drill makes a real call to a
     real provider, so it appears in `billing.ledger` and counts against usage
     exactly as any other message does.

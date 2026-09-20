@@ -177,7 +177,6 @@ Monetization
       asks for). Revisit if two people ever use it at once — a per-member reset
       is one more `eq` on the delete.
 
-- [ ] S1 — `sandbox` conversations are included in the organization export
-      (F18). No new table, so nothing had to be added to `12_deletions`, but an
-      export now carries drills alongside real traffic. Decide whether to filter
-      them out before anybody exports for real.
+- [x] S1 — drills stay out of the organization export (F18). The exporter drops
+      any row whose `service` is `sandbox`, the same rule `notify_webhook`
+      applies. No new table, so `12_deletions` needed nothing.

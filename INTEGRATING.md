@@ -363,6 +363,8 @@ are marked `delivered` in place and no read receipt is sent — but the agent's
 replies are real LLM calls, so they appear in `billing.ledger` and count against
 usage like any other message.
 
+Your organization's export (`## 9`) leaves drills out too.
+
 ### How long an assignment lasts (H4)
 
 `organizations.extra.attention` holds the settings, and every default applies
@@ -410,6 +412,11 @@ one NDJSON file per table (`organizations`, `organizations_addresses`,
 and a `manifest.json`, in a ZIP. Credentials are not included: `extra` values
 stored as secrets, credential-named keys and webhook tokens are left out.
 Attachments are not included either; `messages.content.file.uri` names them.
+
+The simulator is not included: no row whose `service` is `sandbox` is exported,
+on any of those tables, so an export holds real traffic and not a colleague's
+rehearsals. See "Drills" under `## 7`. `manifest.json` counts what was written,
+so its numbers are of the export and not of the database.
 
 ```bash
 # File the export (returns its id; while one is pending you get that one)

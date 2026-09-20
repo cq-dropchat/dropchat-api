@@ -45,6 +45,13 @@ type TableSpec = {
   omit?: string[];
   /** Columns whose JSON gets the credential-key scrub. */
   scrubKeys?: string[];
+  /**
+   * S1: the table has a `service` column, so its `sandbox` rows are the
+   * simulator's and are left out. Stated per table rather than discovered at
+   * runtime — a filter on a column that does not exist is a 400 from
+   * PostgREST at export time, which is the worst moment to find out.
+   */
+  hasService?: boolean;
 };
 
 export const TABLES: TableSpec[] = [
@@ -61,6 +68,7 @@ export const TABLES: TableSpec[] = [
     keyset: false,
     order: ["service", "address"],
     scrubKeys: ["extra"],
+    hasService: true,
   },
   {
     name: "contacts_addresses",
@@ -68,14 +76,22 @@ export const TABLES: TableSpec[] = [
     keyset: false,
     order: ["organization_address", "service", "address"],
     scrubKeys: ["extra"],
+    hasService: true,
   },
   {
     name: "conversations",
     scope: "organization_id",
     keyset: true,
     order: ["id"],
+    hasService: true,
   },
-  { name: "messages", scope: "organization_id", keyset: true, order: ["id"] },
+  {
+    name: "messages",
+    scope: "organization_id",
+    keyset: true,
+    order: ["id"],
+    hasService: true,
+  },
   {
     name: "agents",
     scope: "organization_id",
@@ -90,7 +106,13 @@ export const TABLES: TableSpec[] = [
     order: ["id"],
     omit: ["token"],
   },
-  { name: "logs", scope: "organization_id", keyset: true, order: ["id"] },
+  {
+    name: "logs",
+    scope: "organization_id",
+    keyset: true,
+    order: ["id"],
+    hasService: true,
+  },
 ];
 
 /** Drops F02 masks everywhere; with `keys`, also credential-named keys. */
@@ -135,6 +157,22 @@ async function* pages(
       .from(spec.name)
       .select("*")
       .eq(spec.scope, organizationId);
+
+    // S1 — the simulator's rows are not the organization's data. A drill is
+    // a member rehearsing against an agent; exporting it would mix
+    // rehearsals into the same NDJSON as real customer traffic, with
+    // nothing in the ZIP to tell them apart. This is the rule
+    // notify_webhook already applies, so "is a sandbox row real?" has one
+    // answer and not two.
+    //
+    // The null arm is not decoration. `service <> 'sandbox'` is NULL for a
+    // NULL service, and NULL is not true, so a plain `neq` would silently
+    // drop every public.logs row that names no service — which is most of
+    // them, since an application error is rarely about one channel.
+    if (spec.hasService) {
+      query = query.or("service.is.null,service.neq.sandbox");
+    }
+
     for (const column of spec.order) query = query.order(column);
 
     if (spec.keyset) {
