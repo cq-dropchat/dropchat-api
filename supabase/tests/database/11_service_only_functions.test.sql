@@ -31,6 +31,7 @@ alter table public.messages enable trigger handle_outgoing_message_to_dispatcher
 create temp table service_only (fn text);
 insert into service_only values
   ('public.pending_dispatch_candidates()'),
+  ('public.service_has_carrier(public.service)'),
   ('public.claim_message_dispatch(uuid)'),
   ('public.release_message_dispatch(uuid, jsonb)'),
   ('public.dispatch_pending_messages()'),

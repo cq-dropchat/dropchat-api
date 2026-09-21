@@ -2424,6 +2424,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      service_has_carrier: {
+        Args: { _service: Database["public"]["Enums"]["service"] }
+        Returns: boolean
+      }
       set_conversation_assignment: {
         Args: {
           p_actor_agent_id?: string
