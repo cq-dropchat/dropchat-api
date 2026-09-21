@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- **Error panel** (E1), which had shipped without an entry here. Three tables —
+  `public.error_issues`, `public.error_settings` and `public.platform_admins` —
+  a `public.error_source` and a `public.error_status` enum, and the functions
+  `report_error` and `report_edge_error`.
+
+  **Nothing about it is reachable by a tenant.** `error_issues` and
+  `error_settings` are readable only with `rls.is_platform_admin()`, which is
+  the platform's own operators and not an organization's owner; `UPDATE` on an
+  issue is re-granted **by column** (`status`, `notes`), so a stolen session can
+  move a triage state and leave a note but cannot touch the counters or the
+  samples. `platform_admins` has one policy: each user reads their own row and
+  nothing else — there is no way to list the administrators, and no INSERT
+  policy at all, because an administrator who can name administrators is a
+  privilege escalation from a single stolen session.
+
+  The unit stored is the **issue, not the occurrence**: the second time
+  something fails is an UPDATE of two counters, so the table grows with the
+  number of distinct bugs and not with traffic.
+
+  What reaches it: `report_error` is granted to `anon` on purpose — an error
+  that stops somebody signing in has to be reportable by somebody who is not
+  signed in — and the browser half never sends a query string or a URL fragment.
+  The backend half is off unless `ERROR_REPORTING=on`.
+
+  **Retention**, now with tests: a `resolved` issue is deleted 90 days after its
+  last occurrence and a `preexisting` one after 180. An **open** issue is never
+  deleted however old it is — age is not a reason to stop showing an unfixed bug
+  — and neither is an `ignored` one, or the panel would re-report what somebody
+  already dismissed.
+
 - **Staged publication** (T5). `agent_template_versions.canary_organizations`: a
   version can go to two or three organizations first and be promoted later with
   `promote_agent_template_version(_template_id, _version)`. Null or empty means
