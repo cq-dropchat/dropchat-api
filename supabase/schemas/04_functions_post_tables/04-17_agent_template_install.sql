@@ -386,3 +386,39 @@ revoke execute on function rls.runs_template_version(uuid, integer) from public;
 
 grant execute on function rls.runs_template_version(uuid, integer)
 to anon, authenticated, service_role;
+
+-- T5. Whether a staged version is for this caller.
+--
+-- A helper for the same reason `runs_template_version` is one:
+-- `rls.get_authorized_orgs` RAISES for a caller with neither a JWT nor an
+-- api-key header, and the policy this sits in has always answered such a
+-- caller with an empty list rather than an error.
+--
+-- The generally available case — null or empty — answers true without asking
+-- anything, which is what keeps a plain catalogue read free of that question.
+create function rls.version_is_for_caller(_organizations uuid[])
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path to ''
+as $$
+begin
+  if _organizations is null or cardinality(_organizations) = 0 then
+    return true;
+  end if;
+
+  return exists (
+    select 1
+    from unnest(_organizations) as o(id)
+    where o.id in (select rls.get_authorized_orgs('member'))
+  );
+exception when insufficient_privilege then
+  return false;
+end;
+$$;
+
+revoke execute on function rls.version_is_for_caller(uuid[]) from public;
+
+grant execute on function rls.version_is_for_caller(uuid[])
+to anon, authenticated, service_role;

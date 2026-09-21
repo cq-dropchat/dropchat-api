@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- **Staged publication** (T5). `agent_template_versions.canary_organizations`: a
+  version can go to two or three organizations first and be promoted later with
+  `promote_agent_template_version(_template_id, _version)`. Null or empty means
+  generally available, which is what every version published so far is — nothing
+  changes for you unless somebody stages one.
+
+  **`publish_agent_template_version` takes a third argument** and the
+  two-argument signature was DROPPED, not kept beside it: a default on the third
+  makes `publish(uuid, text)` ambiguous and Postgres answers "function is not
+  unique" instead of publishing. Call it with `_canary_organizations` null for
+  the old behaviour.
+
+  A staged version is **invisible** to the organizations it is not for: it is
+  not in their catalogue, `install_agent_template` does not pick it, naming its
+  number raises, and `template_auto_update` does not move them onto it.
+
+- **`public.agent_template_tests` and `public.agent_template_test_runs`** (T5).
+  The drills a template has to pass — a business profile, what the customer
+  says, and what the answer must and must not contain — and the stored record of
+  running one. Platform-admin only, both of them: a drill a tenant could edit is
+  a gate a tenant could open. A run outlives its drill on purpose (`test_id`
+  goes null), because the evidence that a version was published on the strength
+  of a drill is exactly what somebody would want deleted.
+
 - **An organization can read the template version its own agent runs on** (T7),
   even after that version is retired or its template archived. The catalogue
   policy still hides both, which is how the platform stops handing something

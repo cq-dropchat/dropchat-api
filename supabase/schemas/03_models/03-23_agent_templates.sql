@@ -111,7 +111,20 @@ create table public.agent_template_versions (
   changelog text,
   published_by uuid references auth.users(id) on delete set null,
   published_at timestamp with time zone default now() not null,
-  retired_at timestamp with time zone
+  retired_at timestamp with time zone,
+  -- T5. Staged publication: the organizations this version is for, before it
+  -- is for everybody. Null (or empty) means generally available.
+  --
+  -- A version that goes out to the whole customer base at once is a prompt
+  -- change nobody piloted — every organization on that template starts
+  -- answering differently in the same minute. So it can go to two or three
+  -- first, be watched, and then be promoted.
+  --
+  -- Everything else falls out of RLS: the read policy hides a canary from the
+  -- organizations it is not for, and install/update are SECURITY INVOKER, so
+  -- their «newest version that is not retired» query is already filtered by
+  -- what the caller may read. No second branch to keep in step with the first.
+  canary_organizations uuid[]
 );
 
 alter table only public.agent_template_versions

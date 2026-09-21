@@ -39,6 +39,7 @@ insert into helpers values
   ('is_media_visible', array['text']),
   ('is_platform_admin', array[]::text[]),
   ('runs_template_version', array['uuid', 'integer']),
+  ('version_is_for_caller', array['uuid[]']),
   ('agent_identity_unchanged', array['uuid', 'uuid', 'uuid']),
   ('agent_identity_and_role_unchanged',
    array['uuid', 'uuid', 'uuid', 'public.role']);

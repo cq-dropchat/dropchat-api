@@ -66,6 +66,10 @@ using (
   rls.is_platform_admin()
   or (
     retired_at is null
+    -- T5: a staged version is not in the catalogue of the organizations it is
+    -- not for. Hiding it is the whole enforcement — install and update read
+    -- through this policy, so neither needs to know what a canary is.
+    and rls.version_is_for_caller(canary_organizations)
     and exists (
       select 1
       from public.agent_templates t

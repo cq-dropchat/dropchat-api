@@ -65,7 +65,8 @@ from public, anon, authenticated, service_role;
 -- There is no branch here that could.
 create function public.publish_agent_template_version(
   _template_id uuid,
-  _changelog text default null
+  _changelog text default null,
+  _canary_organizations uuid[] default null
 ) returns public.agent_template_versions
 language plpgsql
 security definer
@@ -144,8 +145,10 @@ begin
   where template_id = _template_id;
 
   insert into public.agent_template_versions
-    (template_id, version, config, config_hash, changelog, published_by)
-  values (_template_id, _version, _config, _hash, _changelog, auth.uid())
+    (template_id, version, config, config_hash, changelog, published_by,
+     canary_organizations)
+  values (_template_id, _version, _config, _hash, _changelog, auth.uid(),
+          nullif(_canary_organizations, '{}'::uuid[]))
   returning * into _row;
 
   -- D7/T6: the agents that asked to be moved, move now — in the same
@@ -153,17 +156,26 @@ begin
   -- agent wants the newest version and is not on it. Crossing tenants here is
   -- the point and is what this function is already allowed to do; what makes
   -- it safe is that each of those agents opted in, one column at a time.
+  -- T5: and only the organizations this version is FOR. This is the one
+  -- place a canary needs an explicit branch: it runs as SECURITY DEFINER, so
+  -- no policy filters it, and «automatic» has to mean the versions that
+  -- organization can have — not «the newest row that exists».
   update public.agents
   set template_version = _version
   where template_id = _template_id
     and template_auto_update
-    and deleted_at is null;
+    and deleted_at is null
+    and (
+      _row.canary_organizations is null
+      or organization_id = any (_row.canary_organizations)
+    );
 
   return _row;
 end;
 $$;
 
-revoke execute on function public.publish_agent_template_version(uuid, text)
+revoke execute on function
+  public.publish_agent_template_version(uuid, text, uuid[])
 from public, anon, service_role;
 
 -- `authenticated` and nothing else. service_role is revoked explicitly because
@@ -172,7 +184,45 @@ from public, anon, service_role;
 -- function records. Under service_role, auth.uid() is null and
 -- rls.is_platform_admin() is false, so the call would fail anyway; this makes
 -- the grant say so instead of relying on it.
-grant execute on function public.publish_agent_template_version(uuid, text)
+grant execute on function
+  public.publish_agent_template_version(uuid, text, uuid[])
+to authenticated;
+
+-- T5. Promote a staged version: it stops being for two organizations and
+-- becomes the one everybody installs. SECURITY DEFINER for the same reason
+-- publishing is — `agent_template_versions` has no write policy at all.
+create function public.promote_agent_template_version(
+  _template_id uuid,
+  _version integer
+) returns public.agent_template_versions
+language plpgsql
+security definer
+set search_path to ''
+as $$
+declare
+  _row public.agent_template_versions;
+begin
+  if not rls.is_platform_admin() then
+    raise exception using errcode = '42501', message = 'not a platform admin';
+  end if;
+
+  update public.agent_template_versions
+  set canary_organizations = null
+  where template_id = _template_id and version = _version
+  returning * into _row;
+
+  if not found then
+    raise exception 'no such version: % of %', _version, _template_id;
+  end if;
+
+  return _row;
+end;
+$$;
+
+revoke execute on function public.promote_agent_template_version(uuid, integer)
+from public, anon, service_role;
+
+grant execute on function public.promote_agent_template_version(uuid, integer)
 to authenticated;
 
 -- Pull a single version: a bad prompt, or a configuration that should not have

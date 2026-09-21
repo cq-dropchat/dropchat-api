@@ -365,7 +365,12 @@ select is(
 select is(
   (
     select array_agg(f.fn || ' / ' || r.role order by f.fn, r.role)
-    from (values ('public.publish_agent_template_version(uuid, text)'),
+    -- T5 added the canary list, which changed the signature: the two-argument
+    -- version was DROPPED rather than left beside it, because a default
+    -- argument on the third makes `publish(uuid, text)` ambiguous and Postgres
+    -- answers «function is not unique» instead of publishing.
+    from (values ('public.publish_agent_template_version(uuid, text, uuid[])'),
+                 ('public.promote_agent_template_version(uuid, integer)'),
                  ('public.retire_agent_template_version(uuid, integer)')) f(fn),
          (values ('anon'), ('service_role')) r(role)
     where has_function_privilege(r.role, f.fn::regprocedure, 'execute')
