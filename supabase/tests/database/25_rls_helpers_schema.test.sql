@@ -12,6 +12,13 @@
 -- ever called one.
 --
 -- They are in `rls` now, which is not in config.toml's exposed schemas.
+--
+-- The list below is hardcoded, so it is also this test's blind spot: a helper
+-- that is not named here can sit in `public` and both assertions stay green,
+-- because each one aggregates over the list rather than over the catalog.
+-- `is_platform_admin` (E1) did exactly that until T3. Every new helper goes in
+-- the list, or this test stops being about the helpers and becomes about the
+-- ones somebody remembered.
 begin;
 select plan(13);
 
@@ -30,6 +37,7 @@ insert into helpers values
   ('is_restricted_conversation', array['public.service', 'text', 'jsonb']),
   ('is_conversation_visible', array['uuid', 'uuid', 'text', 'public.service']),
   ('is_media_visible', array['text']),
+  ('is_platform_admin', array[]::text[]),
   ('agent_identity_unchanged', array['uuid', 'uuid', 'uuid']),
   ('agent_identity_and_role_unchanged',
    array['uuid', 'uuid', 'uuid', 'public.role']);
