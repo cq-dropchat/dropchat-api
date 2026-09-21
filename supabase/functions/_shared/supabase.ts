@@ -17,6 +17,7 @@ export type {
   MessageInsert,
   MessageRow,
   MessageUpdate,
+  ModelTierRow,
   OrganizationAddressRow,
   OrganizationRow,
   Tables,

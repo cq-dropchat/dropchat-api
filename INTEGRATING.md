@@ -425,6 +425,27 @@ one conversation while a malformed schedule misleads every sweep.
 array is replaced whole, never merged.** Send every method you take on every
 write, or the ones you leave out are deleted.
 
+### What an agent runs on (T2)
+
+`public.model_tiers` is a small global catalogue, readable with any key:
+
+| Column                  | Meaning                                        |
+| ----------------------- | ---------------------------------------------- |
+| `slug`                  | `rapido`, `equilibrado`, `avanzado`.           |
+| `name`, `description`   | What the screen shows.                         |
+| `provider`, `model`     | The pair that is priced and called.            |
+| `protocol`              | `chat_completions` or `responses`.             |
+| `supports_forced_tools` | Whether this model accepts a forced tool call. |
+| `sort_order`            | The order to offer them in.                    |
+
+Set `agents.extra.model_tier` to a slug and **that row decides `provider`,
+`model` and `protocol`** — the agent's own `api_url`, `model` and `protocol` are
+ignored while it is set. `extra.api_key` is not: your own key still wins, and is
+still what makes a call not consume platform credits.
+
+Nothing breaks if you never set it. An agent without a tier resolves from
+`api_url` and `model` exactly as it always did.
+
 ## 8. (Optional) Poll instead of webhooks
 
 If you'd rather pull than receive pushes:

@@ -124,6 +124,10 @@ export type ContactAddressInsert =
 
 export type AgentRow = Database["public"]["Tables"]["agents"]["Row"];
 
+// T2: a tier is read on every call that names one, so it travels in the
+// request context rather than being fetched per protocol.
+export type ModelTierRow = Database["public"]["Tables"]["model_tiers"]["Row"];
+
 export type OrganizationAddressRow =
   Database["public"]["Tables"]["organizations_addresses"]["Row"];
 

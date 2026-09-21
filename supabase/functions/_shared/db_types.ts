@@ -1394,6 +1394,45 @@ export type Database = {
           },
         ]
       }
+      model_tiers: {
+        Row: {
+          created_at: string
+          description: string | null
+          model: string
+          name: string
+          protocol: string
+          provider: string
+          slug: string
+          sort_order: number
+          supports_forced_tools: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          model: string
+          name: string
+          protocol?: string
+          provider: string
+          slug: string
+          sort_order?: number
+          supports_forced_tools?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          model?: string
+          name?: string
+          protocol?: string
+          provider?: string
+          slug?: string
+          sort_order?: number
+          supports_forced_tools?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       onboarding_tokens: {
         Row: {
           callback_url: string | null

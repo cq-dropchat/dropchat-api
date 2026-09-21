@@ -4,6 +4,7 @@ import type {
   ConversationRow,
   MessageInsert,
   MessageRow,
+  ModelTierRow,
   OrganizationRow,
 } from "../../_shared/supabase.ts";
 
@@ -24,6 +25,12 @@ export interface RequestContext {
   messages: MessageRow[];
   contact?: ContactInfo;
   agent: AgentRowWithExtra;
+  /**
+   * T2: the row of `public.model_tiers` this agent named, resolved once per
+   * request. Null when it named none, and also when it named one that no
+   * longer exists — the resolver treats both the same way.
+   */
+  tier?: ModelTierRow | null;
 }
 
 export interface ResponseContext {

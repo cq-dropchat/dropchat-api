@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- **`public.model_tiers` and `agents.extra.model_tier`** (T2). Three rows —
+  `rapido`, `equilibrado`, `avanzado` — that say which provider, model and
+  protocol an agent runs on. Readable by anybody, writable only by a platform
+  admin. An agent that names a tier stops carrying `api_url`, `model` and
+  `protocol`: **the tier wins over all three.**
+
+  Why it exists: those strings were copied into every agent, and a template (T4)
+  copies them into every organization that installs it. The day a provider
+  retires a model id, every one of those agents stops answering at once. With a
+  tier it is one UPDATE.
+
+  Additive. An agent with no `model_tier` resolves exactly as before — there is
+  a parity test that holds the old behaviour, oddities included. Two things to
+  know if you write `extra` through the API: **a tier slug that does not exist
+  is not an error**, the agent falls back to its own `api_url`/`model` and the
+  function logs it; and a tier whose provider cannot speak its protocol is
+  refused by the table, because that combination used to resolve silently to
+  `provider = custom` and an unpriced call.
+
 - **`organizations.extra.business_profile`** (T1). What the shop sells, ships
   and charges, as seven named fields instead of a paragraph somebody had to
   write for a model. It fills the second block of the system prompt of every

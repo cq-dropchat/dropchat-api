@@ -25,7 +25,6 @@ import type {
 import { isToolTrace } from "../../_shared/supabase.ts";
 import {
   type AgentProtocolHandler,
-  type AgentRowWithExtra,
   contextHeaders,
   normalizeToolName,
   type RequestContext,
@@ -37,15 +36,20 @@ import * as log from "../../_shared/logger.ts";
 import { getFileMetadata } from "../../_shared/media.ts";
 import { serializePartAsXML } from "./serializer.ts";
 import { buildSystemPrompt, historyRole } from "./prompt.ts";
-import { resolveModel } from "../../_shared/model_resolution.ts";
+import {
+  forcedToolsAllowed,
+  resolveModel,
+} from "../../_shared/model_resolution.ts";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 dayjs.extend(utc);
 
 // Whether this agent answers by calling `respond` (several messages per
 // turn) or in plain text (one). Opt out per agent — see AIAgentExtra.
-const multiMessageResponse = (agent: AgentRowWithExtra): boolean =>
-  agent.extra.multi_message_response ?? true;
+// T2: a tier may take this away and never give it — a model that rejects
+// `tool_choice: "required"` fails the call, which is not a preference.
+const multiMessageResponse = (context: RequestContext): boolean =>
+  forcedToolsAllowed(context.agent.extra, context.tier);
 
 const RESPOND_FUNCTION_NAME = "respond";
 
@@ -413,7 +417,7 @@ export class ChatCompletionsHandler
       },
     }));
 
-    if (multiMessageResponse(agent)) {
+    if (multiMessageResponse(this.context)) {
       chatCompletionTools.push(RESPOND_TOOL);
     }
 
@@ -458,6 +462,7 @@ export class ChatCompletionsHandler
     const { provider, baseURL, apiKey, model } = resolveModel(
       agent.extra,
       "chat_completions",
+      this.context.tier,
     );
 
     const billable = !agent.extra.api_key;
@@ -514,7 +519,9 @@ export class ChatCompletionsHandler
           messages: request.messages,
           // TOOLS
           tools: request.tools.length ? request.tools : undefined,
-          tool_choice: multiMessageResponse(agent) ? "required" : undefined,
+          tool_choice: multiMessageResponse(this.context)
+            ? "required"
+            : undefined,
           parallel_tool_calls: request.tools.length ? true : undefined,
           // THINKING
           // ts-expect-error
@@ -748,7 +755,7 @@ export class ChatCompletionsHandler
     // TODO: finish reasons: length, content filter
 
     if (finish_reason === "stop" && message.content) {
-      if (multiMessageResponse(agent)) {
+      if (multiMessageResponse(this.context)) {
         log.warn(
           "Unexpected stop finish_reason with tool_choice: required. Falling back to text response.",
         );

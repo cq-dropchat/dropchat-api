@@ -29,6 +29,7 @@ import {
   waitForAgentTurn,
 } from "../_shared/agent_turns.ts";
 import { ProtocolFactory } from "./protocols/index.ts";
+import { loadModelTier } from "../_shared/model_resolution.ts";
 import type { AgentRowWithExtra, ResponseContext } from "./protocols/base.ts";
 import type { MCPServer } from "./tools/mcp.ts";
 import { sanitizeLabel } from "./agent_tool.ts";
@@ -378,12 +379,17 @@ export async function handler(req: Request): Promise<Response> {
       agent.extra = {};
     }
 
+    // T2: resolved once per request, before the handler is chosen — the tier
+    // carries the protocol, and the protocol decides which handler answers.
+    const tier = await loadModelTier(client, agent.extra.model_tier);
+
     const context = {
       organization,
       conversation,
       messages,
       contact,
       agent: agent as AgentRowWithExtra,
+      tier,
     };
 
     if (agent.extra.tools) {

@@ -16,7 +16,6 @@ import type {
 import { isToolTrace } from "../../_shared/supabase.ts";
 import {
   type AgentProtocolHandler,
-  type AgentRowWithExtra,
   contextHeaders,
   normalizeToolName,
   type RequestContext,
@@ -28,7 +27,10 @@ import * as log from "../../_shared/logger.ts";
 import { getFileMetadata } from "../../_shared/media.ts";
 import { serializePartAsXML } from "./serializer.ts";
 import { buildSystemPrompt, historyRole } from "./prompt.ts";
-import { resolveModel } from "../../_shared/model_resolution.ts";
+import {
+  forcedToolsAllowed,
+  resolveModel,
+} from "../../_shared/model_resolution.ts";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 dayjs.extend(utc);
@@ -54,8 +56,10 @@ type ResponsesResponse = OpenAI.Responses.Response;
 
 // Whether this agent answers by calling `respond` (several messages per
 // turn) or in plain text (one). Opt out per agent — see AIAgentExtra.
-const multiMessageResponse = (agent: AgentRowWithExtra): boolean =>
-  agent.extra.multi_message_response ?? true;
+// T2: a tier may take this away and never give it — a model that rejects
+// `tool_choice: "required"` fails the call, which is not a preference.
+const multiMessageResponse = (context: RequestContext): boolean =>
+  forcedToolsAllowed(context.agent.extra, context.tier);
 
 const RESPOND_FUNCTION_NAME = "respond";
 
@@ -340,7 +344,7 @@ export class ResponsesHandler
       parameters: tool.inputSchema as Record<string, unknown>,
     }));
 
-    if (multiMessageResponse(agent)) {
+    if (multiMessageResponse(this.context)) {
       tools.push(RESPOND_TOOL);
     }
 
@@ -380,6 +384,7 @@ export class ResponsesHandler
     const { provider, baseURL, apiKey, model } = resolveModel(
       agent.extra,
       "responses",
+      this.context.tier,
     );
 
     const billable = !agent.extra.api_key;
@@ -435,7 +440,9 @@ export class ResponsesHandler
           temperature: agent.extra.temperature ?? undefined,
           max_output_tokens: agent.extra.max_tokens ?? undefined,
           tools: request.tools.length ? request.tools : undefined,
-          tool_choice: multiMessageResponse(agent) ? "required" : undefined,
+          tool_choice: multiMessageResponse(this.context)
+            ? "required"
+            : undefined,
           parallel_tool_calls: request.tools.length ? true : undefined,
           store: false,
         });
@@ -654,7 +661,7 @@ export class ResponsesHandler
       .trim();
 
     if (text) {
-      if (multiMessageResponse(agent)) {
+      if (multiMessageResponse(this.context)) {
         log.warn(
           "Unexpected text output with tool_choice: required. Falling back to text response.",
         );

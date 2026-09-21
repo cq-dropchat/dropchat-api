@@ -322,6 +322,16 @@ export type AIAgentExtra = {
   api_key?: string;
   model?: string;
   protocol?: "chat_completions" | "responses";
+  /**
+   * T2: the slug of a row in `public.model_tiers`, and the alternative to
+   * spelling out `api_url`, `model` and `protocol` here. When it is set it
+   * WINS over all three: the point of a tier is that the day a provider
+   * retires a model, one UPDATE moves every agent that named it.
+   *
+   * A slug that no longer exists does not stop the agent: it falls back to
+   * the fields below and says so in the log.
+   */
+  model_tier?: string;
   max_messages?: number;
   temperature?: number;
   max_tokens?: number;
