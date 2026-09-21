@@ -224,3 +224,15 @@ Monetization
       instantes del PAYLOAD (que sí son expectativas, y están literales en el
       snapshot) de los generados en la corrida—. Enmascarar por forma allí
       borraba aserciones reales; lo descubrí porque el snapshot falló.
+
+- [ ] T3 — `F29: agent-client stops after ten iterations` sigue siendo
+      intermitente, por una causa **distinta** de la que cerró T1. Falló una vez
+      en cuatro corridas de la suite completa el 21/09; el diff del snapshot es
+      solo el ORDEN de las filas, con el contenido idéntico: lotes enteros
+      permutados (`use_id` `call_3_0` donde esperaba `call_1_0`). Verde 10/10
+      corriendo el archivo aislado, y tres corridas completas seguidas en verde
+      después, así que aparece solo bajo la carga de la suite entera.
+      `written()` ya ordena por `created_at` y después por `timestamp`, que es
+      lo correcto para separar lotes y para separar las filas de un lote; lo que
+      falta es qué pasa cuando ese par empata. No es de T3, que no toca ese
+      código — apareció corriendo su CI.
