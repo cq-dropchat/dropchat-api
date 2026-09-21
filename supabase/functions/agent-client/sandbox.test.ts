@@ -360,12 +360,26 @@ test("S1: escalating in the simulator leaves awaiting_human_since, as on a real 
           content.data as { cause?: string; category?: string }
         );
 
-      // TWO notes, in this order, and the pair is the point: the simulator
-      // walks the whole of H1 (routing put the conversation in the agent's
-      // hands) and then the whole of H3 (the agent gave it up). A `local`
-      // DM produces neither.
-      assertEquals(assignments.map((a) => a.cause), ["entry", "escalation"]);
-      assertEquals(assignments.at(-1)?.category, "reclamo");
+      // TWO notes, and the pair is the point: the simulator walks the whole
+      // of H1 (routing put the conversation in the agent's hands) and then
+      // the whole of H3 (the agent gave it up). A `local` DM produces
+      // neither.
+      //
+      // Compared as a SET, not as a sequence. Both notes are written by the
+      // same invocation and the query above has no ORDER BY, so their order
+      // is whatever the plan returns — this asserted `["entry",
+      // "escalation"]` and got the reverse roughly once in a run. Ordering by
+      // `created_at` would not settle it either: `now()` is transaction time,
+      // so notes written in one transaction share it. The escalation is then
+      // identified by its cause rather than by its position.
+      assertEquals(
+        assignments.map((a) => a.cause).sort(),
+        ["entry", "escalation"],
+      );
+      assertEquals(
+        assignments.find((a) => a.cause === "escalation")?.category,
+        "reclamo",
+      );
     }, { multi_message_response: true });
   } finally {
     llm.restore();

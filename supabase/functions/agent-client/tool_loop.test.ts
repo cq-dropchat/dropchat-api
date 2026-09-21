@@ -142,21 +142,36 @@ async function cleanup(client: Client, contact: string) {
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 
-/** Replaces what depends on the run: ids and timestamps. */
-function stable(value: unknown, since: number, agentId: string): unknown {
+/** Any ISO-8601 instant, whole-string: these rows carry no fixed one. */
+const ISO = /^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-]\d{2}:?\d{2})?$/;
+
+/**
+ * Replaces what depends on the run: ids and timestamps.
+ *
+ * Masks by SHAPE and not by age. It used to mask an instant only when it was
+ * newer than `Date.now() - 1000`, which made the snapshot depend on the two
+ * clocks agreeing to within a second: these rows are written with the
+ * DATABASE's clock and compared by Deno's, and this repo already knows they
+ * drift (P1 exists because the database ran ahead). Under a loaded run the
+ * row fell outside the window, the real instant reached the snapshot, and the
+ * test failed for a reason that had nothing to do with the tool loop.
+ *
+ * Nothing is lost by widening it: not one of these timestamps is an
+ * expectation — they were all going to be `<now>`.
+ */
+function stable(value: unknown, agentId: string): unknown {
   if (typeof value === "string") {
-    if (/^\d{4}-\d{2}-\d{2}T/.test(value) && Date.parse(value) >= since) {
-      return "<now>";
-    }
+    if (ISO.test(value)) return "<now>";
+
     return value.replaceAll(agentId, "<agent>").replace(UUID, "<uuid>")
       .replace(/(\w+day), \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC/, "<now>");
   }
-  if (Array.isArray(value)) return value.map((v) => stable(v, since, agentId));
+  if (Array.isArray(value)) return value.map((v) => stable(v, agentId));
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value).map((
         [k, v],
-      ) => [k, stable(v, since, agentId)]),
+      ) => [k, stable(v, agentId)]),
     );
   }
   return value;
@@ -182,7 +197,6 @@ const test = (name: string, fn: (t: Deno.TestContext) => Promise<void>) =>
 test("F29: agent-client tool round, then the answer (characterization)", async (t) => {
   const client = service();
   const contact = "5491129100001";
-  const since = Date.now() - 1000;
   await cleanup(client, contact);
   const llm = scriptedLlm((call) =>
     call === 1
@@ -218,7 +232,6 @@ test("F29: agent-client tool round, then the answer (characterization)", async (
               (r as { messages: unknown[] }).messages
             ),
           },
-          since,
           agentId,
         ),
       );
@@ -232,7 +245,6 @@ test("F29: agent-client tool round, then the answer (characterization)", async (
 test("F29: agent-client stops after ten iterations (characterization)", async (t) => {
   const client = service();
   const contact = "5491129100002";
-  const since = Date.now() - 1000;
   await cleanup(client, contact);
   const llm = scriptedLlm(() => ({
     tool_calls: [{ name: "calculator", arguments: '{"expression":"1+1"}' }],
@@ -249,7 +261,6 @@ test("F29: agent-client stops after ten iterations (characterization)", async (t
         t,
         stable(
           { llmCalls: llm.requests.length, rows },
-          since,
           agentId,
         ),
       );
@@ -263,7 +274,6 @@ test("F29: agent-client stops after ten iterations (characterization)", async (t
 test("F29: agent-client greets a new conversation (characterization)", async (t) => {
   const client = service();
   const contact = "5491129100003";
-  const since = Date.now() - 1000;
   await cleanup(client, contact);
   const llm = scriptedLlm(() => ({ content: "no debería llamarse" }));
 
@@ -280,7 +290,6 @@ test("F29: agent-client greets a new conversation (characterization)", async (t)
             llmCalls: llm.requests.length,
             rows: await written(client, record),
           },
-          since,
           agentId,
         ),
       );

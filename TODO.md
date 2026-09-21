@@ -204,14 +204,23 @@ Monetization
       diferencias (pooler, storage) son ajustes del panel y quedan documentadas
       en `config.toml`.
 
-- [ ] Flaky: `F29: agent-client stops after ten iterations (characterization)`
-      failed once in eight full `deno task test:coverage` runs on 2026-09-20,
-      and passed alone and on the very next full run. Likely the snapshot
-      stabiliser rather than the code: `stable()` masks a timestamp only when
-      `Date.parse(value) >= since`, and `since` is `Date.now() - 1000` — a
-      one-second tolerance for the skew between the database's clock and Deno's,
-      which this repo already knows about (P1). Under a loaded run a row written
-      with the database's clock can fall outside it, and the real timestamp then
-      reaches the snapshot. Same family as the intermittency
-      `gaps/webhook-queue-scope` fixed. Widen the window, or mask by shape (any
-      ISO timestamp in these rows) instead of by age.
+- [x] T1 — las dos intermitencias. (a)
+      `F29: agent-client stops after ten
+      iterations`: el estabilizador de
+      snapshots enmascaraba un instante sólo si era más nuevo que
+      `Date.now() - 1000`, lo que ataba el snapshot a que los dos relojes
+      coincidieran dentro de un segundo —las filas se escriben con el reloj de
+      la BASE y se comparan con el de Deno, y este repo ya sabe que derivan
+      (P1)—. Pasa a enmascarar por FORMA. No se pierde nada: el snapshot no
+      tenía ni un timestamp literal. (b)
+      `S1: escalating in the
+      simulator...`: la query de las notas no tenía
+      `ORDER BY` y yo afirmaba una secuencia; ordenar por `created_at` tampoco
+      alcanzaba, porque `now()` es hora de transacción. Se compara como
+      conjunto.
+
+      **No se tocó** el `stable` gemelo de `whatsapp-webhook/process_payload`:
+      ahí el predicado por edad es correcto a propósito —distingue los
+      instantes del PAYLOAD (que sí son expectativas, y están literales en el
+      snapshot) de los generados en la corrida—. Enmascarar por forma allí
+      borraba aserciones reales; lo descubrí porque el snapshot falló.
