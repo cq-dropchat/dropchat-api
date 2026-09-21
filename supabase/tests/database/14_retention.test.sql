@@ -12,7 +12,7 @@
 -- and the queue row (URL and payload) is visible inside this transaction
 -- before pg_net's worker can take it.
 begin;
-select plan(18);
+select plan(24);
 
 create temp table marks as
 select
@@ -112,6 +112,18 @@ insert into public.onboarding_tokens (name, organization_id, expires_at, status,
   ('f15-just-expired', tests.id('org_a'), now() - interval '1 day', 'expired', 'whatsapp'),
   ('f15-active', tests.id('org_a'), now() + interval '7 days', 'active', 'whatsapp');
 
+-- E1. Two windows, and two statuses that are never purged at all. The rule is
+-- about what a panel should still be showing, not about age: an unfixed bug
+-- stays however old it is, and a dismissed one stays or the panel would
+-- re-report what somebody already dismissed.
+insert into public.error_issues (fingerprint, source, kind, title, status, first_seen, last_seen) values
+  ('f15-res-old',  'edge',     'Error', 'resolved, gone quiet',   'resolved',    now() - interval '400 days', now() - interval '91 days'),
+  ('f15-res-new',  'edge',     'Error', 'resolved, recent',       'resolved',    now() - interval '400 days', now() - interval '89 days'),
+  ('f15-pre-old',  'frontend', 'Error', 'preexisting, very old',  'preexisting', now() - interval '400 days', now() - interval '181 days'),
+  ('f15-pre-mid',  'frontend', 'Error', 'preexisting, 100 days',  'preexisting', now() - interval '400 days', now() - interval '100 days'),
+  ('f15-open-old', 'db',       'Error', 'still open, ancient',    'new',         now() - interval '400 days', now() - interval '399 days'),
+  ('f15-ignored',  'db',       'Error', 'dismissed, ancient',     'ignored',     now() - interval '400 days', now() - interval '399 days');
+
 -- A small batch leaves work for the next run.
 select is(
   (public.purge_expired_rows(2) ->> 'hooks')::int,
@@ -151,6 +163,32 @@ select is(
 select is(
   (select count(*)::int from public.onboarding_tokens where name = 'f15-active'),
   1, 'an active token stays'
+);
+
+-- E1.
+select is(
+  (select count(*)::int from public.error_issues where fingerprint = 'f15-res-old'),
+  0, 'a resolved issue quiet for more than 90 days is deleted'
+);
+select is(
+  (select count(*)::int from public.error_issues where fingerprint = 'f15-res-new'),
+  1, 'one quiet for 89 days stays: a recurrence inside the window is news'
+);
+select is(
+  (select count(*)::int from public.error_issues where fingerprint = 'f15-pre-old'),
+  0, 'a preexisting issue quiet for more than 180 days is deleted'
+);
+select is(
+  (select count(*)::int from public.error_issues where fingerprint = 'f15-pre-mid'),
+  1, 'one quiet for 100 days stays — preexisting gets the longer window'
+);
+select is(
+  (select count(*)::int from public.error_issues where fingerprint = 'f15-open-old'),
+  1, 'an OPEN issue is never purged: age is not a reason to stop showing a bug'
+);
+select is(
+  (select count(*)::int from public.error_issues where fingerprint = 'f15-ignored'),
+  1, 'nor is a dismissed one, or the panel would re-report it'
 );
 
 select is(
