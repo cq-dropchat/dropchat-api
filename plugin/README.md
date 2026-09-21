@@ -39,8 +39,22 @@ If no WhatsApp account is available (or resolution fails), the plugin runs in
 
 ## Quick start
 
-**Hosted users (zero config):** Production Supabase credentials are built in.
-Just authenticate with Google and go.
+**First, name the project.** The plugin ships with none: its url and its
+publishable key are a pair — a key only authenticates against the project it was
+issued for — and a pair frozen in source drifts the moment the project changes.
+It did, and the built-in url outlived its project: it kept resolving and
+answered every request `401`, which reads as a bad key rather than a wrong
+address. So the plugin now refuses to start rather than guess.
+
+```
+/openbsp:config configure https://<project-ref>.supabase.co <publishable-key>
+```
+
+Both values are public (they are the ones the web app ships in its bundle).
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` in the environment do the same thing and
+win over the file, which is the way to do it in CI.
+
+Then run it:
 
 ```bash
 claude --plugin-dir ./plugin
@@ -49,12 +63,6 @@ claude --plugin-dir ./plugin
 Sign in with `/openbsp:config login` — or just start using the plugin and Claude
 will prompt you to sign in when needed. After that, sessions are refreshed
 automatically.
-
-**Self-hosted users:** Point to your own Supabase instance:
-
-```
-/openbsp:config configure https://your-project.supabase.co your-anon-key
-```
 
 ## API access
 
