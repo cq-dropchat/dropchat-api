@@ -1,0 +1,31 @@
+export const snapshot = {};
+
+snapshot[`T1: the full profile, as the model reads it 1`] = `
+"Perfil del negocio:
+- Rubro: Zapatillas urbanas
+- Qué vende: Zapatillas de calle y running, tallas 35 a 45.
+- Cobertura de despacho: Todo Chile continental; retiro en tienda en Ñuñoa.
+- Plazos de entrega: 24 a 48 horas en RM, 3 a 5 días hábiles en regiones.
+- Medios de pago: Webpay, Transferencia, Efectivo contra entrega
+- Cambios y devoluciones: Cambio por talla dentro de 30 días con boleta. Sin devolución de dinero.
+- Moneda: CLP (peso chileno)"
+`;
+
+snapshot[`T1: the profile is named, so the model does not read it as an order 1`] = `
+{
+  dropped: [],
+  profile: {
+    currency: "CLP",
+    industry: "Zapatillas urbanas",
+    payment_methods: [
+      "Webpay",
+      "Transferencia",
+      "Efectivo contra entrega",
+    ],
+    returns_policy: "Cambio por talla dentro de 30 días con boleta. Sin devolución de dinero.",
+    sells: "Zapatillas de calle y running, tallas 35 a 45.",
+    shipping_coverage: "Todo Chile continental; retiro en tienda en Ñuñoa.",
+    shipping_times: "24 a 48 horas en RM, 3 a 5 días hábiles en regiones.",
+  },
+}
+`;

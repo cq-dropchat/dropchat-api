@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **`organizations.extra.business_profile`** (T1). What the shop sells, ships
+  and charges, as seven named fields instead of a paragraph somebody had to
+  write for a model. It fills the second block of the system prompt of every
+  agent of the organization, ahead of the agent's own instructions.
+
+  Additive: nothing you send today changes meaning, and an organization without
+  a profile builds the prompt it built before. Two things are worth knowing if
+  you write it through the API. **`payment_methods` is a list, and `extra` is a
+  JSON merge patch — an array is replaced whole**, so a write that carries one
+  method deletes the others. And **a field that breaks its limit is dropped from
+  the prompt, silently and on its own**, without raising and without taking the
+  rest of the profile with it: the shape and the ceilings are in
+  `INTEGRATING.md` `## 7`.
+
 - **`extra.attention` is validated when it is written** (H4). The defaults of A6
   were applied on read and nothing looked at what was stored, so an API key
   could save a Wednesday that closes before it opens, a negative wait, or a

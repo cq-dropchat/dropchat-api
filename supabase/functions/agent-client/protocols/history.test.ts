@@ -283,3 +283,69 @@ Deno.test("H2: an organization with no brand voice keeps the prompt it had", asy
     stable((chat.messages[0] as { content: string }).content),
   );
 });
+
+// ---------------------------------------------------------------------------
+// T1 — the business profile, in slot 2.
+//
+// The order H2 fixed says it goes after the brand voice and BEFORE the agent's
+// own instructions, and that is not a detail of taste: the agent's block is
+// what a template will write (T6), and it has to be able to say "offer what
+// the business sells" over a profile that is already on the page.
+// ---------------------------------------------------------------------------
+
+function withProfile(brandVoice: boolean) {
+  const ctx = context("whatsapp");
+  ctx.organization = {
+    ...ctx.organization,
+    extra: {
+      ...(brandVoice
+        ? { brand_voice: "Tutea al cliente. Firma como «el equipo»." }
+        : {}),
+      business_profile: {
+        industry: "Zapatillas urbanas",
+        sells: "Zapatillas de calle y running, tallas 35 a 45.",
+        shipping_coverage: "Todo Chile continental.",
+        shipping_times: "24 a 48 horas en RM, 3 a 5 días hábiles en regiones.",
+        payment_methods: ["Webpay", "Transferencia"],
+        returns_policy: "Cambio por talla dentro de 30 días con boleta.",
+        currency: "CLP",
+      },
+    },
+  } as unknown as OrganizationRow;
+  return ctx;
+}
+
+Deno.test("T1: the business profile sits between the brand voice and the instructions", async (t) => {
+  const chat = await new ChatCompletionsHandler([], withProfile(true), noClient)
+    .prepareRequest();
+
+  const system = (chat.messages[0] as { content: string }).content;
+
+  // The positions, asserted as positions and not only as a snapshot: a
+  // snapshot records what happened, this records what may not stop happening.
+  const voice = system.indexOf("Tutea al cliente");
+  const profile = system.indexOf("Perfil del negocio:");
+  const instructions = system.indexOf("Eres Sofía");
+
+  assertEquals(voice < profile && profile < instructions, true, system);
+
+  await assertSnapshot(t, stable(system));
+
+  const responses = await new ResponsesHandler([], withProfile(true), noClient)
+    .prepareRequest();
+
+  assertEquals(stable(responses.instructions), stable(system));
+});
+
+Deno.test("T1: an organization with a profile and no brand voice still leads with the profile", async (t) => {
+  const chat = await new ChatCompletionsHandler(
+    [],
+    withProfile(false),
+    noClient,
+  ).prepareRequest();
+
+  await assertSnapshot(
+    t,
+    stable((chat.messages[0] as { content: string }).content),
+  );
+});

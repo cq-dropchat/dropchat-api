@@ -7,6 +7,7 @@ import utc from "dayjs/plugin/utc";
 import { inspect } from "node:util";
 import type { MessageRow } from "../../_shared/supabase.ts";
 import { attentionContext } from "../../_shared/attention.ts";
+import { businessProfileBlock } from "../../_shared/business_profile.ts";
 import type { RequestContext } from "./base.ts";
 dayjs.extend(utc);
 
@@ -47,8 +48,9 @@ export function historyRole(
  *   4. guardrails           what a template locks (T6)
  *   5. runtime context      date, contact, business hours (H4), origin (R2)
  *
- * Two of those blocks do not exist yet. The order does, so adding them later
- * moves nothing that is already written.
+ * Guardrails (4) do not exist yet. The order does, so adding them later moves
+ * nothing that is already written — which is what T1 just spent: the profile
+ * went into slot 2 and no other block changed.
  */
 export function buildSystemPrompt(context: RequestContext): string {
   const blocks: string[] = [];
@@ -59,7 +61,14 @@ export function buildSystemPrompt(context: RequestContext): string {
     blocks.push(brandVoice);
   }
 
-  // 2. Business profile (T1).
+  // 2. What the business sells, ships and charges (T1). Before the agent's
+  // own instructions, so a template's block can say "offer what the business
+  // sells" over a profile that is already on the page.
+  const businessProfile = businessProfileBlock(context.organization.extra);
+
+  if (businessProfile) {
+    blocks.push(businessProfile);
+  }
 
   if (context.agent.extra.instructions) {
     blocks.push(context.agent.extra.instructions);

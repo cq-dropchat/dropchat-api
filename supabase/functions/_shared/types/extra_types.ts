@@ -1,4 +1,5 @@
 import type { SQLToolConfig } from "../../agent-client/tools/sql.ts";
+import type { BusinessProfile } from "./business_profile.ts";
 
 //===================================
 // Extra
@@ -68,6 +69,13 @@ export type OrganizationExtra = {
    * ahead of the agent's own instructions.
    */
   brand_voice?: string;
+  /**
+   * T1: what the business sells, ships and charges — slot 2 of the system
+   * prompt, ahead of the agent's own instructions. Read through
+   * `parseBusinessProfile`, never straight from here: nothing validates this
+   * column on the way in.
+   */
+  business_profile?: BusinessProfile;
 };
 
 export type WhatsAppOrganizationAddressExtra = {

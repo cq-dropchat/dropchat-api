@@ -398,6 +398,33 @@ Two consequences on the wire: an assignment can change with no API call of yours
 a conversation waiting past the limit may receive one extra outgoing message —
 the waiting message — which is never sent outside the channel's 24-hour window.
 
+### What the business sells (T1)
+
+`organizations.extra.business_profile` is what the agent knows about the shop
+itself, and it is read on every message: it sits in the system prompt ahead of
+the agent's own instructions, so it is the thing that keeps an answer from being
+invented.
+
+| Key                 | Type       | Limit | Meaning                                     |
+| ------------------- | ---------- | ----- | ------------------------------------------- |
+| `industry`          | `string`   | 80    | Rubro — what kind of business it is.        |
+| `sells`             | `string`   | 600   | What it sells.                              |
+| `shipping_coverage` | `string`   | 400   | Where it ships, and where it does not.      |
+| `shipping_times`    | `string`   | 300   | How long delivery takes.                    |
+| `payment_methods`   | `string[]` | 20    | How it gets paid; 60 characters per method. |
+| `returns_policy`    | `string`   | 800   | Returns and exchanges.                      |
+| `currency`          | `"CLP"`    | —     | The currency its prices are in.             |
+
+Every key is optional and the profile as a whole is optional. **A field that
+breaks one of those rules is dropped from the prompt, and only that field** —
+the rest of the profile is still used. Nothing raises: unlike `extra.attention`,
+this column is not validated on the way in, because a malformed profile misleads
+one conversation while a malformed schedule misleads every sweep.
+
+`payment_methods` is a list, and `extra` is a JSON merge patch (see above): **an
+array is replaced whole, never merged.** Send every method you take on every
+write, or the ones you leave out are deleted.
+
 ## 8. (Optional) Poll instead of webhooks
 
 If you'd rather pull than receive pushes:
