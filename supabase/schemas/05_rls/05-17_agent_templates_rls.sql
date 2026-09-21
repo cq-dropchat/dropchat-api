@@ -107,3 +107,20 @@ on public.agent_template_versions from anon, authenticated;
 
 revoke delete, truncate
 on public.agent_templates from anon, authenticated;
+
+-- T7. The version YOUR OWN agent runs on, whatever happened to it since.
+--
+-- The catalogue policy above hides retired versions and archived templates,
+-- which is how the platform stops handing something out. But an organization
+-- that already installed one has to keep reading it: B3 says the base
+-- instructions are visible, and «this version was retired» is precisely the
+-- notice that tells somebody to move — a screen that goes blank instead
+-- explains nothing at the moment it matters most.
+--
+-- Narrow on purpose: it is YOUR agent's version, not anybody's. Somebody
+-- else's install is not a reason to read a version that was pulled.
+create policy "members can read the versions their agents run on"
+on public.agent_template_versions
+for select
+to authenticated, anon
+using (rls.runs_template_version(template_id, version));

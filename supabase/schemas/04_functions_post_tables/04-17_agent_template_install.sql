@@ -351,3 +351,38 @@ from public, service_role;
 
 grant execute on function public.unlink_agent_template(uuid)
 to authenticated, anon;
+
+-- T7. Whether one of the caller's own agents runs on this version.
+--
+-- A helper and not an inline `exists`, for a reason that only shows up at the
+-- edge: `rls.get_authorized_orgs` RAISES 42501 for a caller with neither a JWT
+-- nor an api-key header, instead of resolving to an empty set. Written inline,
+-- this policy would turn "anon reads nothing here" — which is what
+-- `35_agent_templates` pins — into "anon gets an error", for a table whose
+-- other policy has always answered anonymous readers with an empty list.
+--
+-- So the raise is caught and answered the way a policy should answer: no.
+create function rls.runs_template_version(_template_id uuid, _version integer)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path to ''
+as $$
+begin
+  return exists (
+    select 1
+    from public.agents a
+    where a.template_id = _template_id
+      and a.template_version = _version
+      and a.organization_id in (select rls.get_authorized_orgs('member'))
+  );
+exception when insufficient_privilege then
+  return false;
+end;
+$$;
+
+revoke execute on function rls.runs_template_version(uuid, integer) from public;
+
+grant execute on function rls.runs_template_version(uuid, integer)
+to anon, authenticated, service_role;

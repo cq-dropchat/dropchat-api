@@ -19,7 +19,7 @@
 -- one is left OUT of the resolved configuration rather than handed to the
 -- model half-built.
 begin;
-select plan(27);
+select plan(29);
 
 insert into public.platform_settings (id, template_org_id)
 values (true, tests.id('org_b'));
@@ -330,6 +330,59 @@ select is(
   'db.tienda',
   'with the organization''s own connection frozen into it'
 );
+
+-- ---------------------------------------------------------------------------
+-- T7 needs one thing T6 did not give it: an organization has to be able to
+-- read the version ITS OWN agent runs on, even when that version was retired
+-- or its template archived.
+--
+-- Otherwise the screen of an installed agent goes blank exactly when it most
+-- needs to explain itself: B3 says the base instructions are readable, and
+-- «this version was retired» is the notice that tells somebody why they should
+-- move. The catalogue policy hides retired versions on purpose — that is how
+-- the platform stops handing something out — so what is missing is a second,
+-- narrower door.
+-- ---------------------------------------------------------------------------
+
+-- Put the agent back on the template and retire the version it is on.
+update public.agents
+set template_id = 'dddddddd-0000-4000-8000-0000000000c1'::uuid,
+    template_version = 1
+where organization_id = tests.id('org_a') and name = 'Ventas contra entrega';
+
+update public.agent_template_versions
+set retired_at = now()
+where template_id = 'dddddddd-0000-4000-8000-0000000000c1'::uuid and version = 1;
+
+select tests.authenticate_as('alice@test.local');
+
+select is(
+  (select count(*)::int from public.agent_template_versions
+   where template_id = 'dddddddd-0000-4000-8000-0000000000c1'::uuid
+     and version = 1),
+  1,
+  'an organization reads the retired version its own agent still runs on'
+);
+
+select tests.clear_authentication();
+
+-- And the door is exactly that narrow: another organization's agent being on a
+-- version is not a reason for THIS one to read it. Bob stops being the
+-- platform admin for this one assertion — as one, he reads every version
+-- there is, which would make the check pass for the wrong reason.
+delete from public.platform_admins where user_id = tests.id('user_bob');
+
+select tests.authenticate_as('bob@test.local');
+
+select is(
+  (select count(*)::int from public.agent_template_versions
+   where template_id = 'dddddddd-0000-4000-8000-0000000000c1'::uuid
+     and version = 1),
+  0,
+  'and nobody else reads it through somebody else''s install'
+);
+
+select tests.clear_authentication();
 
 -- ---------------------------------------------------------------------------
 -- Privileges. `db diff` does not model function EXECUTE at all — it reports
