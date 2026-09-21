@@ -1044,6 +1044,87 @@ export type Database = {
           },
         ]
       }
+      error_issues: {
+        Row: {
+          culprit: string | null
+          events: number
+          fingerprint: string
+          first_sample: Json
+          first_seen: string
+          id: string
+          kind: string
+          last_sample: Json
+          last_seen: string
+          notes: string | null
+          regressed_at: string | null
+          release: string | null
+          source: Database["public"]["Enums"]["error_source"]
+          status: Database["public"]["Enums"]["error_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          culprit?: string | null
+          events?: number
+          fingerprint: string
+          first_sample?: Json
+          first_seen?: string
+          id?: string
+          kind: string
+          last_sample?: Json
+          last_seen?: string
+          notes?: string | null
+          regressed_at?: string | null
+          release?: string | null
+          source: Database["public"]["Enums"]["error_source"]
+          status?: Database["public"]["Enums"]["error_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          culprit?: string | null
+          events?: number
+          fingerprint?: string
+          first_sample?: Json
+          first_seen?: string
+          id?: string
+          kind?: string
+          last_sample?: Json
+          last_seen?: string
+          notes?: string | null
+          regressed_at?: string | null
+          release?: string | null
+          source?: Database["public"]["Enums"]["error_source"]
+          status?: Database["public"]["Enums"]["error_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      error_settings: {
+        Row: {
+          baseline_closed_at: string | null
+          baseline_closed_by: string | null
+          baseline_open: boolean
+          id: boolean
+          updated_at: string
+        }
+        Insert: {
+          baseline_closed_at?: string | null
+          baseline_closed_by?: string | null
+          baseline_open?: boolean
+          id?: boolean
+          updated_at?: string
+        }
+        Update: {
+          baseline_closed_at?: string | null
+          baseline_closed_by?: string | null
+          baseline_open?: boolean
+          id?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invitations: {
         Row: {
           created_at: string
@@ -1400,6 +1481,24 @@ export type Database = {
           },
         ]
       }
+      platform_admins: {
+        Row: {
+          created_at: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       rate_limits: {
         Row: {
           count: number
@@ -1708,6 +1807,22 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      close_error_baseline: {
+        Args: never
+        Returns: {
+          baseline_closed_at: string | null
+          baseline_closed_by: string | null
+          baseline_open: boolean
+          id: boolean
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "error_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_api_key: {
         Args: {
           p_expires_at?: string
@@ -1738,6 +1853,15 @@ export type Database = {
       edge_call_max_attempts: { Args: never; Returns: number }
       edge_call_retry_delay: { Args: { attempt: number }; Returns: string }
       edge_functions_config: { Args: never; Returns: Record<string, unknown> }
+      error_fingerprint: {
+        Args: {
+          _culprit: string
+          _kind: string
+          _message: string
+          _source: Database["public"]["Enums"]["error_source"]
+        }
+        Returns: string
+      }
       expire_human_assignments: { Args: { p_limit?: number }; Returns: number }
       expired_organization_exports: {
         Args: { _limit?: number }
@@ -1792,6 +1916,23 @@ export type Database = {
         Returns: Json
       }
       message_rate_limit_per_minute: { Args: never; Returns: number }
+      normalize_error_message: { Args: { _message: string }; Returns: string }
+      open_error_baseline: {
+        Args: never
+        Returns: {
+          baseline_closed_at: string | null
+          baseline_closed_by: string | null
+          baseline_open: boolean
+          id: boolean
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "error_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       organization_export_ttl: { Args: never; Returns: string }
       pending_deletion_media: {
         Args: { _limit?: number }
@@ -1838,6 +1979,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      record_error_issue: {
+        Args: {
+          _context?: Json
+          _culprit?: string
+          _kind: string
+          _message: string
+          _release?: string
+          _source: Database["public"]["Enums"]["error_source"]
+          _stack?: string
+        }
+        Returns: string
+      }
       record_webhook_result: {
         Args: { p_delivery_id: string; p_error?: string; p_status_code: number }
         Returns: undefined
@@ -1857,6 +2010,28 @@ export type Database = {
       }
       renew_agent_turn: {
         Args: { _conversation_id: string; _message_id: string }
+        Returns: string
+      }
+      report_edge_error: {
+        Args: {
+          _context?: Json
+          _culprit?: string
+          _kind: string
+          _message: string
+          _release?: string
+          _stack?: string
+        }
+        Returns: string
+      }
+      report_error: {
+        Args: {
+          _context?: Json
+          _culprit?: string
+          _kind: string
+          _message: string
+          _release?: string
+          _stack?: string
+        }
         Returns: string
       }
       request_address_deletion: {
@@ -1912,6 +2087,13 @@ export type Database = {
       webhook_retry_delay: { Args: { attempt: number }; Returns: string }
     }
     Enums: {
+      error_source: "frontend" | "edge" | "db"
+      error_status:
+        | "new"
+        | "acknowledged"
+        | "resolved"
+        | "ignored"
+        | "preexisting"
       log_level: "info" | "warning" | "error"
       role: "owner" | "admin" | "member"
       service:
@@ -2617,6 +2799,14 @@ export const Constants = {
   },
   public: {
     Enums: {
+      error_source: ["frontend", "edge", "db"],
+      error_status: [
+        "new",
+        "acknowledged",
+        "resolved",
+        "ignored",
+        "preexisting",
+      ],
       log_level: ["info", "warning", "error"],
       role: ["owner", "admin", "member"],
       service: [

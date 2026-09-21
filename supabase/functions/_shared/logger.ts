@@ -14,6 +14,7 @@
 // Replaces console.* with `%c` colour escapes, which Supabase's log explorer
 // showed as literal text and nothing could filter on.
 import { AsyncLocalStorage } from "node:async_hooks";
+import { hasWaitUntil, waitUntil } from "./edge_runtime.ts";
 
 type LogLevel = "info" | "warn" | "error";
 
@@ -38,7 +39,13 @@ function toFields(details: unknown): Record<string, unknown> {
   return fields;
 }
 
-function safeStringify(line: Record<string, unknown>): string {
+/**
+ * JSON for a value that was never meant to be JSON: BigInt becomes a string
+ * and a cycle becomes "[circular]" instead of throwing. Exported because
+ * error_reporter.ts needs the same guarantee for the same values — a log line
+ * that can be printed has to be one that can also be stored.
+ */
+export function safeStringify(line: Record<string, unknown>): string {
   const seen = new WeakSet();
   return JSON.stringify(line, (_key, value) => {
     if (typeof value === "bigint") return value.toString();
@@ -48,6 +55,50 @@ function safeStringify(line: Record<string, unknown>): string {
     }
     return value;
   });
+}
+
+// E1. Every error line is also an occurrence of an issue in the panel
+// (error_reporter.ts). Imported lazily, and only when an error actually
+// happens: error_reporter pulls in supabase-js, whose client imports this
+// module back for the request id, so a static import here would be a cycle —
+// and an invocation that never errors would pay to load it for nothing.
+//
+// Fire and forget, after the response: reporting an error must never delay or
+// break the handling of it. A rejection is swallowed here rather than logged,
+// because the thing that would log it is this function.
+//
+// Two gates, and both are checked HERE rather than inside the reporter,
+// because what has to be avoided is deferring anything at all — not just
+// skipping the request once deferred. The Meta webhook tests read "something
+// was deferred" as "the payload was accepted", so a report queued from an
+// error path makes an invalid signature look accepted.
+//
+//   ERROR_REPORTING=on   opt-in, set as a project secret (error_reporter.ts
+//                        explains why this is not the default).
+//   hasWaitUntil()       only where there IS an "after the response" — the
+//                        deployed runtime and `supabase functions serve`.
+//                        Logging is synchronous and has nothing to await on,
+//                        so anywhere else the request would be a promise
+//                        nobody owns, outliving its caller.
+function report(line: Record<string, unknown>): void {
+  try {
+    if (Deno.env.get("ERROR_REPORTING") !== "on") return;
+  } catch {
+    // No --allow-env: nothing to report to either.
+    return;
+  }
+
+  if (!hasWaitUntil()) return;
+
+  try {
+    waitUntil(
+      import("./error_reporter.ts")
+        .then((reporter) => reporter.captureError(line))
+        .catch(() => {}),
+    );
+  } catch {
+    // Reporting is best-effort by construction.
+  }
 }
 
 function log(level: LogLevel, message: string, details?: unknown): void {
@@ -61,6 +112,8 @@ function log(level: LogLevel, message: string, details?: unknown): void {
 
   const method = level === "info" ? "log" : level;
   console[method](safeStringify(line));
+
+  if (level === "error") report(line);
 }
 
 export function info(message: string, details?: unknown): void {
