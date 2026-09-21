@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **An organization can read the template version its own agent runs on** (T7),
+  even after that version is retired or its template archived. The catalogue
+  policy still hides both, which is how the platform stops handing something
+  out; this is a second, narrower policy — your agent's version, not anybody's.
+
+  Without it the screen of an installed agent went blank exactly when it had the
+  most to explain: the base instructions are readable (B3), and "this version
+  was retired" is the notice that says to move.
+
 - **Installing a template** (T6). `agents.template_id`,
   `agents.template_version` and `agents.template_auto_update`, plus
   `install_agent_template`, `update_agent_template_version` and

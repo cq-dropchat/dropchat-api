@@ -1176,6 +1176,20 @@ templates are orphaned (`source_agent_id` null) and every version they already
 published stays published. Publishing new versions stops until a new source is
 named. Nothing is retracted from the organizations that installed it.
 
+**Everything after those two steps is the panel, at `/templates` in the app**
+(T7) — creating a catalogue entry, publishing a version with its changelog,
+retiring one, archiving a template. Not a convenience:
+`publish_agent_template_version` records `auth.uid()` and refuses a caller who
+is not a platform admin, so **it cannot be called from the SQL editor at all**,
+where there is no session. The panel is reached by typing the URL, like the
+error panel, and RLS is what guards it.
+
+Installing is the other end and belongs to the organization: an admin picks a
+template in «Agregar agente», and the agent that appears points at a published
+version instead of copying it (T6). Its own `extra` is the override layer, a
+published tool arrives without a connection and does not run until the
+organization supplies one, and `guardrails` stays the template's.
+
 ## Local development
 
 Requires Node 🐢 and Docker 🐋.
