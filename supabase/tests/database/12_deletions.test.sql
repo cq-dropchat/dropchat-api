@@ -15,7 +15,7 @@
 -- for readers at once and is swept by pg_cron in bounded batches, scoped to
 -- one organization.
 begin;
-select plan(34);
+select plan(37);
 
 select has_table('public', 'deletion_requests', 'deletion_requests exists');
 select has_column('public', 'organizations', 'deletion_requested_at', 'organizations can be marked');
@@ -38,6 +38,21 @@ select
   (select count(*) from public.messages where organization_id = tests.id('org_b')) as b_messages,
   (select count(*) from public.conversations where organization_id = tests.id('org_b')) as b_conversations;
 grant select on counts to anon, authenticated;
+
+-- T4. A template whose source lives in org A, so that deleting org A exercises
+-- `agent_templates.source_agent_id on delete set null` — the only path that
+-- ever really deletes an agent (mark_agent_deleted turns every other delete
+-- into a mark, and only lets the row go once its organization is gone).
+insert into public.platform_settings (id, template_org_id)
+values (true, tests.id('org_a'));
+
+insert into public.agent_templates (id, slug, name, source_agent_id)
+values ('dddddddd-0000-4000-8000-0000000000d1'::uuid, 'plantilla-de-a',
+        'Plantilla de A', tests.id('agent_alice'));
+
+insert into public.agent_template_versions (template_id, version, config, config_hash)
+values ('dddddddd-0000-4000-8000-0000000000d1'::uuid, 1,
+        '{"instructions": "publicada antes del borrado"}', 'hash-d1');
 
 -- A sweep with no requests does nothing.
 select is(public.sweep_deletions(), '{"request": null}'::jsonb, 'nothing to sweep');
@@ -210,6 +225,31 @@ select is(
 select ok(
   (select deleted_rows >= (select a_messages from counts) from public.deletion_requests where organization_id = tests.id('org_a')),
   'the request records what it deleted'
+);
+
+-- T4. The catalogue is global: it outlives the organization that published it.
+-- Deleting a tenant must not retract versions other tenants have installed, so
+-- the template is orphaned rather than removed. A cascade here would delete
+-- the published history of every source organization that ever closes.
+select is(
+  (
+    select count(*) filter (where source_agent_id is null)
+    from public.agent_templates
+    where slug = 'plantilla-de-a'
+  )::int,
+  1,
+  'deleting the source organization orphans its template instead of removing it'
+);
+select is(
+  (select count(*)::int from public.agent_template_versions
+   where template_id = 'dddddddd-0000-4000-8000-0000000000d1'::uuid),
+  1,
+  'and the versions it published stay published'
+);
+select is(
+  (select template_org_id from public.platform_settings),
+  null,
+  'while the platform settings forget which organization was the source'
 );
 select is(
   (select count(*)::int from public.organizations where id = tests.id('org_b')),

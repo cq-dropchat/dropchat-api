@@ -1137,6 +1137,45 @@ Retention is part of the hourly `purge-expired-rows` job: `resolved` issues go
 90 days after their last occurrence, `preexisting` after 180. An open issue is
 never purged, however old.
 
+## Agent templates
+
+DropChat publishes a catalogue of ready-made agents and every organization
+installs from it. A template is built as an ordinary agent inside one "DropChat"
+organization (D6) and then published: publishing copies that agent's stored
+`extra` into an immutable version row, so a version is a COPY and never a view
+of the agent it came from.
+
+`platform_settings` is a single-row table (the `check (id)`) naming which
+organization that is. It is a table rather than a flag on `organizations`
+because a flag in `extra` carries no constraint — nothing would stop two
+organizations claiming to be the source — and rather than a column because the
+column would be true in one row out of every tenant's.
+
+Two things have to be set up once, by hand, and there is no UI for either:
+
+1. **The source organization.** Create it through the app like any other
+   organization, so it gets the owner, subscription and entry agent that the
+   normal signup path gives it — never by INSERT, which skips all of that.
+
+2. **The pointer.** `platform_settings` ships empty and has a read policy for
+   platform admins and _no write policy at all_, so this runs from the SQL
+   editor:
+
+```sql
+insert into public.platform_settings (id, template_org_id)
+select true, id from public.organizations where name = 'DropChat'
+on conflict (id) do update set template_org_id = excluded.template_org_id;
+```
+
+Repointing the source decides what every organization in the product installs,
+which is why it is a deliberate act outside any browser session — the same
+reasoning as the first platform admin above.
+
+Deleting the source organization is survivable: `template_org_id` goes null, the
+templates are orphaned (`source_agent_id` null) and every version they already
+published stays published. Publishing new versions stops until a new source is
+named. Nothing is retracted from the organizations that installed it.
+
 ## Local development
 
 Requires Node 🐢 and Docker 🐋.

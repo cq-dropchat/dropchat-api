@@ -603,6 +603,91 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_template_versions: {
+        Row: {
+          changelog: string | null
+          config: Json
+          config_hash: string
+          published_at: string
+          published_by: string | null
+          retired_at: string | null
+          template_id: string
+          version: number
+        }
+        Insert: {
+          changelog?: string | null
+          config: Json
+          config_hash: string
+          published_at?: string
+          published_by?: string | null
+          retired_at?: string | null
+          template_id: string
+          version: number
+        }
+        Update: {
+          changelog?: string | null
+          config?: Json
+          config_hash?: string
+          published_at?: string
+          published_by?: string | null
+          retired_at?: string | null
+          template_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "agent_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_templates: {
+        Row: {
+          archived_at: string | null
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          slug: string
+          source_agent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          slug: string
+          source_agent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          source_agent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_templates_source_agent_id_fkey"
+            columns: ["source_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_turns: {
         Row: {
           conversation_id: string
@@ -1501,6 +1586,32 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      platform_settings: {
+        Row: {
+          id: boolean
+          template_org_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          template_org_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          template_org_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_settings_template_org_id_fkey"
+            columns: ["template_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rate_limits: {
         Row: {
