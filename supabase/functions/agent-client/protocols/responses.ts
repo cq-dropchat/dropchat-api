@@ -28,6 +28,7 @@ import * as log from "../../_shared/logger.ts";
 import { getFileMetadata } from "../../_shared/media.ts";
 import { serializePartAsXML } from "./serializer.ts";
 import { buildSystemPrompt, historyRole } from "./prompt.ts";
+import { resolveModel } from "../../_shared/model_resolution.ts";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 dayjs.extend(utc);
@@ -373,29 +374,13 @@ export class ResponsesHandler
   ): Promise<ResponsesResponseWrapper> {
     const { agent, organization } = this.context;
 
-    let provider = agent.extra.api_url;
-    let baseURL = agent.extra.api_url;
-    let apiKey = agent.extra.api_key;
-    let model = agent.extra.model;
-
-    switch (baseURL) {
-      case "groq":
-        baseURL = "https://api.groq.com/openai/v1";
-        apiKey ||= Deno.env.get("GROQ_API_KEY");
-        model ||= "openai/gpt-oss-20b";
-        break;
-      case "openai":
-        // undefined makes OpenAI use the default base URL and the api key from
-        // the OPENAI_API_KEY environment variable.
-        baseURL = undefined;
-      /* falls through */
-      default:
-        // Strip a trailing /responses if present; the client appends it.
-        baseURL = baseURL?.replace("/responses", "") || undefined;
-        apiKey ||= undefined;
-        model ||= "gpt-5-mini";
-        provider = !!baseURL && baseURL !== "openai" ? "custom" : "openai";
-    }
+    // T2: the same resolver chat-completions uses. This switch knew two of the
+    // four providers the other one knew, which is why an agent set to
+    // "anthropic" on this protocol never reached Anthropic.
+    const { provider, baseURL, apiKey, model } = resolveModel(
+      agent.extra,
+      "responses",
+    );
 
     const billable = !agent.extra.api_key;
 

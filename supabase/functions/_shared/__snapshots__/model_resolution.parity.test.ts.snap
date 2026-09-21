@@ -1,0 +1,156 @@
+export const snapshot = {};
+
+snapshot[`T2: what every api_url resolves to, both protocols 1`] = `
+[
+  {
+    api_url: undefined,
+    chat_completions: {
+      apiKey: undefined,
+      baseURL: undefined,
+      model: "gpt-5-mini",
+      provider: "openai",
+    },
+    responses: {
+      apiKey: undefined,
+      baseURL: undefined,
+      model: "gpt-5-mini",
+      provider: "openai",
+    },
+  },
+  {
+    api_url: "",
+    chat_completions: {
+      apiKey: undefined,
+      baseURL: undefined,
+      model: "gpt-5-mini",
+      provider: "openai",
+    },
+    responses: {
+      apiKey: undefined,
+      baseURL: undefined,
+      model: "gpt-5-mini",
+      provider: "openai",
+    },
+  },
+  {
+    api_url: "groq",
+    chat_completions: {
+      apiKey: "groq-de-prueba-0000",
+      baseURL: "https://api.groq.com/openai/v1",
+      model: "openai/gpt-oss-20b",
+      provider: "groq",
+    },
+    responses: {
+      apiKey: "groq-de-prueba-0000",
+      baseURL: "https://api.groq.com/openai/v1",
+      model: "openai/gpt-oss-20b",
+      provider: "groq",
+    },
+  },
+  {
+    api_url: "anthropic",
+    chat_completions: {
+      apiKey: "anthropic-de-prueba-0000",
+      baseURL: "https://api.anthropic.com/v1",
+      model: "claude-sonnet-4-6",
+      provider: "anthropic",
+    },
+    responses: {
+      apiKey: undefined,
+      baseURL: "anthropic",
+      model: "gpt-5-mini",
+      provider: "custom",
+    },
+  },
+  {
+    api_url: "google",
+    chat_completions: {
+      apiKey: "google-de-prueba-0000",
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+      model: "gemini-3-flash-preview",
+      provider: "google",
+    },
+    responses: {
+      apiKey: undefined,
+      baseURL: "google",
+      model: "gpt-5-mini",
+      provider: "custom",
+    },
+  },
+  {
+    api_url: "openai",
+    chat_completions: {
+      apiKey: undefined,
+      baseURL: undefined,
+      model: "gpt-5-mini",
+      provider: "openai",
+    },
+    responses: {
+      apiKey: undefined,
+      baseURL: undefined,
+      model: "gpt-5-mini",
+      provider: "openai",
+    },
+  },
+  {
+    api_url: "custom",
+    chat_completions: {
+      apiKey: undefined,
+      baseURL: "custom",
+      model: "gpt-5-mini",
+      provider: "custom",
+    },
+    responses: {
+      apiKey: undefined,
+      baseURL: "custom",
+      model: "gpt-5-mini",
+      provider: "custom",
+    },
+  },
+  {
+    api_url: "https://interno.ejemplo/v1",
+    chat_completions: {
+      apiKey: undefined,
+      baseURL: "https://interno.ejemplo/v1",
+      model: "gpt-5-mini",
+      provider: "custom",
+    },
+    responses: {
+      apiKey: undefined,
+      baseURL: "https://interno.ejemplo/v1",
+      model: "gpt-5-mini",
+      provider: "custom",
+    },
+  },
+  {
+    api_url: "https://interno.ejemplo/v1/chat/completions",
+    chat_completions: {
+      apiKey: undefined,
+      baseURL: "https://interno.ejemplo/v1",
+      model: "gpt-5-mini",
+      provider: "custom",
+    },
+    responses: {
+      apiKey: undefined,
+      baseURL: "https://interno.ejemplo/v1/chat/completions",
+      model: "gpt-5-mini",
+      provider: "custom",
+    },
+  },
+  {
+    api_url: "https://interno.ejemplo/v1/responses",
+    chat_completions: {
+      apiKey: undefined,
+      baseURL: "https://interno.ejemplo/v1/responses",
+      model: "gpt-5-mini",
+      provider: "custom",
+    },
+    responses: {
+      apiKey: undefined,
+      baseURL: "https://interno.ejemplo/v1",
+      model: "gpt-5-mini",
+      provider: "custom",
+    },
+  },
+]
+`;

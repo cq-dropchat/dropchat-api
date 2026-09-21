@@ -37,6 +37,7 @@ import * as log from "../../_shared/logger.ts";
 import { getFileMetadata } from "../../_shared/media.ts";
 import { serializePartAsXML } from "./serializer.ts";
 import { buildSystemPrompt, historyRole } from "./prompt.ts";
+import { resolveModel } from "../../_shared/model_resolution.ts";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 dayjs.extend(utc);
@@ -451,41 +452,13 @@ export class ChatCompletionsHandler
   ): Promise<ChatCompletionsResponse> {
     const { agent, organization } = this.context;
 
-    let provider = agent.extra.api_url;
-    let baseURL = agent.extra.api_url;
-    let apiKey = agent.extra.api_key;
-    let model = agent.extra.model;
-
-    switch (baseURL) {
-      case "groq":
-        baseURL = "https://api.groq.com/openai/v1";
-        apiKey ||= Deno.env.get("GROQ_API_KEY");
-        model ||= "openai/gpt-oss-20b";
-        break;
-      case "anthropic":
-        baseURL = "https://api.anthropic.com/v1";
-        apiKey ||= Deno.env.get("ANTHROPIC_API_KEY");
-        model ||= "claude-sonnet-4-6";
-        break;
-      case "google":
-        baseURL = "https://generativelanguage.googleapis.com/v1beta/openai";
-        apiKey ||= Deno.env.get("GOOGLE_API_KEY");
-        model ||= "gemini-3-flash-preview";
-        break;
-      case "openai":
-        // undefined makes OpenAI use the default base URL
-        // and api key from the OPENAI_API_KEY environment variable.
-        baseURL = undefined;
-      /* falls through */
-      default:
-        // remove /chat/completions from the base URL if it exists,
-        // the client appends it automatically.
-        baseURL = baseURL?.replace("/chat/completions", "") || undefined;
-        apiKey ||= undefined;
-        model ||= "gpt-5-mini";
-        provider = !!baseURL && baseURL !== "openai" ? "custom" : "openai";
-    }
+    // T2: one resolver for both protocols. It used to be this switch, twice,
+    // and the two copies had drifted.
     // Note: for Bedrock, the base URL is https://${bedrock-runtime-endpoint}/openai/v1
+    const { provider, baseURL, apiKey, model } = resolveModel(
+      agent.extra,
+      "chat_completions",
+    );
 
     const billable = !agent.extra.api_key;
 
