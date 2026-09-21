@@ -145,6 +145,19 @@ begin
   select * into _base_url, _token from public.edge_functions_config();
 
   for _row in select * from public.pending_dispatch_candidates() loop
+    -- A service with no carrier has no dispatcher to post to. The insert
+    -- trigger settles these, but a row dated in the future slips past its
+    -- WHEN and arrives here still pending; settle it the same way rather
+    -- than posting to a function that does not exist. Not counted: the
+    -- return value is requests sent.
+    if not public.service_has_carrier(_row.service) then
+      update public.messages
+      set status = jsonb_build_object('delivered', now())
+      where id = _row.id;
+
+      continue;
+    end if;
+
     perform net.http_post(
       url := _base_url || '/' || _row.service::text || '-dispatcher',
       headers := jsonb_build_object(

@@ -62,6 +62,33 @@ $$;
 
 revoke execute on function public.request_id_header() from public, anon, authenticated, service_role;
 
+-- Whether a service has something to send a message THROUGH.
+--
+-- Two do not. `local` is team chat: the row is the delivery. `sandbox` is
+-- S1's simulator: the tester reads it in the same table it was written to.
+-- For both, `'/' || service || '-dispatcher'` names a function that does not
+-- exist, and a message posted there sits pending for ever.
+--
+-- It lives here, as one function, because the rule had two readers and only
+-- one of them knew it: the insert trigger below settled these two services,
+-- and the dispatch sweep built the URL itself. A row dated in the future
+-- skips the trigger's WHEN (`timestamp <= now()`), stays pending, and a
+-- minute later the sweep posted it into the void — which the trigger's own
+-- comment predicted and did not close.
+create function public.service_has_carrier(_service public.service)
+returns boolean
+language sql
+immutable
+set search_path to ''
+as $$
+  select _service not in ('local'::public.service, 'sandbox'::public.service);
+$$;
+
+-- Internal: the rule has two readers and both are in SQL. Nothing outside
+-- the database has a reason to ask whether a service has a carrier.
+revoke execute on function public.service_has_carrier(public.service)
+from public, anon, authenticated;
+
 create function public.dispatcher_edge_function() returns trigger
 language plpgsql
 security definer
@@ -84,7 +111,7 @@ begin
   --             would build '/sandbox-dispatcher' and POST into the void —
   --             the message would sit pending for ever and the dispatch
   --             sweep would keep picking it up.
-  if service in ('local', 'sandbox') then
+  if not public.service_has_carrier(new.service) then
     update public.messages set status = jsonb_build_object('delivered', now()) where id = new.id;
 
     return new;
