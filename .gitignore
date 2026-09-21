@@ -23,3 +23,7 @@ mise.toml
 
 # Deno test coverage
 supabase/functions/coverage/
+
+# Salida de la herramienta de grafo de conocimiento: artefactos generados,
+# uno de ellos un JSON de una sola línea que pone `deno fmt --check` en rojo.
+graphify-out/
