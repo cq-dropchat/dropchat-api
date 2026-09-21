@@ -42,7 +42,25 @@ create type public.error_status as enum (
 create table public.platform_admins (
   user_id uuid not null references auth.users(id) on delete cascade,
   note text,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  -- T3: who appointed them. `note` is free text about a person who may not
+  -- exist; this is the same fact with a foreign key behind it, on the one
+  -- table in this schema that hands out permission across every tenant.
+  --
+  -- `on delete set null`, not cascade: deleting the person who appointed you
+  -- is not a reason to revoke your access, and not a reason to keep pointing
+  -- at a row that is gone. The trail degrades to "unknown", the permission
+  -- stands. It is deliberately NOT a reference to platform_admins: pointing it
+  -- there would erase the trail of everyone an admin appointed the day that
+  -- admin is removed, which is the opposite of what the column is for.
+  --
+  -- The default reads null today and that is the point. The runbook appoints
+  -- from the SQL editor, where there is no session and auth.uid() is null —
+  -- null therefore records "bootstrapped by hand" rather than missing data. No
+  -- policy lets a client insert here, so the only thing that will ever fill it
+  -- is a SECURITY DEFINER function appointing on an admin's behalf, and then
+  -- it fills itself from the session instead of trusting an argument.
+  granted_by uuid references auth.users(id) on delete set null default auth.uid()
 );
 
 alter table only public.platform_admins

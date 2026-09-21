@@ -1118,6 +1118,13 @@ insert into public.platform_admins (user_id, note)
 select id, 'first platform admin' from auth.users where email = 'you@example.com';
 ```
 
+`granted_by` is left null by that statement and should be: the SQL editor has no
+session, `auth.uid()` returns null, and null is the recorded fact that this
+admin was bootstrapped by hand rather than granted by somebody. It fills itself
+from the session on any future path that appoints from inside the app, so never
+pass it by hand — an argument you can type is exactly what `note` already is.
+Deleting the grantor's user blanks it and leaves the admin's access standing.
+
 2. **`ERROR_REPORTING=on`** as an Edge Function secret, for the backend half.
    Reporting hooks `log.error`, which every function reaches on every failure,
    so it is opt-in rather than on wherever credentials exist — otherwise the

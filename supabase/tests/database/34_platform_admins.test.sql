@@ -18,7 +18,7 @@
 -- differently: INSERT raises 42501, while UPDATE and DELETE with no policy are
 -- silent no-ops that touch zero rows and report success.
 begin;
-select plan(15);
+select plan(19);
 
 -- Bob is the platform admin for this transaction. Seeded as the session user,
 -- which is how the runbook in README.md does it: from the SQL editor, never
@@ -181,6 +181,71 @@ select is(
   ),
   array['SELECT'],
   'platform_admins carries exactly one policy, and it is SELECT'
+);
+
+-- ---------------------------------------------------------------------------
+-- Provenance. `note` is free text: it says whatever whoever typed it felt like
+-- typing, about a person who may not exist. `granted_by` is the same fact with
+-- a foreign key behind it, on the one table in this schema that hands out
+-- permission across every tenant.
+-- ---------------------------------------------------------------------------
+
+-- Bob was appointed at the top of this file the way README.md's runbook does
+-- it: from the SQL editor, where there is no session and auth.uid() is null.
+-- Null is therefore not missing data — it is the recorded fact that this row
+-- was bootstrapped by hand rather than granted by somebody.
+select is(
+  (select granted_by from public.platform_admins where user_id = tests.id('user_bob')),
+  null,
+  'an admin bootstrapped from the SQL editor records no grantor'
+);
+
+-- And the other path: inside a session, the default captures the caller
+-- without being asked. No policy lets a client insert here, so the only thing
+-- that will ever take this path is a SECURITY DEFINER function appointing on
+-- an admin's behalf — simulated exactly, with the claims set while the row is
+-- written by the owning role.
+--
+-- Amber is the grantor throughout this section because she owns no
+-- organization: `prevent_owner_user_deletion` refuses to delete alice or bob,
+-- and the last assertion needs the grantor gone.
+select set_config('request.jwt.claim.sub', tests.id('user_amber')::text, true);
+select set_config(
+  'request.jwt.claims',
+  json_build_object('sub', tests.id('user_amber'), 'role', 'authenticated')::text,
+  true
+);
+insert into public.platform_admins (user_id, note)
+values (tests.id('user_alice'), 'nombrada dentro de una sesion');
+select is(
+  (select granted_by from public.platform_admins where user_id = tests.id('user_alice')),
+  tests.id('user_amber'),
+  'an admin appointed inside a session records who appointed her, unasked'
+);
+select tests.clear_authentication();
+
+-- The point of the column over the text field: the grantor has to be somebody.
+select throws_ok(
+  $$ insert into public.platform_admins (user_id, note, granted_by)
+     values (tests.id('user_amber'), 'otorgante inventado',
+             '00000000-0000-4000-8000-00000000dead') $$,
+  '23503',
+  null,
+  'the grantor must be a real user, which free text could never guarantee'
+);
+
+-- `on delete set null`, not cascade: deleting the person who appointed you is
+-- not a reason to revoke your access, and not a reason to keep pointing at a
+-- row that is gone. The trail degrades to "unknown"; the permission stands.
+delete from auth.users where id = tests.id('user_amber');
+select is(
+  (
+    select count(*) filter (where granted_by is null)
+    from public.platform_admins
+    where user_id = tests.id('user_alice')
+  )::int,
+  1,
+  'deleting the grantor blanks the trail and leaves the permission standing'
 );
 
 select * from finish();
