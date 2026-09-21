@@ -446,6 +446,40 @@ still what makes a call not consume platform credits.
 Nothing breaks if you never set it. An agent without a tier resolves from
 `api_url` and `model` exactly as it always did.
 
+### Installing a template (T6)
+
+An agent installed from a template does not carry a copy of it. It points at a
+version — `agents.template_id` + `agents.template_version` — and **its own
+`extra` is the override layer** on top of that version's `config`.
+
+```bash
+# Install the newest version that is not retired. Admin only.
+curl -X POST 'https://qqfrzurledgywyhcxdse.supabase.co/rest/v1/rpc/install_agent_template' \
+  -H 'apikey: <PUBLISHABLE_KEY>' -H 'api-key: <OPENBSP_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{"_organization_id": "<ORG_ID>", "_template_id": "<TEMPLATE_ID>"}'
+```
+
+The agent is created in `draft`, which does not answer: activate it when you
+have read it. `update_agent_template_version(_agent_id, _version)` moves it
+(omit the version for the newest one), and `unlink_agent_template(_agent_id)`
+freezes the effective configuration into `extra` and stops the updates.
+
+**Writing `extra` on one of these writes the LAYER.** The configuration the
+agent runs on is `resolve_agent_config(config, extra)`, which you can call with
+any two objects. It is not a plain merge:
+
+- **Tools merge by identity (`type:label`).** `extra` is a JSON merge patch and
+  an array is replaced whole, so connecting one tool must not require restating
+  the others — and a tool the next version adds is not silently dropped.
+- **A published tool with no `config` is left out** until you give it one. A
+  published version never carries the source organization's connection, so an
+  installed template arrives declaring its tools and waiting for yours.
+- **`guardrails` is the version's**, whatever the layer says.
+
+`template_auto_update` (default false) makes publishing move this agent to the
+new version in the same transaction that publishes it.
+
 ## 8. (Optional) Poll instead of webhooks
 
 If you'd rather pull than receive pushes:

@@ -1,0 +1,82 @@
+export const snapshot = {};
+
+snapshot[`T6: installed and not touched 1`] = `
+{
+  guardrails: "No prometas fechas de entrega que no estén en el perfil.",
+  instructions: "Atendé pedidos contra entrega. Confirmá la dirección.",
+  mode: "draft",
+  model_tier: "equilibrado",
+  tools: [
+    {
+      name: "calculator",
+      provider: "local",
+      type: "function",
+    },
+  ],
+}
+`;
+
+snapshot[`T6: the organization rewrote the instructions 1`] = `
+{
+  guardrails: "No prometas fechas de entrega que no estén en el perfil.",
+  instructions: "Atendé en tono formal. Cobramos contra entrega.",
+  mode: "active",
+  model_tier: "equilibrado",
+  tools: [
+    {
+      name: "calculator",
+      provider: "local",
+      type: "function",
+    },
+  ],
+}
+`;
+
+snapshot[`T6: the organization connected the tool 1`] = `
+{
+  guardrails: "No prometas fechas de entrega que no estén en el perfil.",
+  instructions: "Atendé pedidos contra entrega. Confirmá la dirección.",
+  mode: "active",
+  model_tier: "equilibrado",
+  tools: [
+    {
+      name: "calculator",
+      provider: "local",
+      type: "function",
+    },
+    {
+      config: {
+        driver: "postgres",
+        host: "db.tienda",
+      },
+      label: "pedidos",
+      provider: "local",
+      type: "sql",
+    },
+    {
+      config: {
+        url: "https://erp.tienda",
+      },
+      label: "erp",
+      provider: "local",
+      type: "http",
+    },
+  ],
+}
+`;
+
+snapshot[`T6: a retired version runs exactly as it did 1`] = `
+{
+  guardrails: "No prometas fechas de entrega que no estén en el perfil.",
+  instructions: "Versión retirada",
+  mode: "active",
+  model_tier: "equilibrado",
+  tools: [
+    {
+      name: "calculator",
+      provider: "local",
+      type: "function",
+    },
+  ],
+}
+`;

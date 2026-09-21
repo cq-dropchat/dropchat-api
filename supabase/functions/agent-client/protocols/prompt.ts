@@ -48,9 +48,8 @@ export function historyRole(
  *   4. guardrails           what a template locks (T6)
  *   5. runtime context      date, contact, business hours (H4), origin (R2)
  *
- * Guardrails (4) do not exist yet. The order does, so adding them later moves
- * nothing that is already written — which is what T1 just spent: the profile
- * went into slot 2 and no other block changed.
+ * All five exist now. T1 filled slot 2 and T6 slot 4, and neither moved a
+ * line of what was already written — which is what the fixed order bought.
  */
 export function buildSystemPrompt(context: RequestContext): string {
   const blocks: string[] = [];
@@ -74,7 +73,14 @@ export function buildSystemPrompt(context: RequestContext): string {
     blocks.push(context.agent.extra.instructions);
   }
 
-  // 4. Guardrails (T6).
+  // 4. What the template locks (T6). AFTER the agent's own instructions, so a
+  // local edit cannot talk over it: the last word on what this agent must not
+  // do belongs to whoever published the template.
+  const guardrails = context.agent.extra.guardrails?.trim();
+
+  if (guardrails) {
+    blocks.push(guardrails);
+  }
 
   blocks.push(inspect(runtimeContext(context), {
     compact: false,

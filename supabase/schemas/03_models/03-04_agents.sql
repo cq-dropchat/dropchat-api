@@ -18,6 +18,24 @@ create table public.agents (
   -- user at all (prevent_owner_user_deletion), and a member who leaves is
   -- marked deleted_at, which is the other half of the test.
   extra jsonb,
+  -- T6. What this agent was installed from, and how much of its configuration
+  -- is still the template's.
+  --
+  -- The agent does not COPY the version: it points at it, and `extra` above
+  -- becomes the OVERRIDE LAYER on top of it. That is what makes taking a new
+  -- version one column away (D7) instead of a re-install, and it is why
+  -- `public.resolve_agent_config` exists.
+  --
+  -- The reference is composite on purpose — (template_id, template_version)
+  -- against agent_template_versions — so an agent cannot claim a version
+  -- nobody published. The check below is the other half: half a reference is
+  -- not a reference.
+  template_id uuid,
+  template_version integer,
+  -- D7: taking a new version is opt-in, per agent. Default false, because the
+  -- other default is "somebody else edits the prompt of an agent that is
+  -- already talking to customers".
+  template_auto_update boolean default false not null,
   -- Set by prevent_last_owner_deletion, which cancels the DELETE and marks the
   -- row instead: an agent outlives their membership, because messages name
   -- them as author and local rosters name them in the conversation ADDRESS
@@ -51,6 +69,12 @@ unique (organization_id, id);
 alter table only public.agents
 add constraint agents_pkey
 primary key (id);
+
+-- Half a reference is not a reference. The foreign key itself lives in 03-23,
+-- where agent_template_versions exists.
+alter table only public.agents
+add constraint agents_template_complete
+check ((template_id is null) = (template_version is null));
 
 alter table only public.agents
 add constraint agents_organization_id_fkey

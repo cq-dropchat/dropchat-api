@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+- **Installing a template** (T6). `agents.template_id`,
+  `agents.template_version` and `agents.template_auto_update`, plus
+  `install_agent_template`, `update_agent_template_version` and
+  `unlink_agent_template`. An installed agent does not copy the template: it
+  POINTS at a version, and **its own `extra` becomes the override layer** on top
+  of that version's config.
+
+  What that means if you write `extra` through the API for an agent with a
+  `template_id`: you are writing the layer, not the configuration. The effective
+  configuration is `public.resolve_agent_config(config, extra)`, which you can
+  call. Three rules that are not a plain merge:
+
+  - **Tools merge by identity (`type:label`)**, not as a jsonb array, because a
+    merge patch replaces an array whole. Connecting one tool does not require
+    restating the others, and a tool a new version adds is not lost.
+  - **A published tool with no `config` is left out** of the effective
+    configuration until you give it one — a published version never carries the
+    source organization's connection (D13).
+  - **`guardrails` comes from the version**, always. It is slot 4 of the system
+    prompt and the layer cannot override it.
+
+  Installing creates the agent in `draft`, which does not answer (B4). Taking a
+  new version is opt-in per agent (`template_auto_update`, default false);
+  publishing moves the agents that asked for it, in the same transaction.
+  Unlinking freezes the effective configuration into `extra` and clears the
+  pointer — the agent goes on answering exactly as it did, and stops receiving
+  versions.
+
 - **`public.model_tiers` and `agents.extra.model_tier`** (T2). Three rows —
   `rapido`, `equilibrado`, `avanzado` — that say which provider, model and
   protocol an agent runs on. Readable by anybody, writable only by a platform

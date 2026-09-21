@@ -14,6 +14,7 @@ import * as log from "../_shared/logger.ts";
 import { withRequestLogging } from "../_shared/logger.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { revealAgent } from "../_shared/secrets.ts";
+import { applyAgentTemplate } from "../_shared/agent_templates.ts";
 import {
   type AgentRow,
   createUnsecureClient,
@@ -225,7 +226,16 @@ export async function handler(req: Request): Promise<Response> {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const agent = selection.agent && await revealAgent(client, selection.agent);
+  // T6: the agent as it actually runs — its template version underneath, its
+  // own `extra` as the override layer on top. After revealing, so the
+  // organization's real credentials are the ones that survive the merge, and
+  // once here, so every reader below sees the effective configuration instead
+  // of half of it.
+  const agent = selection.agent &&
+    await applyAgentTemplate(
+      client,
+      await revealAgent(client, selection.agent),
+    );
 
   const fromPeer = peerPredicate(conv, dmAI);
 

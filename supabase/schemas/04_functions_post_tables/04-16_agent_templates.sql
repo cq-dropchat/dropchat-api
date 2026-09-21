@@ -148,6 +148,17 @@ begin
   values (_template_id, _version, _config, _hash, _changelog, auth.uid())
   returning * into _row;
 
+  -- D7/T6: the agents that asked to be moved, move now — in the same
+  -- transaction that published the version, so there is no window where an
+  -- agent wants the newest version and is not on it. Crossing tenants here is
+  -- the point and is what this function is already allowed to do; what makes
+  -- it safe is that each of those agents opted in, one column at a time.
+  update public.agents
+  set template_version = _version
+  where template_id = _template_id
+    and template_auto_update
+    and deleted_at is null;
+
   return _row;
 end;
 $$;

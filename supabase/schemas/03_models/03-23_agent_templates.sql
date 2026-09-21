@@ -125,3 +125,23 @@ on delete cascade;
 
 alter table only public.agent_template_versions
 add constraint agent_template_versions_version_check check (version > 0);
+
+-- T6. What an installed agent points at.
+--
+-- Declared here and not in 03-04 because agents is created first: the same
+-- reason organizations_addresses' agent FK lives in 03-04 and not in 03-01.
+--
+-- COMPOSITE, against (template_id, version) rather than against the template
+-- alone: an agent that could name a version nobody published would resolve
+-- against nothing, and «nothing» is a configuration with no instructions and
+-- no tools — an agent that answers, badly, instead of one that fails loudly.
+--
+-- `on delete set null`: versions are retired, not deleted, so the only way
+-- here is a template row going away for real, and that must not take an
+-- organization's agent with it. It becomes an ordinary agent whose `extra` is
+-- its whole configuration — which is exactly what unlinking does on purpose.
+alter table only public.agents
+add constraint agents_template_version_fkey
+foreign key (template_id, template_version)
+references public.agent_template_versions(template_id, version)
+on delete set null;

@@ -349,3 +349,49 @@ Deno.test("T1: an organization with a profile and no brand voice still leads wit
     stable((chat.messages[0] as { content: string }).content),
   );
 });
+
+// ---------------------------------------------------------------------------
+// T6 — guardrails, in slot 4.
+//
+// AFTER the agent's own instructions on purpose. The organization may rewrite
+// the instructions of a template it installed; what it may not do is talk over
+// what the template locked, and the order is half of how that holds — the
+// other half is `resolve_agent_config`, which takes this block from the
+// published version even when the override layer names it.
+// ---------------------------------------------------------------------------
+
+Deno.test("T6: the whole order, with every block present", async (t) => {
+  const ctx = context("whatsapp");
+  ctx.organization = {
+    ...ctx.organization,
+    extra: {
+      brand_voice: "Tutea al cliente. Firma como «el equipo».",
+      business_profile: { industry: "Zapatillas urbanas", currency: "CLP" },
+    },
+  } as unknown as OrganizationRow;
+  ctx.agent = {
+    ...ctx.agent,
+    extra: {
+      ...ctx.agent.extra,
+      guardrails: "No prometas fechas de entrega que no estén en el perfil.",
+    },
+  };
+
+  const chat = await new ChatCompletionsHandler([], ctx, noClient)
+    .prepareRequest();
+
+  const system = (chat.messages[0] as { content: string }).content;
+
+  const at = (text: string) => system.indexOf(text);
+
+  assertEquals(
+    at("Tutea al cliente") < at("Perfil del negocio:") &&
+      at("Perfil del negocio:") < at("Eres Sofía") &&
+      at("Eres Sofía") < at("No prometas fechas") &&
+      at("No prometas fechas") < at("now:"),
+    true,
+    system,
+  );
+
+  await assertSnapshot(t, stable(system));
+});

@@ -363,5 +363,15 @@ export type AIAgentExtra = {
    */
   can_escalate?: boolean;
   instructions?: string;
+  /**
+   * T6: what a template LOCKS. Slot 4 of the system prompt, after the agent's
+   * own instructions, and the one block the installing organization cannot
+   * override — `resolve_agent_config` takes it from the published version even
+   * when the layer names it.
+   *
+   * An agent with no template may still carry one; there is simply nobody to
+   * override it.
+   */
+  guardrails?: string;
   tools?: ToolConfig[];
 };

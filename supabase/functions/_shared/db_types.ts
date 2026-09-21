@@ -746,6 +746,9 @@ export type Database = {
           organization_id: string
           picture: string | null
           role: Database["public"]["Enums"]["role"]
+          template_auto_update: boolean
+          template_id: string | null
+          template_version: number | null
           updated_at: string
           user_id: string | null
         }
@@ -758,6 +761,9 @@ export type Database = {
           organization_id: string
           picture?: string | null
           role?: Database["public"]["Enums"]["role"]
+          template_auto_update?: boolean
+          template_id?: string | null
+          template_version?: number | null
           updated_at?: string
           user_id?: string | null
         }
@@ -770,6 +776,9 @@ export type Database = {
           organization_id?: string
           picture?: string | null
           role?: Database["public"]["Enums"]["role"]
+          template_auto_update?: boolean
+          template_id?: string | null
+          template_version?: number | null
           updated_at?: string
           user_id?: string | null
         }
@@ -780,6 +789,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agents_template_version_fkey"
+            columns: ["template_id", "template_version"]
+            isOneToOne: false
+            referencedRelation: "agent_template_versions"
+            referencedColumns: ["template_id", "version"]
           },
         ]
       }
@@ -1875,6 +1891,8 @@ export type Database = {
     Functions: {
       accept_invitation: { Args: { invitation_id: string }; Returns: string }
       agent_template_config: { Args: { _extra: Json }; Returns: Json }
+      agent_tool_key: { Args: { _tool: Json }; Returns: string }
+      agent_tool_ready: { Args: { _tool: Json }; Returns: boolean }
       agent_turn_lease: { Args: never; Returns: string }
       assign_conversation: {
         Args: { p_agent_id?: string; p_conversation_id: string }
@@ -2056,6 +2074,35 @@ export type Database = {
         }
         Returns: Json
       }
+      install_agent_template: {
+        Args: {
+          _name?: string
+          _organization_id: string
+          _template_id: string
+          _version?: number
+        }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          extra: Json | null
+          id: string
+          name: string
+          organization_id: string
+          picture: string | null
+          role: Database["public"]["Enums"]["role"]
+          template_auto_update: boolean
+          template_id: string | null
+          template_version: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agents"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       is_public_https_url: { Args: { url: string }; Returns: boolean }
       jsonb_deep_set: {
         Args: { path: string[]; target: Json; value: Json }
@@ -2221,6 +2268,10 @@ export type Database = {
         Args: { _organization_id: string }
         Returns: string
       }
+      resolve_agent_config: {
+        Args: { _config: Json; _extra: Json }
+        Returns: Json
+      }
       retire_agent_template_version: {
         Args: { _template_id: string; _version: number }
         Returns: {
@@ -2275,6 +2326,54 @@ export type Database = {
       sweep_awaiting_human: { Args: { p_limit?: number }; Returns: number }
       sweep_deletions: { Args: { _budget?: number }; Returns: Json }
       sweep_pending_media: { Args: { _limit?: number }; Returns: number }
+      unlink_agent_template: {
+        Args: { _agent_id: string }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          extra: Json | null
+          id: string
+          name: string
+          organization_id: string
+          picture: string | null
+          role: Database["public"]["Enums"]["role"]
+          template_auto_update: boolean
+          template_id: string | null
+          template_version: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agents"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_agent_template_version: {
+        Args: { _agent_id: string; _version?: number }
+        Returns: {
+          created_at: string
+          deleted_at: string | null
+          extra: Json | null
+          id: string
+          name: string
+          organization_id: string
+          picture: string | null
+          role: Database["public"]["Enums"]["role"]
+          template_auto_update: boolean
+          template_id: string | null
+          template_version: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agents"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       webhook_max_attempts: { Args: never; Returns: number }
       webhook_retry_delay: { Args: { attempt: number }; Returns: string }
     }
