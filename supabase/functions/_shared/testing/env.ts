@@ -57,6 +57,33 @@ export async function supabaseIsUp(): Promise<boolean> {
   }
 }
 
+/**
+ * Whether a local edge runtime is serving the functions from disk.
+ *
+ * It must NOT be, and the whole suite depends on that. These tests call each
+ * function's `handler()` in process and stub `globalThis.fetch`; the rows they
+ * insert also fire the triggers, which pg_net posts to `/functions/v1/…`. An
+ * edge runtime answers that post by running a SECOND copy of the same
+ * function, out of process, whose fetch nothing stubs — it takes the dispatch
+ * lease first, and the in-process `handler()` then finds nothing to claim.
+ * Start the stack with `-x edge-runtime`.
+ *
+ * Told apart by what Kong answers for a function that needs auth: 401 when a
+ * runtime is behind it, 503 `name resolution failed` when the container is not
+ * there to resolve.
+ */
+export async function edgeRuntimeIsUp(): Promise<boolean> {
+  try {
+    const res = await fetch(`${env.url}/functions/v1/whatsapp-dispatcher`, {
+      method: "POST",
+    });
+    await res.body?.cancel();
+    return res.status !== 503;
+  } catch {
+    return false;
+  }
+}
+
 /** Ids and values from supabase/tests/fixtures/seed_test.sql. */
 export const fixture = {
   orgA: "aaaaaaaa-0000-4000-8000-000000000001",

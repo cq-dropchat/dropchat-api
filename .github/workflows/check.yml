@@ -40,7 +40,24 @@ jobs:
 
       # Applies every migration and seed.sql on a fresh database. A broken
       # seed (F25) fails here, before it reaches anyone's laptop.
-      - run: supabase start -x studio,imgproxy,inbucket,logflare,vector
+      #
+      # `edge-runtime` is excluded on purpose, and it is the important name in
+      # this list. The Deno suite calls each function's `handler()` in process
+      # and stubs `globalThis.fetch`; the rows it inserts also fire the
+      # triggers, which pg_net posts to `/functions/v1/…`. With an edge runtime
+      # listening, that post is served — by a SECOND, out-of-process copy of
+      # the same function, whose fetch nothing stubs. It takes the dispatch
+      # lease first, so `handler()` finds nothing to claim and answers 200
+      # without calling Meta, and the real request leaves for
+      # graph.facebook.com with a fixture token. Which copy wins is a race:
+      # this cost four tests on CI and five on a laptop, from one commit.
+      # `whatsapp-dispatcher/index.test.ts` states the assumption in a comment
+      # — "pg_net has no edge runtime to reach locally" — which was true
+      # everywhere the suite had ever run, and false here.
+      #
+      # `inbucket` was renamed `mailpit`: the CLI printed "not valid to
+      # exclude" and started it anyway.
+      - run: supabase start -x studio,imgproxy,mailpit,logflare,vector,edge-runtime
       - run: supabase db reset
 
       - name: pgTAP
