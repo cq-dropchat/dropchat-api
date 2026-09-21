@@ -603,8 +603,113 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_template_test_runs: {
+        Row: {
+          deterministic_passed: number
+          deterministic_total: number
+          error: string | null
+          failures: Json
+          finished_at: string | null
+          id: string
+          judge_score: number | null
+          started_at: string
+          status: string
+          template_id: string
+          test_id: string | null
+          transcript: Json
+          version: number
+        }
+        Insert: {
+          deterministic_passed?: number
+          deterministic_total?: number
+          error?: string | null
+          failures?: Json
+          finished_at?: string | null
+          id?: string
+          judge_score?: number | null
+          started_at?: string
+          status?: string
+          template_id: string
+          test_id?: string | null
+          transcript?: Json
+          version: number
+        }
+        Update: {
+          deterministic_passed?: number
+          deterministic_total?: number
+          error?: string | null
+          failures?: Json
+          finished_at?: string | null
+          id?: string
+          judge_score?: number | null
+          started_at?: string
+          status?: string
+          template_id?: string
+          test_id?: string | null
+          transcript?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_template_test_runs_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "agent_template_tests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_template_test_runs_version_fkey"
+            columns: ["template_id", "version"]
+            isOneToOne: false
+            referencedRelation: "agent_template_versions"
+            referencedColumns: ["template_id", "version"]
+          },
+        ]
+      }
+      agent_template_tests: {
+        Row: {
+          created_at: string
+          expectations: Json
+          id: string
+          name: string
+          profile: Json
+          template_id: string
+          turns: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expectations?: Json
+          id?: string
+          name: string
+          profile?: Json
+          template_id: string
+          turns: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expectations?: Json
+          id?: string
+          name?: string
+          profile?: Json
+          template_id?: string
+          turns?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_template_tests_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "agent_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_template_versions: {
         Row: {
+          canary_organizations: string[] | null
           changelog: string | null
           config: Json
           config_hash: string
@@ -615,6 +720,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          canary_organizations?: string[] | null
           changelog?: string | null
           config: Json
           config_hash: string
@@ -625,6 +731,7 @@ export type Database = {
           version: number
         }
         Update: {
+          canary_organizations?: string[] | null
           changelog?: string | null
           config?: Json
           config_hash?: string
@@ -2169,9 +2276,34 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      publish_agent_template_version: {
-        Args: { _changelog?: string; _template_id: string }
+      promote_agent_template_version: {
+        Args: { _template_id: string; _version: number }
         Returns: {
+          canary_organizations: string[] | null
+          changelog: string | null
+          config: Json
+          config_hash: string
+          published_at: string
+          published_by: string | null
+          retired_at: string | null
+          template_id: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agent_template_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      publish_agent_template_version: {
+        Args: {
+          _canary_organizations?: string[]
+          _changelog?: string
+          _template_id: string
+        }
+        Returns: {
+          canary_organizations: string[] | null
           changelog: string | null
           config: Json
           config_hash: string
@@ -2275,6 +2407,7 @@ export type Database = {
       retire_agent_template_version: {
         Args: { _template_id: string; _version: number }
         Returns: {
+          canary_organizations: string[] | null
           changelog: string | null
           config: Json
           config_hash: string
