@@ -236,3 +236,15 @@ Monetization
       lo correcto para separar lotes y para separar las filas de un lote; lo que
       falta es qué pasa cuando ese par empata. No es de T3, que no toca ese
       código — apareció corriendo su CI.
+
+- [ ] T4 — `extract_secrets` enmascara por LISTA FIJA de nombres de clave:
+      `api_key` del agente, y `password`, `token` y `headers` de cada tool. Un
+      tool cuyo `config` lleve otro nombre —`api_key`, `secret`, `client_secret`
+      — se guarda en claro en `agents.extra`, y la API se lo devuelve a
+      cualquier miembro de esa organización, que es justamente lo que la máscara
+      existe para evitar. T4 lo esquiva quitando el `config` entero al publicar
+      (D13), así que NO hay fuga entre inquilinos; el hueco queda del lado del
+      inquilino. Dos salidas posibles: enmascarar por forma (cualquier clave que
+      parezca credencial) en vez de por lista, o validar el `config` del tool
+      con zod al escribir y rechazar lo que no esté en el esquema del tipo.
+      Afirmado como precondición en `36_agent_template_secrets.test.sql`.
