@@ -295,12 +295,6 @@ export type MemberExtra = {
 };
 
 export type AIAgentExtra = {
-  /**
-   * The persona — "presupuestador metalúrgico" — not an access-control role.
-   * It shared the `extra.role` key with the human one until that moved to a
-   * column; this is the half that stayed.
-   */
-  role?: string;
   mode?: "active" | "draft" | "inactive";
   /**
    * Debounce: how long to wait for the contact to finish typing before
@@ -323,6 +317,13 @@ export type AIAgentExtra = {
   max_messages?: number;
   temperature?: number;
   max_tokens?: number;
+  /**
+   * NOT WIRED YET. The call sites are written and commented out in both
+   * protocols (`reasoning_effort` in chat-completions, the same idea in
+   * responses), waiting for a provider matrix that says which models accept
+   * it. Until then, setting this changes nothing — kept because the parked
+   * code refers to it, not because anything reads it.
+   */
   thinking?: "minimal" | "low" | "medium" | "high";
   /**
    * Whether one turn may produce several messages. Default true: the agent is
@@ -344,6 +345,5 @@ export type AIAgentExtra = {
    */
   can_escalate?: boolean;
   instructions?: string;
-  send_inline_files_up_to_size_mb?: number;
   tools?: ToolConfig[];
 };
