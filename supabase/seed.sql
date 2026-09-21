@@ -18,13 +18,11 @@ select vault.create_secret(
 -- BILLING SEED DATA (must be before org inserts for initialize_subscription trigger)
 -- ============================================================================
 
--- Products
-insert into billing.products (id, name, unit, kind) values
-  ('messages',      'Messages',      'count', 'counter'),
-  ('messages_inbound', 'Inbound messages', 'count', 'counter'),
-  ('conversations', 'Conversations', 'count', 'counter'),
-  ('storage',       'Storage',       'gb',    'gauge'),
-  ('ai_credits',    'AI Credits',    'usd',   'balance');
+-- Products and costs are NOT seeded here any more: they ship in the migration
+-- `..._billing_reference_data.sql`, because seed.sql never runs against a
+-- deployed project and production had neither. Tiers, plans and their product
+-- rows below are still seed-only on purpose — they are the commercial offer,
+-- which is not decided yet.
 
 -- Tiers (levels of trust: 0 = free, 1 = starter, ...)
 insert into billing.tiers (id, name, level) values
@@ -63,20 +61,8 @@ insert into billing.plans_products (plan_id, product_id, interval, included, uni
 -- Google: https://ai.google.dev/gemini-api/docs/pricing
 -- Google: text/image/video share the same input rate. Audio has its own rate.
 -- Google: Gemini 3 reports PDF page tokens as IMAGE modality. Native PDF text is free.
--- Groq: https://groq.com/pricing
--- Anthropic: https://platform.claude.com/docs/en/about-claude/pricing
--- OpenIA: https://developers.openai.com/api/docs/pricing
-insert into billing.costs (provider, product, quantity, unit, pricing) values
-  ('anthropic', 'claude-sonnet-4-6',     1000000, 'tokens',   '{"input": 3.00, "output": 15.00, "cache_read": 0.30, "cache_write": 3.75}'),
-  ('groq',      'openai/gpt-oss-20b',   1000000, 'tokens',   '{"input": 0.075, "output": 0.30, "cache_read": 0.037}'),
-  ('groq',      'openai/gpt-oss-120b',   1000000, 'tokens',   '{"input": 0.15, "output": 0.60, "cache_read": 0.075}'),
-  ('google',    'gemini-2.5-flash',       1000000, 'tokens',  '{"input": 0.30, "output": 2.50, "cache_read": 0.03, "audio_input": 1.00, "audio_cache_read": 0.10}'),
-  ('google',    'gemini-3-flash-preview', 1000000, 'tokens',  '{"input": 0.50, "output": 3.00, "cache_read": 0.05, "audio_input": 1.00, "audio_cache_read": 0.10}'),
-  ('openai',    'gpt-5.3-chat-latest',  1000000, 'tokens',   '{"input": 1.75, "output": 14.00, "cache_read": 0.18}'),
-  ('openai',    'gpt-5-mini',           1000000, 'tokens',   '{"input": 0.25, "output": 2.00, "cache_read": 0.03}'),
-  ('whatsapp',  'marketing/ar',          1, 'templates',       '{"price": 0.0618}'),
-  ('whatsapp',  'utility/ar',            1, 'templates',       '{"price": 0.026}'),
-  ('whatsapp',  'authentication/ar',     1, 'templates',       '{"price": 0.026}');
+-- Costs ship in the migration `..._billing_reference_data.sql`; see the note
+-- above the products block.
 
 -- ============================================================================
 -- SEED DATA - Minecraft Creature-Themed Organizations & Users
