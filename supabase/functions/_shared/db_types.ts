@@ -1835,6 +1835,7 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { invitation_id: string }; Returns: string }
+      agent_template_config: { Args: { _extra: Json }; Returns: Json }
       agent_turn_lease: { Args: never; Returns: string }
       assign_conversation: {
         Args: { p_agent_id?: string; p_conversation_id: string }
@@ -2082,6 +2083,25 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      publish_agent_template_version: {
+        Args: { _changelog?: string; _template_id: string }
+        Returns: {
+          changelog: string | null
+          config: Json
+          config_hash: string
+          published_at: string
+          published_by: string | null
+          retired_at: string | null
+          template_id: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agent_template_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       purge_expired_rows: { Args: { _batch?: number }; Returns: Json }
       realtime_topic_uuid: { Args: { _prefix: string }; Returns: string }
       record_edge_call_result: {
@@ -2161,6 +2181,25 @@ export type Database = {
       request_organization_export: {
         Args: { _organization_id: string }
         Returns: string
+      }
+      retire_agent_template_version: {
+        Args: { _template_id: string; _version: number }
+        Returns: {
+          changelog: string | null
+          config: Json
+          config_hash: string
+          published_at: string
+          published_by: string | null
+          retired_at: string | null
+          template_id: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "agent_template_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       set_conversation_assignment: {
         Args: {
