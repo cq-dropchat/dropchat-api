@@ -78,18 +78,20 @@ jobs:
       - if: always()
         run: supabase stop --no-backup
 
-  # F25: main is production (the Supabase GitHub integration deploys every
-  # push). Changes reach it only by promoting develop, which has already been
-  # deployed to DEV and smoke-tested. This job fails any other pull request
-  # into main; pair it with branch protection on main (require this check,
-  # no direct pushes) so the gate cannot be skipped.
-  promotion:
-    if: github.event_name == 'pull_request' && github.base_ref == 'main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: main only accepts develop
-        run: |
-          if [ "${{ github.head_ref }}" != "develop" ]; then
-            echo "::error::Pull requests into main must come from develop (got '${{ github.head_ref }}')."
-            exit 1
-          fi
+  # F25 pedía un job `promotion` acá: fallar cualquier pull request hacia
+  # `main` que no viniera de `develop`, porque `main` es producción y los
+  # cambios tenían que llegar promovidos desde una rama ya desplegada a DEV y
+  # probada. Se quitó el 22/09, y no por estar de más sino porque **nada de
+  # eso existe**: `develop` no está en el repo, no hay variables ni
+  # environments configurados en ninguno de los dos —ni `SUPABASE_PROJECT_ID`
+  # ni los `Production`/`Staging` que `release.yml` declara—, así que una rama
+  # `develop` no desplegaría a ningún lado y no habría nada que promover.
+  #
+  # Mientras estuvo, no protegía: el flujo real es rama por ítem, merge local
+  # y push, así que el job no se disparaba nunca (`skipped` en las tres
+  # corridas del 21/09). Lo que sí hacía era **bloquear la protección de
+  # rama**: al exigir PR para entrar a `main`, todo PR habría chocado contra
+  # él, porque ninguno viene de una rama que no existe.
+  #
+  # Para traerlo de vuelta hace falta, en este orden: un proyecto de Supabase
+  # para DEV, la rama `develop` apuntada a él, y recién entonces el gate.
