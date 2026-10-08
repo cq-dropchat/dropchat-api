@@ -6,6 +6,7 @@ import type {
   WhatsAppOrganizationAddressExtra,
 } from "../_shared/supabase.ts";
 import type { Batch } from "./batch.ts";
+import { mapConcurrent } from "../_shared/concurrency.ts";
 import { downloadMediaItem } from "./media.ts";
 import type { OrgAddressMap } from "./org_addresses.ts";
 
@@ -13,13 +14,15 @@ const DEFAULT_ACCESS_TOKEN = Deno.env.get("META_SYSTEM_USER_ACCESS_TOKEN") ||
   "";
 
 /**
- * Downloads media, then upserts contacts, statuses and messages, then applies
+ * Persists contacts and statuses, downloads media with bounded concurrency,
+ * then upserts messages and applies
  * edits and revokes.
  */
 export async function persistBatch(
   client: SupabaseClient<Database>,
   orgAddressMap: OrgAddressMap,
   batch: Batch,
+  download: typeof downloadMediaItem = downloadMediaItem,
 ): Promise<void> {
   const { messages, statuses, contacts_addresses, edits, revokes } = batch;
 
@@ -39,34 +42,6 @@ export async function persistBatch(
     contacts_addresses: contacts_addresses.length,
     organizations: orgSummary,
   });
-
-  const downloadMediaPromise = Promise.all(
-    messages.map(async (message) => {
-      const orgAddress = orgAddressMap.get(message.organization_address)!;
-
-      try {
-        return await downloadMediaItem({
-          organization_id: orgAddress.organization_id,
-          access_token: orgAddress.extra?.access_token || DEFAULT_ACCESS_TOKEN,
-          message,
-          client,
-        });
-      } catch (error) {
-        log.warn(
-          "Failed to download media, preserving message with original reference",
-          {
-            error: error instanceof Error ? error.message : String(error),
-            message_id: message.external_id,
-          },
-        );
-
-        message.status = {
-          error: error instanceof Error ? error.message : String(error),
-        };
-        return message;
-      }
-    }),
-  );
 
   if (contacts_addresses.length > 0) {
     // Deduplicate by the PK: Meta may send the same contact multiple times in
@@ -112,7 +87,6 @@ export async function persistBatch(
   // Notes for messages:
   // Download media before upserting incoming messages
   // Patched messages include media local id and file size
-  const patchedMessages = await downloadMediaPromise;
 
   // A status row (content `{}`) and a message row can carry the same
   // external_id within one webhook (e.g. an echo plus a status/edit/revoke for
@@ -147,6 +121,37 @@ export async function persistBatch(
   };
 
   await upsertBatch("statuses", statuses);
+
+  const patchedMessages = await mapConcurrent(
+    messages,
+    4,
+    async (message) => {
+      const orgAddress = orgAddressMap.get(message.organization_address)!;
+
+      try {
+        return await download({
+          organization_id: orgAddress.organization_id,
+          access_token: orgAddress.extra?.access_token || DEFAULT_ACCESS_TOKEN,
+          message,
+          client,
+        });
+      } catch (error) {
+        log.warn(
+          "Failed to download media, preserving message with original reference",
+          {
+            error: error instanceof Error ? error.message : String(error),
+            message_id: message.external_id,
+          },
+        );
+
+        message.status = {
+          error: error instanceof Error ? error.message : String(error),
+        };
+        return message;
+      }
+    },
+  );
+
   await upsertBatch("messages", patchedMessages);
 
   // Apply edits and revokes as in-place updates keyed by the ORIGINAL message

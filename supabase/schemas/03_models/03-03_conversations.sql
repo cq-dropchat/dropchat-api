@@ -225,3 +225,14 @@ before update
 on public.conversations
 for each row
 execute function public.moddatetime('updated_at');
+
+create index conversations_org_updated_cursor_idx
+on public.conversations (organization_id, updated_at, id);
+
+create index conversations_waiting_cursor_idx
+on public.conversations (awaiting_human_since, id)
+where awaiting_human_since is not null;
+
+create index conversations_assignment_cursor_idx
+on public.conversations (assigned_at, id)
+where assigned_agent_id is not null;

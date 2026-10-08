@@ -102,6 +102,7 @@ export async function loadRecentMessages(
   const { data: messagesMixedVersions } = await client
     .from("messages")
     .select()
+    .eq("organization_id", incoming.organization_id)
     .eq("conversation_id", incoming.conversation_id)
     // H1: assignment notes are a record of who answers, addressed to the
     // people reading the chat — not something the model should read as a
@@ -113,6 +114,7 @@ export async function loadRecentMessages(
     ) // Time constraint for the conversation.
     .lte("timestamp", windowCeiling(incoming)) // Scheduled messages have a future timestamp.
     .order("timestamp", { ascending: false })
+    .order("id", { ascending: false })
     .limit(MESSAGES_QUANTITY_LIMIT) // Size constraint for the conversation.
     .throwOnError();
 
@@ -188,8 +190,11 @@ export async function findNewerPeerMessage(
   const newerQuery = client
     .from("messages")
     .select()
+    .eq("organization_id", incoming.organization_id)
     .eq("conversation_id", incoming.conversation_id)
-    .gt("created_at", incoming.created_at);
+    .or(
+      `created_at.gt."${incoming.created_at}",and(created_at.eq."${incoming.created_at}",id.gt.${incoming.id})`,
+    );
 
   // The fromPeer predicate, expressed as filters the database can apply.
   if (conv.service === "local") {
@@ -203,6 +208,7 @@ export async function findNewerPeerMessage(
 
   const { data: new_message } = await newerQuery
     .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
     .limit(1)
     .maybeSingle()
     .throwOnError();

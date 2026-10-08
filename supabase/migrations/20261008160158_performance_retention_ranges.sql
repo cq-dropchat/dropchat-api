@@ -1,31 +1,11 @@
--- F15. Retention for tables nothing else trims, run hourly by the
--- `purge-expired-rows` pg_cron job, at most `_batch` rows per table per run
--- (one short transaction; the next run continues).
---
---   supabase_functions.hooks  everything: no trigger writes it any more (see
---                             02-02_edge_functions.sql), what is left is the
---                             backlog from before, oldest first by its PK.
---   public.logs               older than 90 days (idx_logs_created_at). Logs
---                             are what members read on account errors; a
---                             quarter covers any billing or support question.
---   public.onboarding_tokens  expired more than 30 days ago, used or not.
---   public.error_issues       E1: settled issues that have gone quiet —
---                             'resolved' after 90 days without a new
---                             occurrence, 'preexisting' after 180. An open
---                             issue is never purged however old it is: age is
---                             not a reason to stop showing an unfixed bug.
---                             'ignored' is never purged either, or the panel
---                             would keep re-reporting what was dismissed.
---
--- cron.job_run_details already has its own 7-day job; net._http_response has
--- pg_net's TTL.
+set check_function_bodies = off;
 
-create function public.purge_expired_rows(_batch integer default 10000)
-returns jsonb
-language plpgsql
-security definer
-set search_path to ''
-as $$
+CREATE OR REPLACE FUNCTION public.purge_expired_rows(_batch integer DEFAULT 10000)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 declare
   _hooks integer;
   _logs integer;
@@ -156,6 +136,5 @@ begin
     'webhook_deliveries', _deliveries
   );
 end;
-$$;
-
-revoke execute on function public.purge_expired_rows(integer) from public, anon, authenticated;
+$function$
+;

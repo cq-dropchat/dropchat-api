@@ -155,16 +155,23 @@ begin
     select c.id, c.function, c.payload, c.forward_headers
     from (
       select p.id,
-        row_number() over (partition by p.organization_id order by p.next_attempt_at, p.id) as rank,
+        row_number() over (partition by o.id order by p.next_attempt_at, p.id) as rank,
         p.next_attempt_at
-      from public.edge_calls p
-      where p.status = 'pending'
-        and p.next_attempt_at <= now()
+      from public.organizations o
+      cross join lateral (
+        select q.id, q.next_attempt_at
+        from public.edge_calls q
+        where q.organization_id = o.id
+          and q.status = 'pending'
+          and q.next_attempt_at <= now()
+        order by q.next_attempt_at, q.id
+        limit least(greatest(_per_org, 0), greatest(_batch, 0))
+      ) p
     ) ranked
     join public.edge_calls c on c.id = ranked.id
     where ranked.rank <= _per_org
-    order by ranked.rank, ranked.next_attempt_at
-    limit _batch
+    order by ranked.rank, ranked.next_attempt_at, c.id
+    limit greatest(_batch, 0)
     for update of c skip locked
   loop
     select net.http_post(
@@ -212,16 +219,32 @@ $$;
 create view public.edge_calls_health
 with (security_invoker = true)
 as
-select
-  c.function,
-  c.organization_id,
-  count(*) filter (where c.status = 'pending') as pending,
-  count(*) filter (where c.status = 'sending') as sending,
-  count(*) filter (where c.status = 'failed') as failed,
-  min(c.created_at) filter (where c.status = 'pending') as oldest_pending_at,
-  max(c.updated_at) filter (where c.status = 'done') as last_done_at
-from public.edge_calls c
-group by c.function, c.organization_id;
+with backlog as (
+  select c.function, c.organization_id,
+    count(*) filter (where c.status = 'pending') as pending,
+    count(*) filter (where c.status = 'sending') as sending,
+    count(*) filter (where c.status = 'failed') as failed,
+    min(c.created_at) filter (where c.status = 'pending') as oldest_pending_at
+  from public.edge_calls c
+  where c.status <> 'done'
+  group by c.function, c.organization_id
+), completed as (
+  select f.function, o.id as organization_id, last_done.updated_at as last_done_at
+  from public.organizations o
+  cross join (values ('agent-client'::text), ('media-preprocessor'::text)) f(function)
+  cross join lateral (
+    select c.updated_at from public.edge_calls c
+    where c.organization_id = o.id and c.function = f.function and c.status = 'done'
+    order by c.updated_at desc limit 1
+  ) last_done
+)
+select coalesce(b.function, d.function) as function,
+  coalesce(b.organization_id, d.organization_id) as organization_id,
+  coalesce(b.pending, 0::bigint) as pending,
+  coalesce(b.sending, 0::bigint) as sending,
+  coalesce(b.failed, 0::bigint) as failed,
+  b.oldest_pending_at, d.last_done_at
+from backlog b full join completed d using (function, organization_id);
 
 revoke all on public.edge_calls_health from anon, authenticated;
 
@@ -277,7 +300,7 @@ begin
           and c.function = 'media-preprocessor'
           and c.status in ('pending', 'sending')
       )
-    order by m.timestamp
+    order by m.timestamp, m.id
     limit _limit
   ), queued as (
     insert into public.edge_calls (

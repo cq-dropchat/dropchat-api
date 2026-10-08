@@ -1,0 +1,1 @@
+CREATE INDEX CONCURRENTLY messages_media_pending_cursor_idx ON public.messages USING btree ("timestamp", id) WHERE (((content ->> 'type'::text) = 'file'::text) AND ((status ->> 'pending'::text) IS NOT NULL) AND ((status ->> 'preprocessed'::text) IS NULL));

@@ -72,3 +72,47 @@ Deno.test("P1: our own messages never win, skewed window or not", () => {
 
   assertEquals(newest?.id, INCOMING.id);
 });
+
+Deno.test("agent reads include tenant and a stable keyset/order", async () => {
+  const { createClient } = await import("@supabase/supabase-js");
+  const { loadRecentMessages, findNewerPeerMessage } = await import(
+    "./conversation.ts"
+  );
+  const requests: URL[] = [];
+  const client = createClient("http://localhost:54321", "test", {
+    global: {
+      fetch: (input) => {
+        requests.push(new URL(String(input)));
+        return Promise.resolve(
+          new Response("[]", {
+            headers: { "content-type": "application/json" },
+          }),
+        );
+      },
+    },
+    auth: { persistSession: false },
+  });
+  const incoming = {
+    ...INCOMING,
+    id: "aaaaaaaa-0000-4000-8000-000000000001",
+    organization_id: "org-a",
+    conversation_id: "conv-a",
+  };
+  await loadRecentMessages(client, incoming);
+  await findNewerPeerMessage(
+    client,
+    { service: "whatsapp" } as Parameters<typeof findNewerPeerMessage>[1],
+    {} as Parameters<typeof findNewerPeerMessage>[2],
+    incoming,
+  );
+  assertEquals(requests.map((url) => url.searchParams.get("organization_id")), [
+    "eq.org-a",
+    "eq.org-a",
+  ]);
+  assertEquals(requests[0].searchParams.get("order"), "timestamp.desc,id.desc");
+  assertEquals(requests[1].searchParams.get("order"), "created_at.asc,id.asc");
+  assertEquals(
+    requests[1].searchParams.get("or"),
+    `(created_at.gt."${incoming.created_at}",and(created_at.eq."${incoming.created_at}",id.gt.${incoming.id}))`,
+  );
+});

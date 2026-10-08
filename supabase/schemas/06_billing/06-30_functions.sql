@@ -118,23 +118,16 @@ begin
     return;
   end if;
 
-  -- Upsert day
+  -- One statement, same transaction and lock order (day/month/lifetime).
+  -- Avoid three SPI executions per resource without relaxing quota semantics.
   insert into billing.usage (organization_id, product_id, interval, period, quantity)
-  values (_organization_id, _product_id, 'day', _today, _quantity)
+  values
+    (_organization_id, _product_id, 'day', _today, _quantity),
+    (_organization_id, _product_id, 'month', _month, _quantity),
+    (_organization_id, _product_id, 'lifetime', '1970-01-01', _quantity)
   on conflict (organization_id, product_id, interval, period)
-  do update set quantity = billing.usage.quantity + _quantity;
+  do update set quantity = billing.usage.quantity + excluded.quantity;
 
-  -- Upsert month
-  insert into billing.usage (organization_id, product_id, interval, period, quantity)
-  values (_organization_id, _product_id, 'month', _month, _quantity)
-  on conflict (organization_id, product_id, interval, period)
-  do update set quantity = billing.usage.quantity + _quantity;
-
-  -- Upsert lifetime
-  insert into billing.usage (organization_id, product_id, interval, period, quantity)
-  values (_organization_id, _product_id, 'lifetime', '1970-01-01', _quantity)
-  on conflict (organization_id, product_id, interval, period)
-  do update set quantity = billing.usage.quantity + _quantity;
 end;
 $$;
 

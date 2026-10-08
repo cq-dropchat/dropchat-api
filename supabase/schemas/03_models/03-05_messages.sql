@@ -313,3 +313,25 @@ before update
 on public.messages
 for each row
 execute function public.moddatetime('updated_at');
+
+-- Tenant catch-up and agent arrival order: both have a total cursor.
+create index messages_org_updated_cursor_idx
+on public.messages (organization_id, updated_at, id);
+
+create index messages_org_conv_created_cursor_idx
+on public.messages (organization_id, conversation_id, created_at, id);
+
+-- Includes inbound files too; dispatch_pending excludes those.
+create index messages_media_pending_cursor_idx
+on public.messages (timestamp, id)
+where content ->> 'type' = 'file'
+  and status ->> 'pending' is not null
+  and status ->> 'preprocessed' is null;
+
+-- Stable timestamp ties for previews and history pages.
+create index messages_org_conv_history_cursor_idx
+on public.messages (organization_id, conversation_id, timestamp desc, id desc);
+
+-- Organization export pages are ordered by the UUID, independently of time.
+create index messages_org_id_cursor_idx
+on public.messages (organization_id, id);

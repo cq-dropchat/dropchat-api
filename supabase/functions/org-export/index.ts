@@ -4,7 +4,7 @@ import { createUnsecureClient } from "../_shared/supabase.ts";
 import type { Database } from "../_shared/types/database_types.ts";
 import * as log from "../_shared/logger.ts";
 import { withRequestLogging } from "../_shared/logger.ts";
-import { buildOrganizationExport } from "./export.ts";
+import { streamOrganizationExport } from "./export.ts";
 
 /**
  * F18: organization exports worker. Invoked when an export is requested
@@ -16,8 +16,8 @@ import { buildOrganizationExport } from "./export.ts";
  *      uploads it to the private `exports` bucket at
  *      organizations/<org>/exports/<id>.zip and marks it ready (or failed).
  *
- * The export is built in memory: an organization whose data does not fit the
- * function's memory or Storage's upload limit ends `failed` with the reason.
+ * The ZIP streams to Storage with backpressure. Storage's object-size and
+ * the worker's execution-time limits still apply.
  */
 
 const BUCKET = "exports";
@@ -69,16 +69,15 @@ export async function handler(req: Request): Promise<Response> {
     `organizations/${job.organization_id}/exports/${job.id}.zip`;
 
   try {
-    const { zip, counts } = await buildOrganizationExport(
-      client,
-      job.organization_id,
-    );
+    const exported = streamOrganizationExport(client, job.organization_id);
+    const { stream, counts } = exported;
 
     const { error: uploadError } = await client.storage
       .from(BUCKET)
-      .upload(objectName, new Blob([zip], { type: "application/zip" }), {
+      .upload(objectName, stream, {
         contentType: "application/zip",
         upsert: true,
+        duplex: "half",
       });
     if (uploadError) throw uploadError;
 
@@ -91,13 +90,13 @@ export async function handler(req: Request): Promise<Response> {
     log.info("organization export ready", {
       organization_id: job.organization_id,
       export_id: job.id,
-      bytes: zip.length,
+      bytes: exported.bytes,
       counts,
     });
 
     return Response.json({
       expired,
-      exported: { id: job.id, bytes: zip.length, counts },
+      exported: { id: job.id, bytes: exported.bytes, counts },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

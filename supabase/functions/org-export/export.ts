@@ -193,60 +193,97 @@ async function* pages(
   }
 }
 
-export async function buildOrganizationExport(
+/** Pull-based ZIP: at most one database page is compressed ahead of upload. */
+export function streamOrganizationExport(
   client: Client,
   organizationId: string,
-): Promise<
-  { zip: Uint8Array<ArrayBuffer>; counts: Record<ExportTable, number> }
-> {
-  const chunks: Uint8Array[] = [];
-  let failure: Error | null = null;
-  const zip = new Zip((error, chunk) => {
-    if (error) failure = error;
-    else chunks.push(chunk);
-  });
-
+) {
   const counts = {} as Record<ExportTable, number>;
-
-  for (const spec of TABLES) {
-    const file = new ZipDeflate(`${spec.name}.ndjson`, { level: 6 });
-    zip.add(file);
-    counts[spec.name] = 0;
-
-    for await (const rows of pages(client, spec, organizationId)) {
-      const lines = rows.map((row) => JSON.stringify(clean(spec, row)) + "\n");
-      counts[spec.name] += rows.length;
-      file.push(strToU8(lines.join("")));
+  let bytes = 0;
+  async function* generate(): AsyncGenerator<Uint8Array<ArrayBuffer>> {
+    let chunks: Uint8Array<ArrayBuffer>[] = [];
+    let failure: Error | null = null;
+    const zip = new Zip((error, chunk) => {
+      if (error) failure = error;
+      else chunks.push(chunk as Uint8Array<ArrayBuffer>);
+    });
+    try {
+      for (const spec of TABLES) {
+        const file = new ZipDeflate(`${spec.name}.ndjson`, { level: 6 });
+        zip.add(file);
+        counts[spec.name] = 0;
+        for await (const rows of pages(client, spec, organizationId)) {
+          counts[spec.name] += rows.length;
+          file.push(
+            strToU8(
+              rows.map((row) => JSON.stringify(clean(spec, row)) + "\n").join(
+                "",
+              ),
+            ),
+          );
+          if (failure) throw failure;
+          for (const chunk of chunks) {
+            bytes += chunk.length;
+            yield chunk;
+          }
+          chunks = [];
+        }
+        file.push(new Uint8Array(0), true);
+        if (failure) throw failure;
+        for (const chunk of chunks) {
+          bytes += chunk.length;
+          yield chunk;
+        }
+        chunks = [];
+      }
+      const manifest = new ZipDeflate("manifest.json", { level: 6 });
+      zip.add(manifest);
+      manifest.push(
+        strToU8(
+          JSON.stringify(
+            {
+              format: "openbsp-organization-export",
+              version: 1,
+              organization_id: organizationId,
+              exported_at: new Date().toISOString(),
+              counts,
+            },
+            null,
+            2,
+          ),
+        ),
+        true,
+      );
+      zip.end();
+      if (failure) throw failure;
+      for (const chunk of chunks) {
+        bytes += chunk.length;
+        yield chunk;
+      }
+    } finally {
+      zip.terminate();
     }
-    file.push(new Uint8Array(0), true);
   }
-
-  const manifest = new ZipDeflate("manifest.json", { level: 6 });
-  zip.add(manifest);
-  manifest.push(
-    strToU8(JSON.stringify(
-      {
-        format: "openbsp-organization-export",
-        version: 1,
-        organization_id: organizationId,
-        exported_at: new Date().toISOString(),
-        counts,
-      },
-      null,
-      2,
-    )),
-    true,
-  );
-  zip.end();
-
-  if (failure) throw failure;
-
-  const size = chunks.reduce((n, c) => n + c.length, 0);
-  const out = new Uint8Array(new ArrayBuffer(size));
-  let at = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, at);
-    at += chunk.length;
-  }
-  return { zip: out, counts };
+  const iterator = generate();
+  const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
+    async pull(controller) {
+      try {
+        const next = await iterator.next();
+        if (next.done) controller.close();
+        else controller.enqueue(next.value);
+      } catch (error) {
+        controller.error(error);
+      }
+    },
+    async cancel() {
+      await iterator.return(undefined);
+    },
+  }, { highWaterMark: 0 });
+  return {
+    stream,
+    counts,
+    get bytes() {
+      return bytes;
+    },
+  };
 }

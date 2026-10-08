@@ -76,3 +76,7 @@ before update
 on public.webhook_deliveries
 for each row
 execute function public.moddatetime('updated_at');
+
+create index webhook_deliveries_terminal_retention_idx
+on public.webhook_deliveries (organization_id, updated_at, id)
+where status in ('delivered', 'failed');

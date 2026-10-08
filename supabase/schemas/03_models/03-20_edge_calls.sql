@@ -61,7 +61,7 @@ on delete cascade;
 -- What the worker reads: due calls, and calls in flight.
 create index edge_calls_pending_idx
 on public.edge_calls
-using btree (organization_id, next_attempt_at)
+using btree (organization_id, next_attempt_at, id)
 where status = 'pending';
 
 create index edge_calls_sending_idx
@@ -82,3 +82,19 @@ execute function public.moddatetime('updated_at');
 alter table public.edge_calls enable row level security;
 
 revoke all on table public.edge_calls from anon, authenticated;
+
+create index edge_calls_active_record_idx
+on public.edge_calls (record_id, function)
+where status in ('pending', 'sending');
+
+create index edge_calls_terminal_retention_idx
+on public.edge_calls (organization_id, updated_at, id)
+where status in ('done', 'failed');
+
+create index edge_calls_done_health_idx
+on public.edge_calls (organization_id, function, updated_at desc)
+where status = 'done';
+
+create index edge_calls_backlog_health_idx
+on public.edge_calls (organization_id, function, status, created_at)
+where status <> 'done';

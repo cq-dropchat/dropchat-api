@@ -229,7 +229,8 @@ as $$
     else exists (
       select 1
       from public.messages m
-      where m.conversation_id = c.id
+      where m.organization_id = c.organization_id
+        and m.conversation_id = c.id
         and m.sender_address is not null
         and m.timestamp > p_at - interval '24 hours'
     )
@@ -256,45 +257,34 @@ declare
   _count integer := 0;
 begin
   for _conv in
-    select c.id, c.assigned_agent_id, c.assigned_at, o.extra as org_extra
+    select c.id
     from public.conversations c
     join public.agents a on a.id = c.assigned_agent_id
     join public.organizations o on o.id = c.organization_id
+    cross join lateral (
+      select (public.attention_config(o.extra) ->> 'human_assignment_ttl_hours')::numeric as ttl
+    ) config
     where c.assigned_agent_id is not null
       and a.user_id is not null
       and o.deletion_requested_at is null
-    order by c.assigned_at
-    limit p_limit
+      and config.ttl > 0
+      and c.assigned_at <= now() - make_interval(hours => config.ttl::int)
+      and not exists (
+        select 1 from public.messages m
+        where m.organization_id = c.organization_id
+          and m.conversation_id = c.id
+          and m.agent_id = c.assigned_agent_id
+          and m.sender_address is null
+          and m.timestamp > now() - make_interval(hours => config.ttl::int)
+      )
+    order by c.assigned_at, c.id
+    limit greatest(p_limit, 0)
+    for update of c skip locked
   loop
-    declare
-      _ttl numeric := (
-        public.attention_config(_conv.org_extra) ->> 'human_assignment_ttl_hours'
-      )::numeric;
-      _last timestamp with time zone;
-    begin
-      -- 0 (or an unstorable null) means a person keeps the conversation
-      -- until they let go of it.
-      continue when _ttl is null or _ttl <= 0;
-
-      -- The last thing that person sent here, or the moment they took it.
-      select max(m.timestamp) into _last
-      from public.messages m
-      where m.conversation_id = _conv.id
-        and m.agent_id = _conv.assigned_agent_id
-        and m.sender_address is null;
-
-      _last := greatest(coalesce(_last, _conv.assigned_at), _conv.assigned_at);
-
-      if _last > now() - make_interval(hours => _ttl::int) then
-        continue;
-      end if;
-
-      perform public.set_conversation_assignment(
-        _conv.id, null, false, null, '{"cause": "expiry"}'::jsonb
-      );
-
-      _count := _count + 1;
-    end;
+    perform public.set_conversation_assignment(
+      _conv.id, null, false, null, '{"cause": "expiry"}'::jsonb
+    );
+    _count := _count + 1;
   end loop;
 
   return _count;
@@ -326,8 +316,19 @@ begin
     join public.organizations o on o.id = c.organization_id
     where c.awaiting_human_since is not null
       and o.deletion_requested_at is null
-    order by c.awaiting_human_since
-    limit p_limit
+      and public.attention_business_minutes(
+        public.attention_config(o.extra), c.awaiting_human_since, now()
+      ) >= (public.attention_config(o.extra) ->> 'human_wait_minutes')::numeric
+      and (
+        public.attention_config(o.extra) ->> 'on_human_wait_timeout' = 'return_to_ai'
+        or (
+          c.extra ->> 'human_wait_notified_at' is null
+          and public.channel_window_open(c.id)
+        )
+      )
+    order by c.awaiting_human_since, c.id
+    limit greatest(p_limit, 0)
+    for update of c skip locked
   loop
     declare
       _config jsonb := public.attention_config(_conv.org_extra);
