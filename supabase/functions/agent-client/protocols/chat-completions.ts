@@ -33,6 +33,7 @@ import {
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AgentTool } from "../agent_tool.ts";
 import * as log from "../../_shared/logger.ts";
+import { AgentOutputError, parseRespondArguments } from "./output.ts";
 import { getFileMetadata } from "../../_shared/media.ts";
 import { serializePartAsXML } from "./serializer.ts";
 import { buildSystemPrompt, historyRole } from "./prompt.ts";
@@ -90,6 +91,7 @@ const RESPOND_TOOL: ChatCompletionTool = {
           },
         },
       },
+      required: ["messages"],
       additionalProperties: false,
     },
   },
@@ -101,6 +103,7 @@ export interface ChatCompletionsRequest {
 }
 
 export interface ChatCompletionsResponse {
+  id?: string;
   finish_reason: ChatCompletion["choices"][number]["finish_reason"];
   message: ChatCompletionMessage;
 }
@@ -582,36 +585,27 @@ export class ChatCompletionsHandler
       });
     }
 
-    return {
-      finish_reason: response.choices[0].finish_reason,
-      message: response.choices[0].message,
-    };
+    const choice = response.choices[0];
+    if (!choice?.message) throw new AgentOutputError("missing_choice");
+    return { id: response.id, ...choice };
   }
 
   private async processRespondCall(
     respondCall: ChatCompletionMessageToolCall,
-  ): Promise<MessageInsert[]> {
+  ): Promise<ResponseContext> {
     const { agent, conversation } = this.context;
 
     if (respondCall.type !== "function") {
-      return [];
+      throw new AgentOutputError("respond_invalid_tool_type");
     }
 
-    const args = JSON.parse(respondCall.function.arguments) as {
-      messages: Array<
-        | { type: "text"; text: string }
-        | { type: "file"; uri: string; name?: string; text?: string }
-      >;
-    };
+    const messages = parseRespondArguments(respondCall.function.arguments);
 
-    if (!args.messages?.length) {
-      log.info("Respond called with empty messages. No response to user.");
-      return [];
-    }
+    if (!messages.length) return { messages: [], skipResponse: true };
 
     const outgoing: MessageInsert[] = [];
 
-    for (const msg of args.messages) {
+    for (const msg of messages) {
       if (msg.type === "text") {
         outgoing.push({
           organization_id: conversation.organization_id,
@@ -657,7 +651,7 @@ export class ChatCompletionsHandler
       }
     }
 
-    return outgoing;
+    return { messages: outgoing };
   }
 
   async processResponse(
@@ -666,7 +660,29 @@ export class ChatCompletionsHandler
     const { finish_reason, message } = response;
     const { agent, conversation } = this.context;
 
-    if (finish_reason === "tool_calls" && message.tool_calls?.length) {
+    log.info("Agent provider output", {
+      conversation_id: conversation.id,
+      agent_id: agent.id,
+      provider_response_id: response.id,
+      protocol: "chat_completions",
+      finish_reason,
+      text_length: message.content?.length ?? 0,
+      tool_call_count: message.tool_calls?.length ?? 0,
+      refused: !!message.refusal,
+    });
+
+    if (finish_reason === "content_filter" || message.refusal) {
+      throw new AgentOutputError("provider_refusal", false);
+    }
+    // A truncated function call must never be executed, even if it looks valid.
+    if (finish_reason === "length") {
+      throw new AgentOutputError("output_truncated");
+    }
+    if (finish_reason !== "stop" && finish_reason !== "tool_calls") {
+      throw new AgentOutputError("unsupported_finish_reason");
+    }
+
+    if (message.tool_calls?.length) {
       // Check for the virtual respond tool call
       const respondCall = message.tool_calls.find(
         (tc) =>
@@ -675,8 +691,7 @@ export class ChatCompletionsHandler
       );
 
       if (respondCall) {
-        const messages = await this.processRespondCall(respondCall);
-        return { messages };
+        return await this.processRespondCall(respondCall);
       }
 
       // Regular tool calls — existing logic
@@ -752,9 +767,7 @@ export class ChatCompletionsHandler
       };
     }
 
-    // TODO: finish reasons: length, content filter
-
-    if (finish_reason === "stop" && message.content) {
+    if (message.content?.trim()) {
       if (multiMessageResponse(this.context)) {
         log.warn(
           "Unexpected stop finish_reason with tool_choice: required. Falling back to text response.",
@@ -780,8 +793,6 @@ export class ChatCompletionsHandler
       };
     }
 
-    return {
-      messages: [],
-    };
+    throw new AgentOutputError("empty_response");
   }
 }

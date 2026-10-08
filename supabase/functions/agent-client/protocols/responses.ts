@@ -24,6 +24,7 @@ import {
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AgentTool } from "../agent_tool.ts";
 import * as log from "../../_shared/logger.ts";
+import { AgentOutputError, parseRespondArguments } from "./output.ts";
 import { getFileMetadata } from "../../_shared/media.ts";
 import { serializePartAsXML } from "./serializer.ts";
 import { buildSystemPrompt, historyRole } from "./prompt.ts";
@@ -100,6 +101,7 @@ const RESPOND_TOOL: ResponsesTool = {
         },
       },
     },
+    required: ["messages"],
     additionalProperties: false,
   },
 };
@@ -112,6 +114,9 @@ export interface ResponsesRequest {
 
 export interface ResponsesResponseWrapper {
   output: ResponseOutputItem[];
+  id?: string;
+  status?: ResponsesResponse["status"];
+  incomplete_details?: ResponsesResponse["incomplete_details"];
 }
 
 export class ResponsesHandler
@@ -497,29 +502,26 @@ export class ResponsesHandler
       });
     }
 
-    return { output: response.output };
+    return {
+      output: response.output,
+      id: response.id,
+      status: response.status,
+      incomplete_details: response.incomplete_details,
+    };
   }
 
   private async processRespondCall(
     respondCall: FunctionCallItem,
-  ): Promise<MessageInsert[]> {
+  ): Promise<ResponseContext> {
     const { agent, conversation } = this.context;
 
-    const args = JSON.parse(respondCall.arguments) as {
-      messages: Array<
-        | { type: "text"; text: string }
-        | { type: "file"; uri: string; name?: string; text?: string }
-      >;
-    };
+    const messages = parseRespondArguments(respondCall.arguments);
 
-    if (!args.messages?.length) {
-      log.info("Respond called with empty messages. No response to user.");
-      return [];
-    }
+    if (!messages.length) return { messages: [], skipResponse: true };
 
     const outgoing: MessageInsert[] = [];
 
-    for (const msg of args.messages) {
+    for (const msg of messages) {
       if (msg.type === "text") {
         outgoing.push({
           organization_id: conversation.organization_id,
@@ -565,13 +567,39 @@ export class ResponsesHandler
       }
     }
 
-    return outgoing;
+    return { messages: outgoing };
   }
 
   async processResponse(
     response: ResponsesResponseWrapper,
   ): Promise<ResponseContext> {
     const { agent, conversation } = this.context;
+
+    log.info("Agent provider output", {
+      conversation_id: conversation.id,
+      agent_id: agent.id,
+      provider_response_id: response.id,
+      protocol: "responses",
+      status: response.status,
+      incomplete_reason: response.incomplete_details?.reason,
+      output_types: response.output.map((item) => item.type),
+    });
+    const refused = response.output.some((item) =>
+      item.type === "message" && item.content.some((c) => c.type === "refusal")
+    );
+    if (response.incomplete_details?.reason === "content_filter" || refused) {
+      throw new AgentOutputError("provider_refusal", false);
+    }
+    if (response.status && response.status !== "completed") {
+      throw new AgentOutputError(`response_${response.status}`);
+    }
+    if (
+      response.output.some((item) =>
+        "status" in item && item.status === "incomplete"
+      )
+    ) {
+      throw new AgentOutputError("output_truncated");
+    }
 
     const functionCalls = response.output.filter(
       (item): item is FunctionCallItem => item.type === "function_call",
@@ -584,8 +612,7 @@ export class ResponsesHandler
       );
 
       if (respondCall) {
-        const messages = await this.processRespondCall(respondCall);
-        return { messages };
+        return await this.processRespondCall(respondCall);
       }
 
       // Regular tool calls. Share one task id so prepareRequest can group the
@@ -686,6 +713,6 @@ export class ResponsesHandler
       };
     }
 
-    return { messages: [] };
+    throw new AgentOutputError("empty_response");
   }
 }

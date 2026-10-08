@@ -221,7 +221,7 @@ Deno.test("H4: an AI assignment expires when the contact has been away too long"
       entry_agent_id: OLDEST.id,
       attention: { ai_assignment_ttl_days: 14 },
     }),
-    "2026-09-01T12:00:00.000Z",
+    new Date(Date.now() - 18 * 24 * 60 * 60 * 1000).toISOString(),
   );
 
   // 18 days without the contact: routed again, and recorded as an expiry.
@@ -242,7 +242,7 @@ Deno.test("H4: a conversation the contact wrote in recently keeps its agent", ()
       entry_agent_id: OLDEST.id,
       attention: { ai_assignment_ttl_days: 14 },
     }),
-    "2026-09-17T12:00:00.000Z",
+    new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
   );
 
   assertEquals(fresh.agent?.id, NEWER.id);

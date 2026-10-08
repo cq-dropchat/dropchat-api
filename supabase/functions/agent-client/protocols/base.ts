@@ -37,6 +37,8 @@ export interface ResponseContext {
   organization?: OrganizationRow;
   conversation?: ConversationRow;
   messages?: MessageInsert[];
+  /** Only an explicit, valid respond({messages: []}) may end a silent turn. */
+  skipResponse?: boolean;
   agent?: AgentRowWithExtra;
 }
 

@@ -34,10 +34,13 @@ function service() {
 type Completion = {
   content?: string | null;
   tool_calls?: { name: string; arguments: string }[];
+  finish_reason?: string;
 };
 
 /** A chat-completions provider that answers from a script, in order. */
-function scriptedLlm(script: (call: number) => Completion) {
+function scriptedLlm(
+  script: (call: number) => Completion | Promise<Completion>,
+) {
   const realFetch = globalThis.fetch;
   const requests: unknown[] = [];
   globalThis.fetch = async (input, init) => {
@@ -49,7 +52,7 @@ function scriptedLlm(script: (call: number) => Completion) {
       ? await input.clone().text()
       : String(init?.body);
     requests.push(JSON.parse(body));
-    const turn = script(requests.length);
+    const turn = await script(requests.length);
     const tool_calls = turn.tool_calls?.map((c, i) => ({
       id: `call_${requests.length}_${i}`,
       type: "function",
@@ -67,7 +70,8 @@ function scriptedLlm(script: (call: number) => Completion) {
           content: turn.content ?? null,
           ...(tool_calls && { tool_calls }),
         },
-        finish_reason: tool_calls ? "tool_calls" : "stop",
+        finish_reason: turn.finish_reason ??
+          (tool_calls ? "tool_calls" : "stop"),
       }],
       usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 },
     });
@@ -193,6 +197,233 @@ const test = (name: string, fn: (t: Deno.TestContext) => Promise<void>) =>
     sanitizeOps: false,
     fn: (t) => quietly(() => fn(t)),
   });
+
+async function turnState(client: Client, record: MessageRow) {
+  const { data } = await client.from("agent_turns")
+    .select("holder_message_id, handled_message_id")
+    .eq("conversation_id", record.conversation_id)
+    .single().throwOnError();
+  return data;
+}
+
+const validAnswer: Completion = {
+  tool_calls: [{
+    name: "respond",
+    arguments: '{"messages":[{"type":"text","text":"¿Cuál es tu comuna?"}]}',
+  }],
+};
+
+test("empty output: recovers once, stores one answer and deduplicates the turn", async () => {
+  const client = service();
+  const contact = "5491129100021";
+  await cleanup(client, contact);
+  const llm = scriptedLlm((call) => call === 1 ? {} : validAnswer);
+  try {
+    await withTestAgent(client, async () => {
+      const record = await inbound(
+        client,
+        contact,
+        "Casa con rejas, junto a la loma",
+      );
+      await settle();
+      assertEquals((await invoke(record)).status, 200);
+      assertEquals(llm.requests.length, 2);
+      const rows = (await written(client, record)).filter((row) =>
+        (row.content as { text?: string }).text === "¿Cuál es tu comuna?"
+      );
+      assertEquals(rows.length, 1);
+      assertEquals(await turnState(client, record), {
+        holder_message_id: null,
+        handled_message_id: record.id,
+      });
+      assertEquals((await invoke(record)).status, 200);
+      assertEquals(llm.requests.length, 2);
+    });
+  } finally {
+    llm.restore();
+    await cleanup(client, contact);
+  }
+});
+
+test("empty output: repeated failure is retryable and leaves the message unhandled", async () => {
+  const client = service();
+  const contact = "5491129100022";
+  await cleanup(client, contact);
+  const llm = scriptedLlm((call) => call <= 2 ? {} : validAnswer);
+  try {
+    await withTestAgent(client, async () => {
+      const record = await inbound(
+        client,
+        contact,
+        "Necesito corregir mi dirección",
+      );
+      await settle();
+      assertEquals((await invoke(record)).status, 502);
+      assertEquals(llm.requests.length, 2);
+      assertEquals(await turnState(client, record), {
+        holder_message_id: null,
+        handled_message_id: null,
+      });
+      const errors = (await written(client, record)).filter((row) =>
+        (row.content as { text?: string }).text ===
+          "Invalid agent output: empty_response"
+      );
+      assertEquals(errors.length, 1);
+      assertEquals(
+        (errors[0].content as { internal?: boolean }).internal,
+        true,
+      );
+
+      // Simulates edge_calls retrying the same payload after backoff.
+      assertEquals((await invoke(record)).status, 200);
+      assertEquals(llm.requests.length, 3);
+      assertEquals(
+        (await turnState(client, record)).handled_message_id,
+        record.id,
+      );
+    });
+  } finally {
+    llm.restore();
+    await cleanup(client, contact);
+  }
+});
+
+test("empty output: explicit skip ends the turn without retries", async () => {
+  const client = service();
+  const contact = "5491129100023";
+  await cleanup(client, contact);
+  const llm = scriptedLlm(() => ({
+    tool_calls: [{ name: "respond", arguments: '{"messages":[]}' }],
+  }));
+  try {
+    await withTestAgent(client, async () => {
+      const record = await inbound(client, contact, "Gracias, eso es todo");
+      await settle();
+      assertEquals((await invoke(record)).status, 200);
+      assertEquals(llm.requests.length, 1);
+      assertEquals(
+        (await turnState(client, record)).handled_message_id,
+        record.id,
+      );
+      await invoke(record);
+      assertEquals(llm.requests.length, 1);
+    });
+  } finally {
+    llm.restore();
+    await cleanup(client, contact);
+  }
+});
+
+test("empty output: recovery respects a human takeover during the first call", async () => {
+  const client = service();
+  const contact = "5491129100024";
+  await cleanup(client, contact);
+  let incoming: MessageRow;
+  const llm = scriptedLlm(async () => {
+    await client.rpc("set_conversation_assignment", {
+      p_conversation_id: incoming.conversation_id!,
+      p_agent_id: fixture.agentAlice,
+      p_awaiting_human: false,
+      p_actor_agent_id: fixture.agentAlice,
+      p_reason: { cause: "manual" },
+    }).throwOnError();
+    return {};
+  });
+  try {
+    await withTestAgent(client, async () => {
+      incoming = await inbound(
+        client,
+        contact,
+        "Quiero hablar con una persona",
+      );
+      await settle();
+      assertEquals((await invoke(incoming)).status, 200);
+      assertEquals(llm.requests.length, 1);
+      assertEquals(
+        (await turnState(client, incoming)).handled_message_id,
+        null,
+      );
+    });
+  } finally {
+    llm.restore();
+    await cleanup(client, contact);
+  }
+});
+
+test("empty output: provider filtering is terminal, not retried or marked answered", async () => {
+  const client = service();
+  const contact = "5491129100025";
+  await cleanup(client, contact);
+  const llm = scriptedLlm(() => ({ finish_reason: "content_filter" }));
+  try {
+    await withTestAgent(client, async () => {
+      const record = await inbound(
+        client,
+        contact,
+        "Mensaje filtrado de prueba",
+      );
+      await settle();
+      assertEquals((await invoke(record)).status, 422);
+      assertEquals(llm.requests.length, 1);
+      assertEquals((await turnState(client, record)).handled_message_id, null);
+    });
+  } finally {
+    llm.restore();
+    await cleanup(client, contact);
+  }
+});
+
+test("response storage: a failed insert leaves the turn retryable, not answered", async () => {
+  const client = service();
+  const contact = "5491129100026";
+  await cleanup(client, contact);
+  const llm = scriptedLlm(() => validAnswer);
+  const providerFetch = globalThis.fetch;
+  let failInsert = true;
+  globalThis.fetch = async (input, init) => {
+    const url = input instanceof Request ? input.url : String(input);
+    const method = input instanceof Request ? input.method : init?.method;
+    if (failInsert && url.includes("/rest/v1/messages") && method === "POST") {
+      const body = input instanceof Request
+        ? await input.clone().text()
+        : String(init?.body);
+      if (body.includes("¿Cuál es tu comuna?")) {
+        failInsert = false;
+        return Response.json({ message: "Storage unavailable" }, {
+          status: 503,
+        });
+      }
+    }
+    return providerFetch(input, init);
+  };
+  try {
+    await withTestAgent(client, async () => {
+      const record = await inbound(
+        client,
+        contact,
+        "¿Cómo corrijo mi dirección?",
+      );
+      await settle();
+      assertEquals((await invoke(record)).status, 502);
+      assertEquals(await turnState(client, record), {
+        holder_message_id: null,
+        handled_message_id: null,
+      });
+      assertEquals((await invoke(record)).status, 200);
+      assertEquals(
+        (await turnState(client, record)).handled_message_id,
+        record.id,
+      );
+      const answers = (await written(client, record)).filter((row) =>
+        (row.content as { text?: string }).text === "¿Cuál es tu comuna?"
+      );
+      assertEquals(answers.length, 1);
+    });
+  } finally {
+    llm.restore();
+    await cleanup(client, contact);
+  }
+});
 
 test("F29: agent-client tool round, then the answer (characterization)", async (t) => {
   const client = service();

@@ -18,6 +18,7 @@ import { applyAgentTemplate } from "../_shared/agent_templates.ts";
 import {
   type AgentRow,
   createUnsecureClient,
+  isInternal,
   type MessageInsert,
   type MessageRow,
   type TextPart,
@@ -60,6 +61,8 @@ import { waitForPendingPreprocessing } from "./preprocessing.ts";
 import { buildAgentTools, initMCPServers } from "./toolset.ts";
 import { runToolUses } from "./tool_uses.ts";
 import { agentErrorMessages, storeIterationMessages } from "./store.ts";
+import { requestAgentResponse } from "./response.ts";
+import { AgentOutputError } from "./protocols/output.ts";
 
 export type { AgentTool } from "./agent_tool.ts";
 
@@ -429,6 +432,7 @@ export async function handler(req: Request): Promise<Response> {
     let iterationsAfterEscalation = 0;
     const max_iterations = 10;
     let shouldContinue = true;
+    let failureStatus = 502;
 
     // Basic ReAct algorithm: stop if no tool uses are found.
     while (shouldContinue) {
@@ -448,48 +452,51 @@ export async function handler(req: Request): Promise<Response> {
         // STILL OUR TURN? (F16) Checked before every LLM call, so a message
         // that arrived meanwhile costs at most the call already in flight.
 
-        const turn = await renewAgentTurn(client, incoming);
+        const canRequest = async (): Promise<boolean> => {
+          const turn = await renewAgentTurn(client, incoming);
 
-        if (turn !== "renewed") {
-          log.info(
-            `Agent turn ${turn} for conversation ${conv.id}. Skipping response.`,
-            { conversation_id: conv.id, message_id: incoming.id },
+          if (turn !== "renewed") {
+            log.info(
+              `Agent turn ${turn} for conversation ${conv.id}. Skipping response.`,
+              { conversation_id: conv.id, message_id: incoming.id },
+            );
+
+            return false;
+          }
+
+          // CHECK IF THERE IS A NEWER INCOMING MESSAGE (posterior to the incoming one)
+          //
+          // Covers a newer message whose own invocation has not registered yet.
+
+          // STILL OURS? (H3) A person who answers by hand takes the
+          // conversation (the implicit takeover), and an escalation hands it
+          // away. Neither is a peer message, so agent_turns cannot see them:
+          // without this the answer in flight would land on top of the human's.
+          if (await takenFromUs(client, conversation)) {
+            log.info(
+              `Conversation ${conv.id} is no longer this agent's. Skipping response.`,
+              { conversation_id: conv.id, message_id: incoming.id },
+            );
+
+            return false;
+          }
+
+          const new_message = await findNewerPeerMessage(
+            client,
+            conv,
+            agent,
+            incoming,
           );
 
-          return new Response("ok", { headers: corsHeaders });
-        }
+          if (new_message) {
+            log.info(
+              `Newer message ${new_message.id} for conversation ${conv.id} found while processing tool use messages and/or waiting for pending preprocessing. Skipping response.`,
+            );
 
-        // CHECK IF THERE IS A NEWER INCOMING MESSAGE (posterior to the incoming one)
-        //
-        // Covers a newer message whose own invocation has not registered yet.
-
-        // STILL OURS? (H3) A person who answers by hand takes the
-        // conversation (the implicit takeover), and an escalation hands it
-        // away. Neither is a peer message, so agent_turns cannot see them:
-        // without this the answer in flight would land on top of the human's.
-        if (await takenFromUs(client, conversation)) {
-          log.info(
-            `Conversation ${conv.id} is no longer this agent's. Skipping response.`,
-            { conversation_id: conv.id, message_id: incoming.id },
-          );
-
-          return new Response("ok", { headers: corsHeaders });
-        }
-
-        const new_message = await findNewerPeerMessage(
-          client,
-          conv,
-          agent,
-          incoming,
-        );
-
-        if (new_message) {
-          log.info(
-            `Newer message ${new_message.id} for conversation ${conv.id} found while processing tool use messages and/or waiting for pending preprocessing. Skipping response.`,
-          );
-
-          return new Response("ok", { headers: corsHeaders });
-        }
+            return false;
+          }
+          return true;
+        };
 
         // MCP SERVERS INITIALIZATION
         // It is here because of multi-agents, which we are not using by the time being.
@@ -504,11 +511,13 @@ export async function handler(req: Request): Promise<Response> {
 
         const handler = ProtocolFactory.getHandler(tools, context, client);
 
-        const agentRequest = await handler.prepareRequest();
-
-        const agentResponse = await handler.sendRequest(agentRequest);
-
-        response = await handler.processResponse(agentResponse);
+        const result = await requestAgentResponse(handler, canRequest, {
+          conversation_id: conv.id,
+          message_id: incoming.id,
+          agent_id: agent.id,
+        });
+        if (!result) return new Response("ok", { headers: corsHeaders });
+        response = result;
 
         if (!response.messages?.length) {
           response.messages = [];
@@ -533,7 +542,18 @@ export async function handler(req: Request): Promise<Response> {
       } catch (error) {
         shouldContinue = false;
 
-        log.error("Error in agent client", error as Error);
+        if (error instanceof AgentOutputError && !error.retryable) {
+          // A provider refusal is terminal: the queue must not retry it.
+          failureStatus = 422;
+        }
+        log.error("Error in agent client", {
+          conversation_id: conv.id,
+          message_id: incoming.id,
+          agent_id: agent.id,
+          iteration,
+          ...(error instanceof AgentOutputError && { reason: error.reason }),
+          error,
+        });
 
         response.messages = agentErrorMessages(
           conv,
@@ -561,6 +581,13 @@ export async function handler(req: Request): Promise<Response> {
 
       if (!(await storeIterationMessages(client, conv, messages, response))) {
         shouldContinue = false;
+      } else if (
+        response.skipResponse === true ||
+        response.messages?.some((message) => !isInternal(message))
+      ) {
+        // Tool traces and error notes alone are not an answer. Once a real
+        // answer is stored, do not retry the turn and send it twice.
+        handled = true;
       }
 
       // An escalation gives the agent ONE more iteration — its goodbye — and
@@ -598,7 +625,20 @@ export async function handler(req: Request): Promise<Response> {
   }
   */
 
-    handled = true;
+    if (!handled) {
+      log.error("Agent turn ended without a response", {
+        conversation_id: conv.id,
+        message_id: incoming.id,
+        agent_id: agent.id,
+        iteration,
+      });
+      // edge_calls retries 5xx with backoff; finally releases the lease
+      // without marking the incoming message handled.
+      return new Response("Agent did not produce a response", {
+        status: failureStatus,
+        headers: corsHeaders,
+      });
+    }
 
     // The caller is pg_net, which discards the body — don't serialize the
     // whole conversation into it.
