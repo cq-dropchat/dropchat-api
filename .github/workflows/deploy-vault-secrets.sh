@@ -46,7 +46,7 @@ fi
 echo "Updating vault secrets..."
 
 # SQL to upsert secrets (insert or update if exists)
-psql "$DB_URL" << EOF
+psql "$DB_URL" -v ON_ERROR_STOP=1 --single-transaction << EOF
 -- Upsert edge_functions_url secret
 DO \$\$
 BEGIN

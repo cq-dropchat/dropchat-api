@@ -7,10 +7,22 @@ on:
   #    - main
   #    - develop
   workflow_dispatch:
+    inputs:
+      ui_sha:
+        description: Full UI SHA with successful paired Check evidence
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   db-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     environment: ${{ github.ref == 'refs/heads/main' && 'Production' || 'Staging' }}
 
@@ -21,18 +33,36 @@ jobs:
       SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
       SUPABASE_SESSION_POOLER_HOST: ${{ vars.SUPABASE_SESSION_POOLER_HOST }}
 
-    # TODO: this is not working as expected
-    # if: vars.SUPABASE_PROJECT_ID
-
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify exact release and pairing
+        run: node .github/scripts/verify-release.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_EVIDENCE_TOKEN || github.token }}
+          DEPLOYMENT_OWNER: ${{ vars.DEPLOYMENT_OWNER }}
+          UI_REPOSITORY: ${{ vars.UI_REPOSITORY || 'cq-dropchat/dropchat-ui' }}
+          UI_SHA: ${{ inputs.ui_sha }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ github.sha }}
+          path: artifacts/release/evidence.json
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.119.0
 
+      - name: Check required deployment configuration
+        shell: bash
+        run: |
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_SERVICE_ROLE_KEY SUPABASE_PROJECT_ID SUPABASE_SESSION_POOLER_HOST; do
+            if [[ -z "${!name}" ]]; then echo "Missing deployment configuration: $name"; exit 1; fi
+          done
       - run: supabase link --project-ref $SUPABASE_PROJECT_ID
       - run: supabase db push
+      - run: supabase secrets set API_RELEASE="$GITHUB_SHA"
       - run: supabase functions deploy
 
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client

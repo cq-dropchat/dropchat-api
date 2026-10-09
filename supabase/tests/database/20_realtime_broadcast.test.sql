@@ -20,11 +20,13 @@ select plan(26);
 
 select has_function('public', 'broadcast_realtime_change', array[]::text[], 'broadcast_realtime_change exists');
 
-create temp table marks as select now() - interval '1 second' as t0;
+-- Fence to this transaction: fresh seed notices must not be mistaken for
+-- the changes under test, even when the suite starts within the same second.
+create temp table marks as select id from realtime.messages;
 
 create function pg_temp.notices(_topic text) returns setof jsonb language sql as $$
   select m.payload from realtime.messages m
-  where m.topic = _topic and m.inserted_at >= (select t0 from marks)::timestamp
+  where m.topic = _topic and not exists (select 1 from marks where marks.id = m.id)
   order by m.inserted_at;
 $$;
 
