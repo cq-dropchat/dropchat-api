@@ -32,7 +32,7 @@ export async function processPayload(
     const waba_id = entry.id; // WhatsApp business account ID (WABA ID)
 
     for (const { value, field } of entry.changes) {
-      log.info(`WhatsApp ${field} payload`, value);
+      log.info("WhatsApp change received", { field });
 
       if (field === "account_update") {
         await handleAccountUpdate(client, waba_id, value);

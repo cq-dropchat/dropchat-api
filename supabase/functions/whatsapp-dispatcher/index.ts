@@ -510,7 +510,12 @@ export async function handler(req: Request): Promise<Response> {
 
   const message = ((await req.json()) as WebhookPayload<MessageRow>).record!;
 
-  log.info(`Dispatching message ${message.id}`, message);
+  log.event("dispatch.started", "started", {
+    message_id: message.id,
+    organization_id: message.organization_id,
+    conversation_id: message.conversation_id,
+    provider: "whatsapp",
+  });
 
   // The recipient is the conversation's peer. WhatsApp Cloud only has direct
   // chats, so conversation_address is the contact.
@@ -600,12 +605,19 @@ export async function handler(req: Request): Promise<Response> {
         recipient,
       });
 
+      const providerStarted = performance.now();
       const response = await postPayloadToWhatsAppEndpoint({
         payload,
         phone_number_id: message.organization_address,
         access_token,
       });
 
+      log.event("provider.accepted", "accepted", {
+        message_id: message.id,
+        organization_id: message.organization_id,
+        provider: "whatsapp",
+        duration_ms: performance.now() - providerStarted,
+      });
       await commitDispatchedMessage({
         client,
         messageId: message.id,
@@ -617,6 +629,11 @@ export async function handler(req: Request): Promise<Response> {
         },
       });
     } catch (error) {
+      log.event("provider.rejected", "failure", {
+        message_id: message.id,
+        organization_id: message.organization_id,
+        provider: "whatsapp",
+      });
       const isWhatsAppError = error instanceof WhatsAppError;
       const errorMessage = error instanceof Error
         ? error.message

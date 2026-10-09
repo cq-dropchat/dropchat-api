@@ -152,7 +152,7 @@ begin
   select * into _base_url, _token from public.edge_functions_config();
 
   for _row in
-    select c.id, c.function, c.payload, c.forward_headers
+    select c.id, c.function, c.payload, c.forward_headers, c.attempts, c.next_attempt_at
     from (
       select p.id,
         row_number() over (partition by o.id order by p.next_attempt_at, p.id) as rank,
@@ -180,7 +180,11 @@ begin
       headers := jsonb_build_object(
         'content-type', 'application/json',
         'authorization', 'Bearer ' || _token
-      ) || _row.forward_headers,
+      ) || _row.forward_headers || jsonb_build_object(
+        'x-job-id', _row.id::text,
+        'x-job-attempt', (_row.attempts + 1)::text,
+        'x-queue-wait-ms', (greatest(0, extract(epoch from now() - _row.next_attempt_at)) * 1000)::text
+      ),
       timeout_milliseconds := 10000
     ) into _request_id;
 

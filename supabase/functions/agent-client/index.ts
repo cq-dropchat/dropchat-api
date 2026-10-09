@@ -21,7 +21,6 @@ import {
   isInternal,
   type MessageInsert,
   type MessageRow,
-  type TextPart,
   type WebhookPayload,
 } from "../_shared/supabase.ts";
 import {
@@ -68,7 +67,17 @@ export type { AgentTool } from "./agent_tool.ts";
 
 const RESPONSE_DELAY_SECS = 3; // 3 seconds
 
-export async function handler(req: Request): Promise<Response> {
+function skipped(reason: string, failure = false): Response {
+  return new Response("ok", {
+    headers: {
+      ...corsHeaders,
+      "x-business-outcome": failure ? "failure" : "skipped",
+      "x-business-code": reason,
+    },
+  });
+}
+
+async function execute(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
 
@@ -160,7 +169,7 @@ export async function handler(req: Request): Promise<Response> {
   if (TEAM_CHAT_SERVICES.has(conv.service) && !dmAI) {
     log.info(`Conversation ${conv.id} is team chat. Skipping response.`);
 
-    return new Response("ok", { headers: corsHeaders });
+    return skipped("team_chat");
   }
 
   // RETRIEVE CONTACT (external services only)
@@ -226,7 +235,7 @@ export async function handler(req: Request): Promise<Response> {
       `Conversation ${conv.id} was assigned by another invocation. Skipping response.`,
     );
 
-    return new Response("ok", { headers: corsHeaders });
+    return skipped("assignment_race");
   }
 
   // T6: the agent as it actually runs — its template version underneath, its
@@ -281,7 +290,7 @@ export async function handler(req: Request): Promise<Response> {
       log.info(`Agent turn ${claim}. Skipping response.`, details);
     }
 
-    return new Response("ok", { headers: corsHeaders });
+    return skipped(`turn_${claim}`, claim === "timeout");
   }
 
   // Everything below holds the turn; the finally releases it on every exit.
@@ -308,7 +317,7 @@ export async function handler(req: Request): Promise<Response> {
         `Newer message ${newestMessage.id} found for conversation ${conv.id}. Skipping response.`,
       );
 
-      return new Response("ok", { headers: corsHeaders });
+      return skipped("superseded");
     }
 
     // SESSION RESTART if /new is found — USEFUL FOR WHATSAPP TESTING
@@ -327,7 +336,7 @@ export async function handler(req: Request): Promise<Response> {
       messagesBeforeRestart,
     );
 
-    log.info("Contact request", messages.at(-1)?.content);
+    log.info("Contact request", { message_id: messages.at(-1)?.id });
 
     // The agent was chosen before the delay, above.
 
@@ -335,7 +344,7 @@ export async function handler(req: Request): Promise<Response> {
       log.info(
         `No active AI agents found for conversation ${conv.id}. Skipping response.`,
       );
-      return new Response("ok", { headers: corsHeaders });
+      return skipped("human_or_no_agent");
     }
 
     // WELCOME MESSAGE
@@ -366,7 +375,7 @@ export async function handler(req: Request): Promise<Response> {
         },
       };
 
-      log.info("Welcome message", (outgoing.content as TextPart).text);
+      log.info("Welcome message", { message_id: outgoing.id });
 
       await client
         .from("messages")
@@ -516,7 +525,7 @@ export async function handler(req: Request): Promise<Response> {
           message_id: incoming.id,
           agent_id: agent.id,
         });
-        if (!result) return new Response("ok", { headers: corsHeaders });
+        if (!result) return skipped("superseded_or_taken");
         response = result;
 
         if (!response.messages?.length) {
@@ -576,7 +585,7 @@ export async function handler(req: Request): Promise<Response> {
           { conversation_id: conv.id, message_id: incoming.id },
         );
 
-        return new Response("ok", { headers: corsHeaders });
+        return skipped("taken_while_answering");
       }
 
       if (!(await storeIterationMessages(client, conv, messages, response))) {
@@ -651,6 +660,52 @@ export async function handler(req: Request): Promise<Response> {
     await releaseAgentTurn(client, incoming, handled).catch((releaseError) =>
       log.warn("Failed to release the agent turn.", releaseError)
     );
+  }
+}
+
+export async function handler(req: Request): Promise<Response> {
+  const started = performance.now();
+  if (
+    !isServiceToken(req.headers.get("Authorization")?.replace("Bearer ", ""))
+  ) return execute(req);
+  // Correlation comes from the same validated record the existing handler reads.
+  let fields: Record<string, unknown> = {};
+  if (
+    isServiceToken(req.headers.get("Authorization")?.replace("Bearer ", ""))
+  ) {
+    const record = (await req.clone().json().catch(() => ({}))).record;
+    fields = {
+      organization_id: record?.organization_id,
+      conversation_id: record?.conversation_id,
+      message_id: record?.id,
+    };
+  }
+  log.event("agent.started", "started", fields);
+  try {
+    const response = await execute(req);
+    log.event(
+      "agent.completed",
+      response.headers.get("x-business-outcome") === "skipped"
+        ? "skipped"
+        : response.headers.get("x-business-outcome") === "failure" ||
+            !response.ok
+        ? "failure"
+        : "success",
+      {
+        code: response.headers.get("x-business-code"),
+        ...fields,
+        status: response.status,
+        duration_ms: performance.now() - started,
+      },
+    );
+    return response;
+  } catch (error) {
+    log.event("agent.completed", "failure", {
+      ...fields,
+      duration_ms: performance.now() - started,
+      error_class: error instanceof Error ? error.name : "unknown",
+    });
+    throw error;
   }
 }
 

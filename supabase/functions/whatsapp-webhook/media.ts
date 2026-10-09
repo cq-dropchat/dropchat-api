@@ -10,7 +10,7 @@ import {
 const API_VERSION = "v24.0";
 
 /** The media id in a file message's uri → the file, in our storage. */
-export async function downloadMediaItem({
+async function download({
   organization_id,
   access_token,
   message,
@@ -86,4 +86,39 @@ export async function downloadMediaItem({
   message.content.file.uri = uri; // Overwrite WA media id with the internal uri
 
   return message;
+}
+
+export async function downloadMediaItem(
+  input: Parameters<typeof download>[0],
+): Promise<MessageInsert> {
+  if (input.message.content.type !== "file") return input.message;
+  const started = performance.now();
+  const fields = {
+    organization_id: input.organization_id,
+    conversation_id: input.message.conversation_id,
+    message_id: input.message.id,
+    provider: "whatsapp",
+  };
+  log.event("media.started", "started", fields);
+  try {
+    const result = await download(input);
+    log.event(
+      "media.completed",
+      result.status && "error" in result.status && result.status.error
+        ? "failure"
+        : "success",
+      {
+        ...fields,
+        duration_ms: performance.now() - started,
+      },
+    );
+    return result;
+  } catch (error) {
+    log.event("media.completed", "failure", {
+      ...fields,
+      duration_ms: performance.now() - started,
+      error_class: error instanceof Error ? error.name : "unknown",
+    });
+    throw error;
+  }
 }

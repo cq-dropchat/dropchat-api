@@ -34,7 +34,7 @@ export type Database = {
         Row: {
           created_at: string
           effective_at: string
-          pricing: Json
+          pricing: NonNullable<Json>
           product: string
           provider: string
           quantity: number
@@ -44,7 +44,7 @@ export type Database = {
         Insert: {
           created_at?: string
           effective_at?: string
-          pricing: Json
+          pricing: NonNullable<Json>
           product: string
           provider: string
           quantity: number
@@ -54,7 +54,7 @@ export type Database = {
         Update: {
           created_at?: string
           effective_at?: string
-          pricing?: Json
+          pricing?: NonNullable<Json>
           product?: string
           provider?: string
           quantity?: number
@@ -608,7 +608,7 @@ export type Database = {
           deterministic_passed: number
           deterministic_total: number
           error: string | null
-          failures: Json
+          failures: NonNullable<Json>
           finished_at: string | null
           id: string
           judge_score: number | null
@@ -616,14 +616,14 @@ export type Database = {
           status: string
           template_id: string
           test_id: string | null
-          transcript: Json
+          transcript: NonNullable<Json>
           version: number
         }
         Insert: {
           deterministic_passed?: number
           deterministic_total?: number
           error?: string | null
-          failures?: Json
+          failures?: NonNullable<Json>
           finished_at?: string | null
           id?: string
           judge_score?: number | null
@@ -631,14 +631,14 @@ export type Database = {
           status?: string
           template_id: string
           test_id?: string | null
-          transcript?: Json
+          transcript?: NonNullable<Json>
           version: number
         }
         Update: {
           deterministic_passed?: number
           deterministic_total?: number
           error?: string | null
-          failures?: Json
+          failures?: NonNullable<Json>
           finished_at?: string | null
           id?: string
           judge_score?: number | null
@@ -646,7 +646,7 @@ export type Database = {
           status?: string
           template_id?: string
           test_id?: string | null
-          transcript?: Json
+          transcript?: NonNullable<Json>
           version?: number
         }
         Relationships: [
@@ -669,32 +669,32 @@ export type Database = {
       agent_template_tests: {
         Row: {
           created_at: string
-          expectations: Json
+          expectations: NonNullable<Json>
           id: string
           name: string
-          profile: Json
+          profile: NonNullable<Json>
           template_id: string
-          turns: Json
+          turns: NonNullable<Json>
           updated_at: string
         }
         Insert: {
           created_at?: string
-          expectations?: Json
+          expectations?: NonNullable<Json>
           id?: string
           name: string
-          profile?: Json
+          profile?: NonNullable<Json>
           template_id: string
-          turns: Json
+          turns: NonNullable<Json>
           updated_at?: string
         }
         Update: {
           created_at?: string
-          expectations?: Json
+          expectations?: NonNullable<Json>
           id?: string
           name?: string
-          profile?: Json
+          profile?: NonNullable<Json>
           template_id?: string
-          turns?: Json
+          turns?: NonNullable<Json>
           updated_at?: string
         }
         Relationships: [
@@ -711,7 +711,7 @@ export type Database = {
         Row: {
           canary_organizations: string[] | null
           changelog: string | null
-          config: Json
+          config: NonNullable<Json>
           config_hash: string
           published_at: string
           published_by: string | null
@@ -722,7 +722,7 @@ export type Database = {
         Insert: {
           canary_organizations?: string[] | null
           changelog?: string | null
-          config: Json
+          config: NonNullable<Json>
           config_hash: string
           published_at?: string
           published_by?: string | null
@@ -733,7 +733,7 @@ export type Database = {
         Update: {
           canary_organizations?: string[] | null
           changelog?: string | null
-          config?: Json
+          config?: NonNullable<Json>
           config_hash?: string
           published_at?: string
           published_by?: string | null
@@ -1194,7 +1194,7 @@ export type Database = {
         Row: {
           attempts: number
           created_at: string
-          forward_headers: Json
+          forward_headers: NonNullable<Json>
           function: string
           id: string
           last_error: string | null
@@ -1202,7 +1202,7 @@ export type Database = {
           locked_until: string | null
           next_attempt_at: string
           organization_id: string
-          payload: Json
+          payload: NonNullable<Json>
           record_id: string
           request_id: number | null
           status: string
@@ -1211,7 +1211,7 @@ export type Database = {
         Insert: {
           attempts?: number
           created_at?: string
-          forward_headers?: Json
+          forward_headers?: NonNullable<Json>
           function: string
           id?: string
           last_error?: string | null
@@ -1219,7 +1219,7 @@ export type Database = {
           locked_until?: string | null
           next_attempt_at?: string
           organization_id: string
-          payload: Json
+          payload: NonNullable<Json>
           record_id: string
           request_id?: number | null
           status?: string
@@ -1228,7 +1228,7 @@ export type Database = {
         Update: {
           attempts?: number
           created_at?: string
-          forward_headers?: Json
+          forward_headers?: NonNullable<Json>
           function?: string
           id?: string
           last_error?: string | null
@@ -1236,7 +1236,7 @@ export type Database = {
           locked_until?: string | null
           next_attempt_at?: string
           organization_id?: string
-          payload?: Json
+          payload?: NonNullable<Json>
           record_id?: string
           request_id?: number | null
           status?: string
@@ -1257,11 +1257,11 @@ export type Database = {
           culprit: string | null
           events: number
           fingerprint: string
-          first_sample: Json
+          first_sample: NonNullable<Json>
           first_seen: string
           id: string
           kind: string
-          last_sample: Json
+          last_sample: NonNullable<Json>
           last_seen: string
           notes: string | null
           regressed_at: string | null
@@ -1275,11 +1275,11 @@ export type Database = {
           culprit?: string | null
           events?: number
           fingerprint: string
-          first_sample?: Json
+          first_sample?: NonNullable<Json>
           first_seen?: string
           id?: string
           kind: string
-          last_sample?: Json
+          last_sample?: NonNullable<Json>
           last_seen?: string
           notes?: string | null
           regressed_at?: string | null
@@ -1293,11 +1293,11 @@ export type Database = {
           culprit?: string | null
           events?: number
           fingerprint?: string
-          first_sample?: Json
+          first_sample?: NonNullable<Json>
           first_seen?: string
           id?: string
           kind?: string
-          last_sample?: Json
+          last_sample?: NonNullable<Json>
           last_seen?: string
           notes?: string | null
           regressed_at?: string | null
@@ -1444,7 +1444,7 @@ export type Database = {
       messages: {
         Row: {
           agent_id: string | null
-          content: Json
+          content: NonNullable<Json>
           conversation_address: string | null
           conversation_id: string
           created_at: string
@@ -1454,14 +1454,14 @@ export type Database = {
           organization_id: string
           sender_address: string | null
           service: Database["public"]["Enums"]["service"]
-          status: Json
+          status: NonNullable<Json>
           thread_id: string | null
           timestamp: string
           updated_at: string
         }
         Insert: {
           agent_id?: string | null
-          content: Json
+          content: NonNullable<Json>
           conversation_address?: string | null
           conversation_id: string
           created_at?: string
@@ -1471,14 +1471,14 @@ export type Database = {
           organization_id: string
           sender_address?: string | null
           service: Database["public"]["Enums"]["service"]
-          status?: Json
+          status?: NonNullable<Json>
           thread_id?: string | null
           timestamp?: string
           updated_at?: string
         }
         Update: {
           agent_id?: string | null
-          content?: Json
+          content?: NonNullable<Json>
           conversation_address?: string | null
           conversation_id?: string
           created_at?: string
@@ -1488,7 +1488,7 @@ export type Database = {
           organization_id?: string
           sender_address?: string | null
           service?: Database["public"]["Enums"]["service"]
-          status?: Json
+          status?: NonNullable<Json>
           thread_id?: string | null
           timestamp?: string
           updated_at?: string
@@ -1775,6 +1775,50 @@ export type Database = {
           },
         ]
       }
+      queue_retention_stats: {
+        Row: {
+          attempts: number
+          day: string
+          newest_created_at: string
+          oldest_created_at: string
+          organization_id: string
+          payload_bytes: number
+          purged_rows: number
+          status: string
+          table_name: string
+        }
+        Insert: {
+          attempts: number
+          day: string
+          newest_created_at: string
+          oldest_created_at: string
+          organization_id: string
+          payload_bytes: number
+          purged_rows: number
+          status: string
+          table_name: string
+        }
+        Update: {
+          attempts?: number
+          day?: string
+          newest_created_at?: string
+          oldest_created_at?: string
+          organization_id?: string
+          payload_bytes?: number
+          purged_rows?: number
+          status?: string
+          table_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "queue_retention_stats_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limits: {
         Row: {
           count: number
@@ -1817,7 +1861,7 @@ export type Database = {
           scope: string
           service: Database["public"]["Enums"]["service"] | null
           updated_at: string
-          value: Json
+          value: NonNullable<Json>
         }
         Insert: {
           address?: string | null
@@ -1828,7 +1872,7 @@ export type Database = {
           scope: string
           service?: Database["public"]["Enums"]["service"] | null
           updated_at?: string
-          value?: Json
+          value?: NonNullable<Json>
         }
         Update: {
           address?: string | null
@@ -1839,7 +1883,7 @@ export type Database = {
           scope?: string
           service?: Database["public"]["Enums"]["service"] | null
           updated_at?: string
-          value?: Json
+          value?: NonNullable<Json>
         }
         Relationships: [
           {
@@ -1876,7 +1920,7 @@ export type Database = {
           last_status_code: number | null
           next_at: string
           organization_id: string
-          payload: Json
+          payload: NonNullable<Json>
           request_id: number | null
           status: string
           updated_at: string
@@ -1892,7 +1936,7 @@ export type Database = {
           last_status_code?: number | null
           next_at?: string
           organization_id: string
-          payload: Json
+          payload: NonNullable<Json>
           request_id?: number | null
           status?: string
           updated_at?: string
@@ -1908,7 +1952,7 @@ export type Database = {
           last_status_code?: number | null
           next_at?: string
           organization_id?: string
-          payload?: Json
+          payload?: NonNullable<Json>
           request_id?: number | null
           status?: string
           updated_at?: string
@@ -1930,6 +1974,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      webhook_receipts: {
+        Row: {
+          attempts: number
+          correlation_id: string | null
+          created_at: string
+          digest: string
+          id: string
+          last_error_class: string | null
+          last_scheduled_at: string | null
+          lease_token: string | null
+          lease_until: string | null
+          next_attempt_at: string
+          payload: NonNullable<Json>
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          correlation_id?: string | null
+          created_at?: string
+          digest: string
+          id?: string
+          last_error_class?: string | null
+          last_scheduled_at?: string | null
+          lease_token?: string | null
+          lease_until?: string | null
+          next_attempt_at?: string
+          payload: NonNullable<Json>
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          correlation_id?: string | null
+          created_at?: string
+          digest?: string
+          id?: string
+          last_error_class?: string | null
+          last_scheduled_at?: string | null
+          lease_token?: string | null
+          lease_until?: string | null
+          next_attempt_at?: string
+          payload?: NonNullable<Json>
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       webhooks: {
         Row: {
@@ -1984,15 +2076,7 @@ export type Database = {
           pending: number | null
           sending: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "edge_calls_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Functions: {
@@ -2000,7 +2084,7 @@ export type Database = {
       agent_template_config: { Args: { _extra: Json }; Returns: Json }
       agent_tool_key: { Args: { _tool: Json }; Returns: string }
       agent_tool_ready: { Args: { _tool: Json }; Returns: boolean }
-      agent_turn_lease: { Args: never; Returns: string }
+      agent_turn_lease: { Args: Record<PropertyKey, never>; Returns: string }
       assign_conversation: {
         Args: { p_agent_id?: string; p_conversation_id: string }
         Returns: {
@@ -2066,7 +2150,7 @@ export type Database = {
         Returns: boolean
       }
       claim_organization_export: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           completed_at: string | null
           error: string | null
@@ -2086,8 +2170,32 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      claim_webhook_receipt: {
+        Args: { _id: string }
+        Returns: {
+          attempts: number
+          correlation_id: string | null
+          created_at: string
+          digest: string
+          id: string
+          last_error_class: string | null
+          last_scheduled_at: string | null
+          lease_token: string | null
+          lease_until: string | null
+          next_attempt_at: string
+          payload: NonNullable<Json>
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "webhook_receipts"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       close_error_baseline: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           baseline_closed_at: string | null
           baseline_closed_by: string | null
@@ -2102,6 +2210,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      complete_webhook_receipt: {
+        Args: {
+          _error_class?: string
+          _id: string
+          _lease_token: string
+          _success: boolean
+        }
+        Returns: boolean
+      }
       create_api_key: {
         Args: {
           p_expires_at?: string
@@ -2115,23 +2232,32 @@ export type Database = {
           key_prefix: string
         }[]
       }
-      deliver_edge_calls: { Args: never; Returns: Json }
-      deliver_webhooks: { Args: never; Returns: Json }
+      deliver_edge_calls: { Args: Record<PropertyKey, never>; Returns: Json }
+      deliver_webhooks: { Args: Record<PropertyKey, never>; Returns: Json }
       dispatch_edge_calls: {
         Args: { _batch?: number; _per_org?: number }
         Returns: number
       }
-      dispatch_lease_ttl: { Args: never; Returns: string }
-      dispatch_pending_messages: { Args: never; Returns: number }
+      dispatch_lease_ttl: { Args: Record<PropertyKey, never>; Returns: string }
+      dispatch_pending_messages: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       dispatch_retry_delay: { Args: { attempt: number }; Returns: string }
       dispatch_webhook_deliveries: {
         Args: { p_batch?: number }
         Returns: number
       }
-      edge_call_lease: { Args: never; Returns: string }
-      edge_call_max_attempts: { Args: never; Returns: number }
+      edge_call_lease: { Args: Record<PropertyKey, never>; Returns: string }
+      edge_call_max_attempts: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       edge_call_retry_delay: { Args: { attempt: number }; Returns: string }
-      edge_functions_config: { Args: never; Returns: Record<string, unknown> }
+      edge_functions_config: {
+        Args: Record<PropertyKey, never>
+        Returns: Record<string, unknown>
+      }
       error_fingerprint: {
         Args: {
           _culprit: string
@@ -2223,10 +2349,13 @@ export type Database = {
         Args: { object: Json; path: string[]; target: Json }
         Returns: Json
       }
-      message_rate_limit_per_minute: { Args: never; Returns: number }
+      message_rate_limit_per_minute: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       normalize_error_message: { Args: { _message: string }; Returns: string }
       open_error_baseline: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           baseline_closed_at: string | null
           baseline_closed_by: string | null
@@ -2241,7 +2370,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      organization_export_ttl: { Args: never; Returns: string }
+      organization_export_ttl: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       pending_deletion_media: {
         Args: { _limit?: number }
         Returns: {
@@ -2251,10 +2383,10 @@ export type Database = {
         }[]
       }
       pending_dispatch_candidates: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           agent_id: string | null
-          content: Json
+          content: NonNullable<Json>
           conversation_address: string | null
           conversation_id: string
           created_at: string
@@ -2264,7 +2396,7 @@ export type Database = {
           organization_id: string
           sender_address: string | null
           service: Database["public"]["Enums"]["service"]
-          status: Json
+          status: NonNullable<Json>
           thread_id: string | null
           timestamp: string
           updated_at: string
@@ -2281,7 +2413,7 @@ export type Database = {
         Returns: {
           canary_organizations: string[] | null
           changelog: string | null
-          config: Json
+          config: NonNullable<Json>
           config_hash: string
           published_at: string
           published_by: string | null
@@ -2305,7 +2437,7 @@ export type Database = {
         Returns: {
           canary_organizations: string[] | null
           changelog: string | null
-          config: Json
+          config: NonNullable<Json>
           config_hash: string
           published_at: string
           published_by: string | null
@@ -2364,6 +2496,7 @@ export type Database = {
         Args: { _conversation_id: string; _message_id: string }
         Returns: string
       }
+      replay_webhook_receipts: { Args: { _batch?: number }; Returns: number }
       report_edge_error: {
         Args: {
           _context?: Json
@@ -2395,7 +2528,7 @@ export type Database = {
         }
         Returns: string
       }
-      request_id_header: { Args: never; Returns: Json }
+      request_id_header: { Args: Record<PropertyKey, never>; Returns: Json }
       request_organization_export: {
         Args: { _organization_id: string }
         Returns: string
@@ -2409,7 +2542,7 @@ export type Database = {
         Returns: {
           canary_organizations: string[] | null
           changelog: string | null
-          config: Json
+          config: NonNullable<Json>
           config_hash: string
           published_at: string
           published_by: string | null
@@ -2458,8 +2591,11 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      settle_edge_calls: { Args: never; Returns: number }
-      settle_webhook_deliveries: { Args: never; Returns: number }
+      settle_edge_calls: { Args: Record<PropertyKey, never>; Returns: number }
+      settle_webhook_deliveries: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       sweep_awaiting_human: { Args: { p_limit?: number }; Returns: number }
       sweep_deletions: { Args: { _budget?: number }; Returns: Json }
       sweep_pending_media: { Args: { _limit?: number }; Returns: number }
@@ -2511,7 +2647,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      webhook_max_attempts: { Args: never; Returns: number }
+      webhook_max_attempts: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       webhook_retry_delay: { Args: { attempt: number }; Returns: string }
     }
     Enums: {
@@ -2554,6 +2693,8 @@ export type Database = {
           created_at: string | null
           file_size_limit: number | null
           id: string
+          lifecycle_configuration: Json | null
+          lifecycle_configuration_generation: string | null
           name: string
           owner: string | null
           owner_id: string | null
@@ -2568,6 +2709,8 @@ export type Database = {
           created_at?: string | null
           file_size_limit?: number | null
           id: string
+          lifecycle_configuration?: Json | null
+          lifecycle_configuration_generation?: string | null
           name: string
           owner?: string | null
           owner_id?: string | null
@@ -2582,6 +2725,8 @@ export type Database = {
           created_at?: string | null
           file_size_limit?: number | null
           id?: string
+          lifecycle_configuration?: Json | null
+          lifecycle_configuration_generation?: string | null
           name?: string
           owner?: string | null
           owner_id?: string | null
@@ -2649,7 +2794,7 @@ export type Database = {
           catalog_id: string
           created_at: string
           id: string
-          metadata: Json
+          metadata: NonNullable<Json>
           name: string
           updated_at: string
         }
@@ -2658,7 +2803,7 @@ export type Database = {
           catalog_id: string
           created_at?: string
           id?: string
-          metadata?: Json
+          metadata?: NonNullable<Json>
           name: string
           updated_at?: string
         }
@@ -2667,7 +2812,7 @@ export type Database = {
           catalog_id?: string
           created_at?: string
           id?: string
-          metadata?: Json
+          metadata?: NonNullable<Json>
           name?: string
           updated_at?: string
         }
@@ -2789,7 +2934,7 @@ export type Database = {
           name?: string | null
           owner?: string | null
           owner_id?: string | null
-          path_tokens?: string[] | null
+          path_tokens?: never
           updated_at?: string | null
           user_metadata?: Json | null
           version?: string | null
@@ -2806,7 +2951,7 @@ export type Database = {
           name?: string | null
           owner?: string | null
           owner_id?: string | null
-          path_tokens?: string[] | null
+          path_tokens?: never
           updated_at?: string | null
           user_metadata?: Json | null
           version?: string | null
@@ -2991,7 +3136,7 @@ export type Database = {
         Returns: string
       }
       get_size_by_bucket: {
-        Args: never
+        Args: { delete_markers?: string; noncurrent_versions?: string }
         Returns: {
           bucket_id: string
           size: number
@@ -3005,6 +3150,7 @@ export type Database = {
           next_key_token?: string
           next_upload_token?: string
           prefix_param: string
+          raw_prefix_param?: string
         }
         Returns: {
           created_at: string
@@ -3015,28 +3161,38 @@ export type Database = {
       list_objects_with_delimiter: {
         Args: {
           _bucket_id: string
+          delete_markers?: string
           delimiter_param: string
           max_keys?: number
           next_token?: string
+          next_token_archived_at?: string
+          next_token_version?: string
+          noncurrent_versions?: string
           prefix_param: string
           sort_order?: string
           start_after?: string
         }
         Returns: {
+          archived_at: string
           created_at: string
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           last_accessed_at: string
           metadata: Json
           name: string
           updated_at: string
+          version: string
         }[]
       }
-      operation: { Args: never; Returns: string }
+      operation: { Args: Record<PropertyKey, never>; Returns: string }
       search: {
         Args: {
           bucketname: string
+          delete_markers?: string
           levels?: number
           limits?: number
+          noncurrent_versions?: string
           offsets?: number
           prefix: string
           search?: string
@@ -3044,16 +3200,22 @@ export type Database = {
           sortorder?: string
         }
         Returns: {
+          archived_at: string
           created_at: string
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           last_accessed_at: string
           metadata: Json
           name: string
           updated_at: string
+          version: string
         }[]
       }
       search_by_timestamp: {
         Args: {
+          delete_markers?: string
+          noncurrent_versions?: string
           p_bucket_id: string
           p_level: number
           p_limit: number
@@ -3062,36 +3224,50 @@ export type Database = {
           p_sort_column_after: string
           p_sort_order: string
           p_start_after: string
+          p_start_after_version?: string
         }
         Returns: {
+          archived_at: string
           created_at: string
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           key: string
           last_accessed_at: string
           metadata: Json
           name: string
           updated_at: string
+          version: string
         }[]
       }
       search_v2: {
         Args: {
           bucket_name: string
+          delete_markers?: string
           levels?: number
           limits?: number
+          noncurrent_versions?: string
           prefix: string
           sort_column?: string
           sort_column_after?: string
           sort_order?: string
           start_after?: string
+          start_after_archived_at?: string
+          start_after_is_continuation?: boolean
+          start_after_version?: string
         }
         Returns: {
+          archived_at: string
           created_at: string
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           key: string
           last_accessed_at: string
           metadata: Json
           name: string
           updated_at: string
+          version: string
         }[]
       }
     }
@@ -3112,12 +3288,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3141,11 +3317,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3166,11 +3342,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3191,11 +3367,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3208,11 +3384,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3263,4 +3439,3 @@ export const Constants = {
     },
   },
 } as const
-

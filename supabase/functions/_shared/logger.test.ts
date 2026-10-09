@@ -105,3 +105,80 @@ Deno.test("F26: string details stay readable", () => {
   }
   assertEquals(JSON.parse(out.lines[0]).details, "bad input");
 });
+
+Deno.test("operational events allowlist fields and preserve release/correlation", async () => {
+  const out = captureConsole();
+  try {
+    await log.withRequestLogging("worker", () => {
+      log.event("persist.completed", "success", {
+        message_id: "m1",
+        duration_ms: 12,
+        access_token: "secret",
+        payload: { text: "private" },
+      });
+      return new Response();
+    })(
+      new Request("http://localhost", { headers: { "x-request-id": "chain" } }),
+    );
+  } finally {
+    out.restore();
+  }
+  const event = out.lines.map((line) => JSON.parse(line)).find((line) =>
+    line.event === "persist.completed"
+  );
+  assertEquals(event.request_id, "chain");
+  assertEquals(event.message_id, "m1");
+  assertEquals(event.duration_ms, 12);
+  assertEquals(event.access_token, undefined);
+  assertEquals(event.payload, undefined);
+  assertEquals(event.release, "unknown");
+});
+
+Deno.test("event floods are bounded, report lost samples and cannot break processing", () => {
+  const out = captureConsole();
+  const saved = Date.now;
+  const sample = Deno.env.get("TELEMETRY_SUCCESS_SAMPLE_RATE");
+  let now = saved() + 120000;
+  Date.now = () => now;
+  Deno.env.set("TELEMETRY_SUCCESS_SAMPLE_RATE", "1");
+  try {
+    for (let n = 0; n < 1000; n++) {
+      log.event("media.completed", "success", { duration_ms: 1 });
+    }
+    for (let n = 0; n < 200; n++) {
+      log.event("media.completed", "failure", { error_class: "injected" });
+    }
+    const budget = log.telemetryBudget();
+    assertEquals(budget.successes, 600);
+    assertEquals(budget.failures, 100);
+    assertEquals(budget.limited, 500);
+    assertEquals(budget.complete_business_window, false);
+    now += 60000;
+    log.event("media.completed", "success");
+    assert(
+      out.lines.some((line) => JSON.parse(line).event === "telemetry.budget"),
+    );
+    console.log = () => {
+      throw new Error("collector broken");
+    };
+    log.event("media.completed", "failure");
+  } finally {
+    Date.now = saved;
+    out.restore();
+    if (sample === undefined) Deno.env.delete("TELEMETRY_SUCCESS_SAMPLE_RATE");
+    else Deno.env.set("TELEMETRY_SUCCESS_SAMPLE_RATE", sample);
+  }
+});
+Deno.test("untrusted job headers cannot impersonate cron correlation", async () => {
+  const out = captureConsole();
+  try {
+    await log.withRequestLogging("worker", () => new Response())(
+      new Request("http://localhost", {
+        headers: { "x-job-id": "a".repeat(36), "x-job-attempt": "1" },
+      }),
+    );
+  } finally {
+    out.restore();
+  }
+  assertEquals(JSON.parse(out.lines.at(-1)!).job_id, undefined);
+});

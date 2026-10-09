@@ -23,7 +23,8 @@ Deno.test("statuses persist before slow media, downloads are bounded and failure
     from: () => ({
       upsert: (rows: MessageInsert[]) => {
         written.push(rows);
-        return Promise.resolve({ error: null });
+        const result = Promise.resolve({ error: null, data: [] });
+        return Object.assign(result, { select: () => result });
       },
     }),
   } as unknown as SupabaseClient<Database>;

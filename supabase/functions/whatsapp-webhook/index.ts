@@ -7,17 +7,17 @@
 //   media.ts             Graph media → storage
 //   persist.ts           upserts, then edits and revokes
 //   org_addresses.ts     phone number id → account
-import { waitUntil } from "../_shared/edge_runtime.ts";
+import { hasWaitUntil, waitUntil } from "../_shared/edge_runtime.ts";
 import * as log from "../_shared/logger.ts";
 import { withRequestLogging } from "../_shared/logger.ts";
 import {
   createUnsecureClient,
   type MetaWebhookPayload,
 } from "../_shared/supabase.ts";
-import { processPayload } from "./process.ts";
+import { processReceipt, receive } from "./receipts.ts";
 import { validateWebhookSignature, verifyToken } from "./verify.ts";
 
-export { processPayload };
+export { processPayload } from "./process.ts";
 
 export async function handler(request: Request): Promise<Response> {
   switch (request.method) {
@@ -52,20 +52,27 @@ async function processMessage(request: Request): Promise<Response> {
     return new Response("Unexpected object", { status: 400 });
   }
 
-  // F05: ack first. Meta retries (and eventually disables) a webhook that
-  // takes too long, and a batch with twenty media downloads did. Processing
-  // is idempotent (upserts on organization_id, external_id), so a retry that
-  // still lands is harmless. On the deployed runtime waitUntil keeps the
-  // worker alive; without it the work is awaited inline.
-  const work = processPayload(createUnsecureClient(), payload).catch(
-    (error) => {
-      log.error("WhatsApp webhook processing failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    },
-  );
-
+  log.event("webhook.validated", "success", { provider: "whatsapp" });
+  const client = createUnsecureClient();
+  let id: string;
+  try {
+    id = await receive(client, body, payload);
+  } catch {
+    log.event("webhook.queued", "failure", { provider: "whatsapp" });
+    return new Response("Durable reception unavailable", { status: 503 });
+  }
+  const work = processReceipt(client, id).catch(() => {
+    // A worker/runtime failure leaves the receipt claimable after its lease.
+    log.event("webhook.deferred", "failure", {
+      job_id: id,
+      provider: "whatsapp",
+    });
+  });
   await waitUntil(work);
-
+  log.event("webhook.ack", "accepted", {
+    job_id: id,
+    provider: "whatsapp",
+    deferred: hasWaitUntil(),
+  });
   return new Response();
 }

@@ -160,3 +160,8 @@ additional_redirect_urls = [
 [remotes.production.auth.oauth_server]
 enabled = false
 authorization_url_path = "/oauth/consent"
+
+[functions.webhook-replay]
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/webhook-replay/index.ts"

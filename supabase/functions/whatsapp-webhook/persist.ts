@@ -63,9 +63,9 @@ export async function persistBatch(
 
     if (contactsError) {
       log.error("Failed to upsert contacts_addresses", {
-        error: contactsError,
+        error: new Error(`Contact persistence failed (${contactsError.code})`),
         organizations: orgSummary,
-        contacts_addresses: dedupedContactsAddresses,
+        count: dedupedContactsAddresses.length,
       });
       throw contactsError;
     }
@@ -97,7 +97,8 @@ export async function persistBatch(
   const upsertBatch = async (label: string, rows: MessageInsert[]) => {
     if (rows.length === 0) return;
 
-    const { error } = await client
+    const started = performance.now();
+    const operation = client
       .from("messages")
       // defaultToNull: false — rows in one batch carry different keys (a
       // media item that failed adds `status`); PostgREST would otherwise
@@ -107,16 +108,39 @@ export async function persistBatch(
         onConflict: "organization_id,external_id",
         defaultToNull: false,
       });
+    const { data: persisted, error } = label === "statuses"
+      ? await operation.select("id,organization_id,conversation_id,status")
+      : await operation;
 
     if (error) {
       log.error(`Failed to upsert ${label}`, {
-        error,
+        error: new Error(`Message persistence failed (${error.code})`),
         organizations: orgSummary,
         count: rows.length,
+      });
+      log.event("persist.completed", "failure", {
+        count: rows.length,
+        duration_ms: performance.now() - started,
       });
       throw error;
     }
 
+    log.event("persist.completed", "success", {
+      count: rows.length,
+      duration_ms: performance.now() - started,
+    });
+    if (label === "statuses") {
+      for (const row of persisted ?? []) {
+        if ((row.status as Record<string, unknown>).delivered) {
+          log.event("provider.delivered", "delivered", {
+            organization_id: row.organization_id,
+            conversation_id: row.conversation_id,
+            message_id: row.id,
+            provider: "whatsapp",
+          });
+        }
+      }
+    }
     log.info(`Persisted ${label}`, { count: rows.length });
   };
 

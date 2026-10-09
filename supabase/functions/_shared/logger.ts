@@ -15,10 +15,16 @@
 // showed as literal text and nothing could filter on.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { hasWaitUntil, waitUntil } from "./edge_runtime.ts";
+import { isServiceToken } from "./service_auth.ts";
 
 type LogLevel = "info" | "warn" | "error";
 
-type RequestLogContext = { fn: string; request_id: string };
+type RequestLogContext = {
+  fn?: string;
+  request_id?: string;
+  job_id?: string;
+  attempt?: number;
+};
 
 const storage = new AsyncLocalStorage<RequestLogContext>();
 
@@ -101,11 +107,20 @@ function report(line: Record<string, unknown>): void {
   }
 }
 
+function release(): string {
+  try {
+    return Deno.env.get("API_RELEASE") || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 function log(level: LogLevel, message: string, details?: unknown): void {
   const line = {
     ts: new Date().toISOString(),
     level,
     ...storage.getStore(),
+    release: release(),
     msg: message,
     ...toFields(details),
   };
@@ -146,10 +161,34 @@ export function withRequestLogging(
     const request_id = req.headers.get("x-request-id") || crypto.randomUUID();
     const started = performance.now();
 
-    return storage.run({ fn, request_id }, async () => {
+    const context: RequestLogContext = { fn, request_id };
+    try {
+      if (
+        isServiceToken(req.headers.get("authorization")?.replace("Bearer ", ""))
+      ) {
+        const job = req.headers.get("x-job-id");
+        const attempt = Number(req.headers.get("x-job-attempt"));
+        if (
+          job && /^[a-f0-9-]{36}$/.test(job) && Number.isInteger(attempt) &&
+          attempt > 0 && attempt <= 5
+        ) {
+          context.job_id = job;
+          context.attempt = attempt;
+        }
+      }
+    } catch { /* Missing environment permission must not block a handler. */ }
+    return storage.run(context, async () => {
+      if (context.job_id) {
+        const wait = Number(req.headers.get("x-queue-wait-ms"));
+        event("queue.started", "started", {
+          duration_ms: Number.isFinite(wait) && wait >= 0 ? wait : 0,
+        });
+      }
       try {
         const response = await handler(req);
         info("request completed", {
+          event: "http.completed",
+          outcome: response.ok ? "success" : "failure",
           method: req.method,
           status: response.status,
           duration_ms: Math.round(performance.now() - started),
@@ -162,6 +201,8 @@ export function withRequestLogging(
         return response;
       } catch (err) {
         error("request failed", {
+          event: "http.failed",
+          outcome: "failure",
           method: req.method,
           duration_ms: Math.round(performance.now() - started),
           error: err instanceof Error ? err : String(err),
@@ -170,4 +211,102 @@ export function withRequestLogging(
       }
     });
   };
+}
+
+/** Operational telemetry never includes payloads, credentials or text. */
+const EVENT_FIELDS = new Set([
+  "organization_id",
+  "conversation_id",
+  "message_id",
+  "job_id",
+  "attempt",
+  "provider",
+  "duration_ms",
+  "status",
+  "code",
+  "count",
+  "deferred",
+  "error_class",
+]);
+let eventWindow = 0;
+let successCount = 0;
+let failureCount = 0;
+let sampled = 0;
+let limited = 0;
+export function telemetryBudget() {
+  return {
+    window_start: eventWindow,
+    successes: successCount,
+    failures: failureCount,
+    sampled,
+    limited,
+    complete_business_window: sampled === 0 && limited === 0,
+  };
+}
+export function event(
+  name: string,
+  outcome:
+    | "success"
+    | "failure"
+    | "started"
+    | "accepted"
+    | "delivered"
+    | "skipped",
+  details: Record<string, unknown> = {},
+): void {
+  try {
+    const now = Date.now();
+    if (now - eventWindow >= 60_000 || now < eventWindow) {
+      if (sampled || limited) {
+        log("warn", "telemetry window incomplete", {
+          event: "telemetry.budget",
+          ...telemetryBudget(),
+        });
+      }
+      eventWindow = now;
+      successCount =
+        failureCount =
+        sampled =
+        limited =
+          0;
+    }
+    // Configurable success sampling; failures have their own existing reporter.
+    const configured = Number(
+      Deno.env.get("TELEMETRY_SUCCESS_SAMPLE_RATE") ?? "1",
+    );
+    const rate = Number.isFinite(configured)
+      ? Math.max(0, Math.min(1, configured))
+      : 1;
+    if (outcome !== "failure" && Math.random() >= rate) {
+      sampled++;
+      return;
+    }
+    if (outcome === "failure" ? failureCount >= 100 : successCount >= 600) {
+      limited++;
+      return;
+    }
+    if (outcome === "failure") failureCount++;
+    else successCount++;
+    const safe = Object.fromEntries(
+      Object.entries(details).filter(([key, value]) =>
+        EVENT_FIELDS.has(key) &&
+        ["string", "number", "boolean"].includes(typeof value)
+      ),
+    );
+    log(outcome === "failure" ? "error" : "info", name, {
+      ...safe,
+      event: name,
+      outcome,
+    });
+  } catch {
+    /* Observation cannot break processing, including a failed collector. */
+  }
+}
+
+export function withJobLogging<T>(
+  job_id: string,
+  attempt: number,
+  work: () => Promise<T>,
+): Promise<T> {
+  return storage.run({ ...storage.getStore(), job_id, attempt }, work);
 }

@@ -50,7 +50,11 @@ export async function storeIterationMessages(
   response: ResponseContext,
 ): Promise<boolean> {
   if (response.messages?.length) {
-    log.info("Agent response", response.messages.at(-1)?.content);
+    log.info("Agent response stored", {
+      organization_id: conv.organization_id,
+      conversation_id: conv.id,
+      count: response.messages.length,
+    });
 
     const output_messages = response.messages.map((message, index) => ({
       ...message,
@@ -75,8 +79,11 @@ export async function storeIterationMessages(
 
       // Append generated messages to the context
       messages.push(...inserted_messages);
-    } catch (storageError) {
-      log.error("Failed to store agent response", storageError as Error);
+    } catch {
+      log.error(
+        "Failed to store agent response",
+        new Error("Agent response storage failed"),
+      );
       return false;
     }
   }

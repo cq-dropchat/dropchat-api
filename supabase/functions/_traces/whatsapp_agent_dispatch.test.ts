@@ -261,7 +261,7 @@ Deno.test({
           messages: [{
             from: CONTACT,
             id: inboundWamid,
-            timestamp: String(Math.floor(Date.now() / 1000)),
+            timestamp: String(Math.floor((Date.now() - 5000) / 1000)),
             type: "text",
             text: { body: "¿Tienen stock?" },
           }],

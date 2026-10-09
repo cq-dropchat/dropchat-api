@@ -1,31 +1,43 @@
--- F15. Retention for tables nothing else trims, run hourly by the
--- `purge-expired-rows` pg_cron job, at most `_batch` rows per table per run
--- (one short transaction; the next run continues).
---
---   supabase_functions.hooks  everything: no trigger writes it any more (see
---                             02-02_edge_functions.sql), what is left is the
---                             backlog from before, oldest first by its PK.
---   public.logs               older than 90 days (idx_logs_created_at). Logs
---                             are what members read on account errors; a
---                             quarter covers any billing or support question.
---   public.onboarding_tokens  expired more than 30 days ago, used or not.
---   public.error_issues       E1: settled issues that have gone quiet —
---                             'resolved' after 90 days without a new
---                             occurrence, 'preexisting' after 180. An open
---                             issue is never purged however old it is: age is
---                             not a reason to stop showing an unfixed bug.
---                             'ignored' is never purged either, or the panel
---                             would keep re-reporting what was dismissed.
---
--- cron.job_run_details already has its own 7-day job; net._http_response has
--- pg_net's TTL.
 
-create function public.purge_expired_rows(_batch integer default 10000)
-returns jsonb
-language plpgsql
-security definer
-set search_path to ''
-as $$
+  create table "public"."queue_retention_stats" (
+    "organization_id" uuid not null,
+    "table_name" text not null,
+    "status" text not null,
+    "day" date not null,
+    "purged_rows" bigint not null,
+    "payload_bytes" bigint not null,
+    "attempts" bigint not null,
+    "oldest_created_at" timestamp with time zone not null,
+    "newest_created_at" timestamp with time zone not null
+      );
+
+
+alter table "public"."queue_retention_stats" enable row level security;
+
+CREATE UNIQUE INDEX queue_retention_stats_pkey ON public.queue_retention_stats USING btree (organization_id, table_name, status, day);
+
+alter table "public"."queue_retention_stats" add constraint "queue_retention_stats_pkey" PRIMARY KEY using index "queue_retention_stats_pkey";
+
+alter table "public"."queue_retention_stats" add constraint "queue_retention_stats_organization_id_fkey" FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE not valid;
+
+alter table "public"."queue_retention_stats" validate constraint "queue_retention_stats_organization_id_fkey";
+
+alter table "public"."queue_retention_stats" add constraint "queue_retention_stats_status_check" CHECK ((status = ANY (ARRAY['done'::text, 'delivered'::text, 'failed'::text]))) not valid;
+
+alter table "public"."queue_retention_stats" validate constraint "queue_retention_stats_status_check";
+
+alter table "public"."queue_retention_stats" add constraint "queue_retention_stats_table_name_check" CHECK ((table_name = ANY (ARRAY['edge_calls'::text, 'webhook_deliveries'::text]))) not valid;
+
+alter table "public"."queue_retention_stats" validate constraint "queue_retention_stats_table_name_check";
+
+set check_function_bodies = off;
+
+CREATE OR REPLACE FUNCTION public.purge_expired_rows(_batch integer DEFAULT 10000)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 declare
   _hooks integer;
   _logs integer;
@@ -176,6 +188,21 @@ begin
     'webhook_deliveries', _deliveries
   );
 end;
-$$;
+$function$
+;
 
-revoke execute on function public.purge_expired_rows(integer) from public, anon, authenticated;
+grant delete on table "public"."queue_retention_stats" to "service_role";
+
+grant insert on table "public"."queue_retention_stats" to "service_role";
+
+grant references on table "public"."queue_retention_stats" to "service_role";
+
+grant select on table "public"."queue_retention_stats" to "service_role";
+
+grant trigger on table "public"."queue_retention_stats" to "service_role";
+
+grant truncate on table "public"."queue_retention_stats" to "service_role";
+
+grant update on table "public"."queue_retention_stats" to "service_role";
+
+
