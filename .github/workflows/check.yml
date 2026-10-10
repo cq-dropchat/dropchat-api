@@ -25,6 +25,8 @@ jobs:
       - run: node --test .github/scripts/verify-release.test.mjs
       - run: deno fmt --check
       - run: cd supabase/functions && deno lint && deno check .
+      - name: Operational harness types
+        run: cd supabase/functions && deno check ../tests/performance/export_capacity.ts ../tests/performance/queue_workers.ts ../tests/performance/telemetry_latency.ts ../tests/performance/operations_report.ts ../tests/operational/critical_backend.ts
       - run: cd plugin && deno lint && deno check .
 
   # Database (pgTAP) and Edge Function (Deno.test) suites against a local

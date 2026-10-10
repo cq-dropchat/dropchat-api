@@ -228,7 +228,9 @@ try {
     try {
       await sql`update public.organizations set extra=jsonb_build_object('attention',jsonb_build_object('human_assignment_ttl_hours',72,'human_wait_minutes',1,'timezone','UTC','on_human_wait_timeout','notify_customer','human_wait_message',${timeoutText}::text,'business_hours',null)) where id=${org}`;
       await sql`select public.set_conversation_assignment(${conv},${fixture.agentAlice},false,null,'{"cause":"manual"}'::jsonb)`;
-      await sql.begin(async (tx) => {
+      await sql.begin(async (transaction) => {
+        // postgres.js omits the transaction call signature in its Deno types.
+        const tx = transaction as unknown as typeof sql;
         await tx`select set_config('app.assignment_writer','on',true)`;
         await tx`update public.conversations set assigned_at=now()-interval '4 days' where id=${conv} and organization_id=${org}`;
         await tx`update public.messages set timestamp=now()-interval '4 days' where conversation_id=${conv} and sender_address is null and agent_id=${fixture.agentAlice}`;
@@ -244,7 +246,9 @@ try {
         0,
       );
       await sql`select public.set_conversation_assignment(${conv},null,true,${fixture.agentRobotA},'{"cause":"escalation"}'::jsonb)`;
-      await sql.begin(async (tx) => {
+      await sql.begin(async (transaction) => {
+        // postgres.js omits the transaction call signature in its Deno types.
+        const tx = transaction as unknown as typeof sql;
         await tx`select set_config('app.assignment_writer','on',true)`;
         await tx`update public.conversations set awaiting_human_since=now()-interval '2 minutes' where id=${conv}`;
       });
@@ -276,7 +280,9 @@ try {
           }),
       );
     } finally {
-      await sql.begin(async (tx) => {
+      await sql.begin(async (transaction) => {
+        // postgres.js omits the transaction call signature in its Deno types.
+        const tx = transaction as unknown as typeof sql;
         // Restore the exact fixture policy; ordinary writes are JSON merge patches.
         await tx`set local session_replication_role=replica`;
         await tx`update public.organizations set extra=${

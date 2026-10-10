@@ -120,3 +120,23 @@ Antes de activar retención o Broadcast, registrar políticas por organización 
 comparar en el entorno desplegado latencia p95, buffers, lag realtime, duración
 de exportaciones y esperas de locks de facturación. Estas decisiones operativas
 no se activaron como parte de la implementación local.
+
+## Estabilidad operativa — 9 de octubre de 2026
+
+La implementación y evidencia actual están en [OPERATIONS.md](OPERATIONS.md),
+con estado de cada criterio del spec y pendientes operativos explícitos. Se
+reprodujo el gate original con 407.613 buffers / 144,798 ms; correlacionar el
+lateral con el tenant de la conversación permite el índice de dos claves. No se
+ampliaron presupuestos. Tres resets dieron ocho planes correctos por run, ≤775
+buffers concentrado y ≤655 uniforme. El gate SQL tiene runner independiente de
+pgTAP/Deno, de modo que no omite las pruebas funcionales por costo.
+
+Se añadieron recuperación visible cancelable, recepción durable antes del ACK,
+correlación de trabajos, distribución de latencias/alertas, E2E de
+historial/medios/ atención/despacho y purga con fairness y agregados
+preservados. Se midieron facturación y exports reales locales: cuotas exactas;
+ZIP válidos hasta un millón de filas; export best-effort bajo escritura
+concurrente. No son límites sostenibles de producción. La sesión UI de 60
+minutos fue rechazada por permisos y permanece pendiente, junto con comparación
+Broadcast, límites reales Storage y siete días de crecimiento. Se mantiene
+postgres_changes y no se activa retención en producción.
