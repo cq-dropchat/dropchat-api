@@ -31,11 +31,12 @@ export function distributions(
       !allowed.has(sample.event) || sample.ts < start || sample.ts >= end ||
       !Number.isFinite(sample.duration_ms) || sample.duration_ms! < 0
     ) continue;
-    const provider = ["whatsapp", "instagram", "slack", "local"].includes(
-        sample.provider ?? "",
-      )
-      ? sample.provider
-      : "internal";
+    const provider =
+      ["whatsapp", "instagram", "slack", "local", "google"].includes(
+          sample.provider ?? "",
+        )
+        ? sample.provider
+        : "internal";
     const outcome =
       ["success", "failure", "started", "accepted", "delivered", "skipped"]
           .includes(

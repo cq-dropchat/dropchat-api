@@ -129,6 +129,18 @@ colector no bloquea negocio. Se retiraron payload de webhook, contenido de
 agente y detalles SQL de persistencia que podían incluir filas. Se reutiliza el
 reporter y /errors.
 
+El worker de anotación de medios emite inicio/fin con proveedor Google y
+correlación de trabajo. Un rechazo permanente responde HTTP 200 según su
+política terminal existente, pero cuenta como fallo de negocio; configuración,
+cuota y respuesta inválida también se distinguen de skip. Claims, reservas,
+consumo y reintentos no cambian. El nuevo test C1 ejecuta Storage/DB reales con
+Gemini falso, verifica correlación y ausencia del detalle privado del proveedor.
+La suite completa posterior pasó 283 tests con cobertura generada desde cero:
+`artifacts/deno-fresh-coverage-final.log`. La medición de ACK anterior sigue
+asociada al mismo código de webhook; este ajuste está en otro worker. Logs
+legacy ajenos a los nuevos eventos aún requieren revisión de contenido/volumen
+antes de configurar acceso y retención en producción.
+
 La medición emparejada de 80 ACKs por brazo, éxitos 0 vs 1, dio p95 control
 2,378 ms / instrumentado 2,440 ms: +2,595% (<5%). Hubo actividad E2E al final
 del ensayo; es un resultado local, sin comparación pre-ledger ni prueba de ACK
@@ -317,11 +329,11 @@ previews iguales. Se conserva `e2e-parallel-fixture-failure.log`; fixtures
 compartidos ahora usan workers=1, selector por conversación y retries=0. No se
 relaja el gate de performance.
 
-Checks finales: pgTAP 43 archivos / 871 aserciones; Deno 282 tests + 6 steps;
-cobertura _shared 82,10% (mínimo 74), handlers 65,54% (58), total 68,76% (60).
-Fmt 558 archivos, lint/check functions y plugin, tres tests de release Node 24 y
-YAML de ambos workflows aprobados. UI 58 archivos / 425 tests, 31 warnings
-existentes sin errores; líneas 49,95%; traducciones 806 claves, strict
+Checks finales: pgTAP 43 archivos / 871 aserciones; Deno 283 tests + 6 steps;
+cobertura limpia _shared 82,11% (mínimo 74), handlers 65,74% (58), total 68,90%
+(60). Fmt 558 archivos, lint/check functions y plugin, tres tests de release
+Node 24 y YAML de ambos workflows aprobados. UI 58 archivos / 425 tests, 31
+warnings existentes sin errores; líneas 49,95%; traducciones 806 claves, strict
 types-sync con API_REPO_DIR=../api y bundle aprobados. Node final 24.21.0, Deno
 2.9.6, Supabase 2.119.0. Bundle gzip: inicial 162,6/165 KB; primera pantalla
 336,0/340; chat abierto 454,0/472 KB JS y 12,93/13,6 KB CSS. No se cambiaron
@@ -358,6 +370,18 @@ Los resultados detallados viven en artefactos; tres resets SQL y el manifiesto
 registran base, patch hash, plataforma y versiones. El spec ajeno sin
 seguimiento puede marcar dirty tras commits, sin significar código nuestro sin
 commit.
+
+## Estado de los criterios finales de la sección 10
+
+| Criterio                  | Estado                                            | Razón pendiente                                                                                             |
+| ------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| A1                        | Abierto                                           | Falta log original y tres Checks remotos del código final; tres resets locales sí pasaron.                  |
+| A2                        | Abierto                                           | Falta inventario efectivo, promoción, smoke y rollback observado.                                           |
+| B                         | Validado local; CI pendiente                      | Diez repeticiones por prueba, sin retry; falta ejecutar sobre el par publicado.                             |
+| C                         | Implementado y probado local; operación pendiente | Recepción/replay y eventos probados; falta cadena de release y alertas atendidas.                           |
+| D                         | Parcial                                           | Capacidad provisional; D3 largo y comparación Broadcast pendientes; límites reales de export sin verificar. |
+| E                         | Abierto                                           | Fairness/preview/agregados probados; falta política, restore y siete días representativos.                  |
+| Incidentes y responsables | Abierto                                           | Fallos locales encontrados corregidos; falta asignar responsables externos reales.                          |
 
 ## Pendientes operativos, impacto y siguiente acción
 

@@ -124,7 +124,7 @@ const INLINE_DATA_SIZE_LIMIT = 19 * 1000 * 1000; // 19MB
 // window the `preprocess-pending-messages` sweep uses.
 const PREPROCESSING_LEASE_MS = 10 * 60 * 1000;
 
-export async function handler(req: Request): Promise<Response> {
+async function preprocess(req: Request): Promise<Response> {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
 
@@ -160,7 +160,12 @@ export async function handler(req: Request): Promise<Response> {
     log.info("Preprocessing skipped: already done or in progress", {
       message_id: incoming.id,
     });
-    return new Response();
+    return new Response(null, {
+      headers: {
+        "x-business-outcome": "skipped",
+        "x-business-code": "already_done_or_claimed",
+      },
+    });
   }
 
   /** Lets a retry of this call run (a transient failure). */
@@ -173,6 +178,8 @@ export async function handler(req: Request): Promise<Response> {
   const log_update_and_respond = async (
     logLevel: "error" | "warn" | "info",
     logMessage: string,
+    code: string,
+    outcome: "failure" | "skipped",
   ) => {
     log[logLevel](logMessage);
 
@@ -182,7 +189,9 @@ export async function handler(req: Request): Promise<Response> {
       .eq("id", incoming.id)
       .throwOnError();
 
-    return new Response();
+    return new Response(null, {
+      headers: { "x-business-outcome": outcome, "x-business-code": code },
+    });
   };
 
   const { data: conv } = await client
@@ -210,6 +219,8 @@ export async function handler(req: Request): Promise<Response> {
     return log_update_and_respond(
       "info",
       "Media preprocessing mode is not active. Skipping preprocessing.",
+      "mode_inactive",
+      "skipped",
     );
   }
 
@@ -223,6 +234,8 @@ export async function handler(req: Request): Promise<Response> {
     return log_update_and_respond(
       "warn",
       "GOOGLE_API_KEY not set. Skipping preprocessing.",
+      "missing_api_key",
+      "failure",
     );
   }
 
@@ -236,6 +249,8 @@ export async function handler(req: Request): Promise<Response> {
     return log_update_and_respond(
       "error",
       "Incoming message is not a file. Skipping preprocessing.",
+      "invalid_input",
+      "failure",
     );
   }
 
@@ -299,6 +314,8 @@ export async function handler(req: Request): Promise<Response> {
     return log_update_and_respond(
       "warn",
       `Unsupported mime type ${mimeType} for media type ${mediaType}. Skipping preprocessing.`,
+      "unsupported_mime",
+      "skipped",
     );
   }
 
@@ -313,6 +330,8 @@ export async function handler(req: Request): Promise<Response> {
     return log_update_and_respond(
       "warn",
       "Base64 encoded data size exceeds 19MB limit. File should be uploaded using the Gemini File API but it is not implemented yet.",
+      "size_limit",
+      "failure",
     );
   }
 
@@ -337,6 +356,8 @@ export async function handler(req: Request): Promise<Response> {
       return log_update_and_respond(
         "warn",
         `No pricing found for google/${model}`,
+        "missing_pricing",
+        "failure",
       );
     }
 
@@ -360,6 +381,8 @@ export async function handler(req: Request): Promise<Response> {
         `AI credits check failed: ${
           error instanceof Error ? error.message : String(error)
         }`,
+        "credits_check",
+        "failure",
       );
     }
   }
@@ -472,6 +495,8 @@ export async function handler(req: Request): Promise<Response> {
         return log_update_and_respond(
           "warn",
           `Gemini API quota exhausted for ${model}. Skipping preprocessing.`,
+          "quota_exhausted",
+          "failure",
         );
       }
     }
@@ -485,7 +510,9 @@ export async function handler(req: Request): Promise<Response> {
 
     return log_update_and_respond(
       "error",
-      `Gemini API error in preprocessing. Skipping preprocessing. ${error}`,
+      "Gemini API error in preprocessing. Skipping preprocessing.",
+      "provider_permanent",
+      "failure",
     );
   }
 
@@ -518,6 +545,8 @@ export async function handler(req: Request): Promise<Response> {
     return log_update_and_respond(
       "error",
       "No response text received from the preprocessing model. Skipping preprocessing.",
+      "empty_response",
+      "failure",
     );
   }
 
@@ -533,6 +562,8 @@ export async function handler(req: Request): Promise<Response> {
     return log_update_and_respond(
       "error",
       "Failed to parse the response text from the preprocessing model into a JSON object. Skipping preprocessing.",
+      "invalid_response",
+      "failure",
     );
   }
 
@@ -620,6 +651,49 @@ export async function handler(req: Request): Promise<Response> {
     .throwOnError();
 
   return new Response();
+}
+
+/** HTTP completion does not establish successful annotation. */
+export async function handler(req: Request): Promise<Response> {
+  if (
+    !isServiceToken(req.headers.get("authorization")?.replace(/^Bearer /i, ""))
+  ) return new Response("Unauthorized", { status: 401 });
+  const incoming = ((await req.clone().json()) as WebhookPayload<MessageRow>)
+    .record!;
+  const started = performance.now();
+  const fields = {
+    organization_id: incoming.organization_id,
+    conversation_id: incoming.conversation_id,
+    message_id: incoming.id,
+    provider: "google",
+  };
+  log.event("media.started", "started", fields);
+  try {
+    const response = await preprocess(req);
+    const business = response.headers.get("x-business-outcome");
+    log.event(
+      "media.completed",
+      !response.ok || business === "failure"
+        ? "failure"
+        : business === "skipped"
+        ? "skipped"
+        : "success",
+      {
+        ...fields,
+        duration_ms: performance.now() - started,
+        status: response.status,
+        code: response.headers.get("x-business-code") ?? "annotated",
+      },
+    );
+    return response;
+  } catch (error) {
+    log.event("media.completed", "failure", {
+      ...fields,
+      duration_ms: performance.now() - started,
+      error_class: error instanceof Error ? error.name : "unknown",
+    });
+    throw error;
+  }
 }
 
 if (import.meta.main) {

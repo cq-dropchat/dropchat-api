@@ -13,6 +13,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database, MessageRow } from "../_shared/types/database_types.ts";
 import { env, fixture, supabaseIsUp } from "../_shared/testing/env.ts";
 import { handler } from "./index.ts";
+import { withRequestLogging } from "../_shared/logger.ts";
 
 const up = await supabaseIsUp();
 
@@ -143,7 +144,8 @@ Deno.test({
         assertEquals(gemini.calls(), 1, "Gemini was called twice");
 
         // And once it is done, a late retry does nothing either.
-        await handler(request(message));
+        const duplicate = await handler(request(message));
+        assertEquals(duplicate.headers.get("x-business-outcome"), "skipped");
         assertEquals(gemini.calls(), 1);
 
         const { data } = await client
@@ -197,6 +199,77 @@ Deno.test({
           .throwOnError();
         assert((data.status as Record<string, unknown>).preprocessed);
       } finally {
+        gemini.restore();
+      }
+    }),
+});
+
+Deno.test({
+  name:
+    "C1: media permanent provider failure remains HTTP 200 and a correlated business failure",
+  ignore: !up,
+  sanitizeResources: false,
+  sanitizeOps: false,
+  fn: () =>
+    withImageMessage(async (client, message) => {
+      const gemini = stubGemini(() =>
+        Response.json({
+          error: {
+            code: 400,
+            message: "private provider detail",
+            status: "INVALID_ARGUMENT",
+          },
+        }, { status: 400 }), 0);
+      const lines: Array<Record<string, unknown>> = [];
+      const savedLog = console.log, savedError = console.error;
+      const capture = (...args: unknown[]) => {
+        try {
+          lines.push(JSON.parse(String(args[0])));
+        } catch {
+          /* SDK output is not an operational event. */
+        }
+      };
+      console.log = capture;
+      console.error = capture;
+      const req = request(message);
+      const job = crypto.randomUUID();
+      req.headers.set("x-job-id", job);
+      req.headers.set("x-job-attempt", "2");
+      try {
+        const response = await withRequestLogging(
+          "media-preprocessor",
+          handler,
+        )(req);
+        assertEquals(response.status, 200);
+        assertEquals(response.headers.get("x-business-outcome"), "failure");
+        const business = lines.find((l) => l.event === "media.completed")!;
+        assertEquals([
+          business.outcome,
+          business.code,
+          business.job_id,
+          business.attempt,
+          business.message_id,
+          business.provider,
+        ], ["failure", "provider_permanent", job, 2, message.id, "google"]);
+        assertEquals(
+          lines.find((l) => l.event === "http.completed")?.outcome,
+          "success",
+        );
+        assertEquals(
+          JSON.stringify(business).includes("private provider detail"),
+          false,
+        );
+        const { data } = await client.from("messages").select("status").eq(
+          "id",
+          message.id,
+        ).single().throwOnError();
+        assert(
+          (data.status as Record<string, unknown>).preprocessed,
+          "Terminal policy remains unchanged",
+        );
+      } finally {
+        console.log = savedLog;
+        console.error = savedError;
         gemini.restore();
       }
     }),
