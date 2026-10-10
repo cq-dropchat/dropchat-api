@@ -17,7 +17,7 @@ producción. Los hitos dependientes permanecen abiertos aunque su código exista
 | A1 / H1           | Local; CI pendiente             | Reproducción SQL, corrección sin ampliar budgets, tres resets limpios; performance separado de Deno                       | Log original autenticado; tres runs de CI verdes del código publicado                              |
 | A2 / H2           | Preparado; sin acceso operativo | Release exige SHA exacto y checks pareados; snapshot de migraciones/índices/cron                                          | Inventario real Supabase/Cloudflare/GitHub, propietario único de deploy, entorno, smoke y rollback |
 | B1                | Local                           | 1.600 IDs, empates, 31 páginas antiguas y regreso; ventana ≤1.000; preview independiente                                  | CI del par final de SHAs                                                                           |
-| B2                | Local; CI pendiente             | Retry antiguo probado; se agrega retry reciente, cursor y ancla                                                           | Diez ejecuciones aprobadas en ambas direcciones; falta CI                                          |
+| B2                | Local; CI pendiente             | Retry antiguo y reciente, cursor y ancla aprobados diez veces                                                             | Diez ejecuciones aprobadas en ambas direcciones; falta CI                                          |
 | B3                | Local                           | Offline HTTP/WS visible, otro escritor, convergencia real                                                                 | Dispositivo/red de referencia y evidencia del entorno                                              |
 | B4                | Local                           | 11.001 actualizaciones con empate; fallback >10 páginas; cancelación y refresco retenido; seis horas cubiertas por unidad | Visibility es señal headless; repetir en dispositivo real                                          |
 | B5                | Local                           | Request lento de A, B, logout/login, vuelta A; aislamiento                                                                | CI del par final de SHAs                                                                           |
@@ -342,11 +342,22 @@ siguiente. D3 se salta por defecto en el gate funcional y nunca cuenta como
 aprobado por estar skipped.
 
 Commits locales API: `a21c335` (CI/historial/release), `2c001ee` (durable,
-trazabilidad, permisos y retención). El commit de evidencia/capacidad y el SHA
-de UI se registran tras la repetición final. Los resultados detallados viven en
-artefactos; los tres resets SQL y el manifiesto identifican base, patch hash,
-plataforma y versiones. El spec ajeno sin seguimiento puede marcar dirty aun
-tras commits, sin significar edición nuestra sin commit.
+trazabilidad, permisos y retención), `02462ef` (capacidad y evidencia). UI:
+`fa14f1f` (par inmutable de CI), `010b0d3` (recuperación, ancla, telemetría y
+E2E). El SHA final y hashes de evidencia quedan en
+`artifacts/final-manifest.json`.
+
+E2E final: **100 passed / 10 skipped / cero retries**, diez ejecuciones de cada
+prueba funcional, 8,7 minutos, Node 24.21.0 y workers=1.
+`ui/artifacts/e2e-delivery-final-ten.log`. Los diez skips corresponden a D3 y no
+se contabilizan como capacidad aprobada. `npm run check` pasó de nuevo después
+de las últimas correcciones de fixtures. Typecheck de los cinco harnesses
+aprobado desde functions/import map; quedó incorporado en Check de API.
+
+Los resultados detallados viven en artefactos; tres resets SQL y el manifiesto
+registran base, patch hash, plataforma y versiones. El spec ajeno sin
+seguimiento puede marcar dirty tras commits, sin significar código nuestro sin
+commit.
 
 ## Pendientes operativos, impacto y siguiente acción
 
