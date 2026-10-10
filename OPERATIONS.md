@@ -14,7 +14,7 @@ producción. Los hitos dependientes permanecen abiertos aunque su código exista
 
 | Criterio          | Estado                          | Evidencia disponible                                                                                                      | Falta para cerrar                                                                                  |
 | ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| A1 / H1           | Local; CI pendiente             | Reproducción SQL, corrección sin ampliar budgets, tres resets limpios; performance separado de Deno                       | Log original autenticado; tres runs de CI verdes del código publicado                              |
+| A1 / H1           | Local; primer CI API aprobado   | Reproducción SQL, corrección sin ampliar budgets, tres resets limpios; performance separado de Deno                       | Log original autenticado; tres runs de CI verdes del código publicado                              |
 | A2 / H2           | Preparado; sin acceso operativo | Release exige SHA exacto y checks pareados; snapshot de migraciones/índices/cron                                          | Inventario real Supabase/Cloudflare/GitHub, propietario único de deploy, entorno, smoke y rollback |
 | B1                | Local                           | 1.600 IDs, empates, 31 páginas antiguas y regreso; ventana ≤1.000; preview independiente                                  | CI del par final de SHAs                                                                           |
 | B2                | Local; CI pendiente             | Retry antiguo y reciente, cursor y ancla aprobados diez veces                                                             | Diez ejecuciones aprobadas en ambas direcciones; falta CI                                          |
@@ -313,9 +313,31 @@ npm run e2e -- --repeat-each=10
 DROPCHAT_CAPACITY=1 npm run e2e -- e2e/capacity.spec.ts
 ```
 
-Se verificaron nuevamente los endpoints públicos al finalizar: API sigue en run
-37811215297, SHA 680a87f, completed/failure; logs HTTP 403. UI run 37811215875,
-SHA 2a60999, completed/success. Ningún commit nuevo se publicó.
+Antes del push, los endpoints públicos mostraban API run 37811215297, SHA
+680a87f, completed/failure y logs HTTP 403; UI run 37811215875, SHA 2a60999,
+completed/success. Esa comprobación precede a los commits publicados.
+
+Tras publicar API 9213104 y UI 010b0d3, el primer Check de API
+[38008794442](https://github.com/cq-dropchat/dropchat-api/actions/runs/38008794442)
+aprobó check, pgTAP/Deno/cobertura y performance. El Check de UI
+[38008804202](https://github.com/cq-dropchat/dropchat-ui/actions/runs/38008804202)
+aprobó check y types-sync, pero E2E falló al cargar los tests. El usuario aportó
+el error exacto: `spawnSync supabase ENOENT` en critical-flows.spec.ts:12.
+
+La CLI estaba instalada por setup-cli y había arrancado Supabase correctamente.
+El cwd calculado era ../api, inexistente en el checkout de CI, que usa
+open-bsp-ui junto a open-bsp-api. Una estructura local equivalente reprodujo
+exactamente ENOENT con la CLI instalada; el mismo comando status pasó usando
+../open-bsp-api. Se añadió `API_REPO_DIR: ../open-bsp-api` al paso E2E, que
+también configura Playwright y el driver backend. Evidencia:
+`ui/artifacts/ci-api-path-reproduction.log`. Las advertencias de rutas de tests
+y baseline-browser-mapping también aparecen cuando E2E arranca correctamente; no
+son la causa de este fallo. La corrección requiere comprobar el nuevo Check
+remoto; un primer API verde no equivale a tres ejecuciones completas verdes. La
+suite funcional completa en la estructura open-bsp-ui/open-bsp-api, con CI=1 y
+Node 24.21.0, aprobó 10 tests / 1 skip D3, workers=1 y retries=0 en 58,7s.
+`ui/artifacts/e2e-ci-layout.log`. UI check aprobó de nuevo 425 tests y los 31
+warnings existentes; `ui/artifacts/ui-check-ci-path.log`.
 
 Incidentes de validación resueltos: la aserción DOM detectó un salto real de
 ancla tras retry antiguo; se conserva la clave durante la medición de filas
@@ -373,15 +395,15 @@ commit.
 
 ## Estado de los criterios finales de la sección 10
 
-| Criterio                  | Estado                                            | Razón pendiente                                                                                             |
-| ------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| A1                        | Abierto                                           | Falta log original y tres Checks remotos del código final; tres resets locales sí pasaron.                  |
-| A2                        | Abierto                                           | Falta inventario efectivo, promoción, smoke y rollback observado.                                           |
-| B                         | Validado local; CI pendiente                      | Diez repeticiones por prueba, sin retry; falta ejecutar sobre el par publicado.                             |
-| C                         | Implementado y probado local; operación pendiente | Recepción/replay y eventos probados; falta cadena de release y alertas atendidas.                           |
-| D                         | Parcial                                           | Capacidad provisional; D3 largo y comparación Broadcast pendientes; límites reales de export sin verificar. |
-| E                         | Abierto                                           | Fairness/preview/agregados probados; falta política, restore y siete días representativos.                  |
-| Incidentes y responsables | Abierto                                           | Fallos locales encontrados corregidos; falta asignar responsables externos reales.                          |
+| Criterio                  | Estado                                            | Razón pendiente                                                                                                   |
+| ------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| A1                        | Abierto                                           | Primer Check API aprobado; faltan log original y tres Checks limpios; UI falló por cwd y su corrección espera CI. |
+| A2                        | Abierto                                           | Falta inventario efectivo, promoción, smoke y rollback observado.                                                 |
+| B                         | Validado local; CI pendiente                      | Diez repeticiones por prueba, sin retry; falta ejecutar sobre el par publicado.                                   |
+| C                         | Implementado y probado local; operación pendiente | Recepción/replay y eventos probados; falta cadena de release y alertas atendidas.                                 |
+| D                         | Parcial                                           | Capacidad provisional; D3 largo y comparación Broadcast pendientes; límites reales de export sin verificar.       |
+| E                         | Abierto                                           | Fairness/preview/agregados probados; falta política, restore y siete días representativos.                        |
+| Incidentes y responsables | Abierto                                           | Fallos locales encontrados corregidos; falta asignar responsables externos reales.                                |
 
 ## Pendientes operativos, impacto y siguiente acción
 
